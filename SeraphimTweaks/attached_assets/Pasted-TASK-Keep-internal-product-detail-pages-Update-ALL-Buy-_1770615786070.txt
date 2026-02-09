@@ -1,0 +1,103 @@
+TASK:
+Keep internal product detail pages.
+Update ALL Buy Now buttons (on product cards AND on product detail pages)
+to redirect directly to external Payhip checkout URLs.
+
+REQUIREMENTS:
+- Product cards (image/title) STILL link to internal product pages
+- Buy Now buttons on product cards go DIRECTLY to Payhip
+- Buy Now buttons on product detail pages go DIRECTLY to Payhip
+- Do NOT use React Router for checkout
+- Do NOT create Express checkout routes
+- Do NOT change server.ts
+- Do NOT use internal /checkout or /buy routes
+- Must work on Render.com (Vite + Express static hosting)
+
+PAYHIP CHECKOUT URLS (USE EXACTLY):
+
+FPS Boost:
+https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=oRNea&qty%5BoRNea%5D=1
+
+Zero Delay:
+https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=kjZgR&qty%5BkjZgR%5D=1
+
+Bloom Reducer:
+https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=uXWr4&qty%5BuXWr4%5D=1
+
+IMPLEMENTATION:
+
+1. Product Data (REQUIRED):
+Find where products are defined and add checkoutUrl to EVERY product.
+
+Example:
+{
+  id: "fps-boost",
+  name: "FPS Boost",
+  slug: "fps-boost",
+  checkoutUrl: "https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=oRNea&qty%5BoRNea%5D=1"
+}
+
+2. Product Card Component:
+
+KEEP internal routing for image/title:
+<Link to={`/product/${product.slug}`}>
+
+CHANGE ONLY Buy Now button to:
+
+<button
+  onClick={(e) => {
+    e.stopPropagation();
+    window.open(product.checkoutUrl, "_blank", "noopener,noreferrer");
+  }}
+>
+  Buy Now
+</button>
+
+OR:
+
+<a
+  href={product.checkoutUrl}
+  target="_blank"
+  rel="noopener noreferrer"
+  onClick={(e) => e.stopPropagation()}
+>
+  Buy Now
+</a>
+
+3. Product Detail Page:
+
+REMOVE any internal checkout navigation:
+- navigate("/checkout")
+- navigate("/buy")
+- <Link to="/checkout">
+
+REPLACE Buy Now button with:
+
+<button
+  onClick={() => {
+    window.open(product.checkoutUrl, "_blank", "noopener,noreferrer");
+  }}
+>
+  Buy Now
+</button>
+
+OR:
+
+<a
+  href={product.checkoutUrl}
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Buy Now
+</a>
+
+DO NOT:
+- Do not remove internal product routes
+- Do not change server.ts
+- Do not add Express checkout routes
+- Do not use React Router for checkout
+
+GOAL:
+Product image/title opens internal product page.
+ALL Buy Now buttons open Payhip checkout directly.
+Must work on Render.com with static + Express hosting.
