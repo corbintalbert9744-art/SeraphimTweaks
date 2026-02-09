@@ -1,0 +1,95 @@
+TASK:
+Product cards should open internal product info pages.
+Buy Now buttons on product info pages should open Payhip checkout.
+
+REQUIREMENTS:
+- Clicking a product card goes to /product/:slug (internal info page)
+- Product card Buy Now (if present) should also go to internal info page
+- ONLY the Buy Now button on the PRODUCT INFO PAGE goes to Payhip
+- Do NOT use React Router for checkout
+- Do NOT create Express checkout routes
+- Must work on Render.com (Vite + Express static hosting)
+
+PAYHIP CHECKOUT URLS:
+
+FPS Boost:
+https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=oRNea&qty%5BoRNea%5D=1
+
+Zero Delay:
+https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=kjZgR&qty%5BkjZgR%5D=1
+
+Bloom Reducer:
+https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=uXWr4&qty%5BuXWr4%5D=1
+
+========================================
+1. PRODUCT DATA
+========================================
+
+Add checkoutUrl to each product:
+
+{
+  id: "zero-delay",
+  slug: "zero-delay",
+  name: "Zero Delay",
+  checkoutUrl: "https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=kjZgR&qty%5BkjZgR%5D=1"
+}
+
+========================================
+2. PRODUCT CARDS (PRICING PAGE)
+========================================
+
+Entire card INCLUDING Buy Now
+should link to internal info page.
+
+Use ONLY internal routing here:
+
+<Link to={`/product/${product.slug}`} className="product-card">
+  <!-- card UI -->
+  <button className="buy-now">
+    Buy Now
+  </button>
+</Link>
+
+DO NOT use Payhip on cards.
+
+========================================
+3. PRODUCT INFO PAGE (DETAIL PAGE)
+========================================
+
+Buy Now MUST go to Payhip directly.
+NO internal navigation allowed here.
+
+Replace Buy Now with:
+
+<button
+  onClick={() => window.open(product.checkoutUrl, "_blank", "noopener,noreferrer")}
+>
+  Buy Now
+</button>
+
+OR:
+
+<a
+  href={product.checkoutUrl}
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Buy Now
+</a>
+
+========================================
+DO NOT:
+========================================
+
+- Do NOT use navigate() for checkout
+- Do NOT use <Link> for checkout
+- Do NOT route checkout internally
+- Do NOT create Express checkout routes
+
+========================================
+FINAL EXPECTED BEHAVIOR
+========================================
+
+✅ Clicking product card → /product/zero-delay  
+✅ Clicking Buy Now on product card → /product/zero-delay  
+✅ Clicking Buy Now on info page → Payhip checkout
