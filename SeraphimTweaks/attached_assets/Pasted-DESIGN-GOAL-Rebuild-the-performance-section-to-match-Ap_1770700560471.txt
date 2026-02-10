@@ -1,0 +1,268 @@
+DESIGN GOAL
+
+Rebuild the performance section to match Aphrodite’s exact performance card design and layout 1:1 from the provided screenshot.
+
+This is a visual clone, not a redesign.
+
+Match:
+
+Spacing
+
+Typography
+
+Alignment
+
+Card sizing
+
+Layout structure
+
+Visual hierarchy
+
+Only change the color theme to match our brand.
+
+SECTION LAYOUT (CRITICAL)
+
+The section must be structured in this exact vertical order:
+
+Performance Cards (top)
+
+Average FPS
+
+Input Delay
+
+Network Ping
+
+Bar Graph (below performance cards)
+
+User Stats (below bar graph)
+
+Total Users
+
+Active Now
+
+Performance cards must ALWAYS be above the bar graph and user stats.
+
+APHRODITE MATCHING (CRITICAL)
+
+Performance cards must look visually identical to Aphrodite’s cards:
+
+Same clean, minimal dark card style
+
+Same rounded corner radius
+
+Same padding and spacing
+
+Same number sizing and placement
+
+Same Before / After layout
+
+Same Improvement row placement
+
+Same overall proportions
+
+Only difference allowed: our brand colors
+
+CARD LAYOUT (MATCH APHRODITE SCREENSHOT)
+
+Each performance card must use this exact layout:
+
+Title (top)
+
+AVERAGE FPS
+
+INPUT DELAY
+
+NETWORK PING
+
+Values Row
+
+Left: Before
+
+Large white/gray number
+
+Right: After
+
+Large gold/yellow number
+
+Bottom Row
+
+Label: Improvement
+Value: Green percentage (e.g. +82.4%)
+
+LIVE DATA BEHAVIOR — PERFORMANCE CARDS ONLY (CRITICAL)
+
+ONLY the 3 performance cards fluctuate.
+
+They must:
+
+Fluctuate automatically every 0.2 seconds
+
+Always show real numeric values
+
+Never show NaN
+
+Never freeze
+
+Never show placeholders
+
+Always keep After better than Before
+
+Average FPS
+
+Before: 120 – 180
+
+After: 220 – 320
+
+Improvement: calculated %
+
+Input Delay
+
+Before: 10ms – 25ms
+
+After: 2ms – 8ms
+
+Improvement: calculated %
+
+Network Ping
+
+Before: 40ms – 70ms
+
+After: 18ms – 30ms
+
+Improvement: calculated %
+
+BAR GRAPH & USER STATS — STATIC (CRITICAL FIX)
+
+The following MUST NOT fluctuate:
+
+Bar Graph
+
+Must remain static
+
+No auto-updating
+
+No animated value changes
+
+No fluctuating bars
+
+User Stats (STATIC)
+
+These must be fixed and NOT fluctuate:
+
+Total Users
+
+2,103
+
++12%
+
+Active Now
+
+627
+
++8%
+
+These values must:
+
+Never change
+
+Never animate
+
+Never fluctuate
+
+Never pulse
+
+HOVER & OUTLINE BEHAVIOR (CRITICAL FIX)
+
+For the 3 performance cards:
+
+NO flashing outlines
+
+NO pulsing borders
+
+NO animated glow
+
+NO hover outline animation
+
+Allowed hover behavior:
+
+Subtle lift (slight translateY)
+
+Very subtle shadow increase
+
+NO border flashing
+
+NO glow pulse
+
+COLOR & STYLE RULES (MATCH APHRODITE STYLE, RECOLORED)
+
+Card background: deep black / dark gray
+
+Card border: very subtle static glow (not animated)
+
+Title: light gray
+
+Before value: white / soft gray
+
+After value: gold / yellow
+
+Improvement: bright green
+
+Strictly forbidden:
+
+No progress bars in cards
+
+No neon pink
+
+No purple theme
+
+No animated borders
+
+No flashing hover outlines
+
+TYPOGRAPHY
+
+Bold, modern font
+
+Large numbers for values
+
+Smaller labels for Before / After
+
+Clean spacing exactly like Aphrodite screenshot
+
+ANIMATION (PERFORMANCE CARDS ONLY)
+
+Numbers smoothly interpolate when updating
+
+No flicker
+
+No jump cuts
+
+No bar animations
+
+Only number changes
+
+FINAL VALIDATION RULES
+
+Must:
+
+Visually match Aphrodite screenshot layout
+
+Keep same clean structure
+
+Keep Before / After format
+
+Keep performance cards ABOVE bar graph
+
+Performance cards fluctuate
+
+Bar graph + user stats DO NOT fluctuate
+
+Never show NaN
+
+Never show 0ms or unrealistic values
+
+Never reverse (After always better than Before)
+
+Never add extra UI elements
+
+Never add flashing outlines
