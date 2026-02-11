@@ -96,7 +96,11 @@ export default function ProductPage() {
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <button 
                 onClick={() => {
-                  window.open(product.checkoutUrl, "_blank", "noopener,noreferrer");
+                  if (product.slug) {
+                    window.location.href = `https://payhip.com/b/${product.slug}`;
+                  } else {
+                    console.warn("Missing product slug for checkout");
+                  }
                 }}
                 className="flex-1 px-8 py-5 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-xl font-bold text-lg text-black hover:opacity-90 transition-all shadow-[0_0_20px_-5px_rgba(234,179,8,0.5)] hover:shadow-[0_0_30px_-5px_rgba(234,179,8,0.6)] hover:translate-y-[-2px] active:translate-y-[0px] flex items-center justify-center gap-3 cursor-pointer"
               >

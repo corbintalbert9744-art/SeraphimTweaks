@@ -1,3 +1,4 @@
+// server/index.ts
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -5,12 +6,6 @@ import { createServer } from "http";
 
 const app = express();
 const httpServer = createServer(app);
-
-// === PAYHIP ROUTING FIX (Replit AI) ===
-app.get(['/b/{*path}', '/buy{*path}', '/c/{*path}', '/embed/{*path}'], (req, res) => {
-  res.redirect(302, `https://payhip.com${req.originalUrl}`);
-});
-// === END PAYHIP ROUTING FIX ===
 
 declare module "http" {
   interface IncomingMessage {
