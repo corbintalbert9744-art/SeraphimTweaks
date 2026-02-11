@@ -28,4 +28,4 @@ A gaming tweaks product website built with Express + Vite + React (TypeScript). 
 - Run: `npm run start`
 
 ## Recent Changes
-- 2026-02-10: Imported project from GitHub. Moved files from SeraphimTweaks/ subdirectory to workspace root. Configured workflow and deployment for Replit environment.
+- 2026-02-11: Imported project from GitHub. Moved files from SeraphimTweaks-1/ subdirectory to workspace root. Configured workflow and deployment for Replit environment.
