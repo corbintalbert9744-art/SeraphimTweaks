@@ -1,0 +1,141 @@
+DESIGN CHANGE GOAL
+
+Replace the following elements entirely:
+
+Bar graph section
+
+Total Users (2,103 +12%)
+
+Active Now (627 +8%)
+
+These sections must be REMOVED and replaced with a Seraphim-style screenshot carousel that displays 3 tweak screenshots.
+
+NEW SECTION: TWEAK PREVIEW CAROUSEL
+PURPOSE
+
+Show real Seraphim tweak UI screenshots in a professional preview area that users can cycle through using arrow controls.
+
+This replaces fake analytics and makes the dashboard feel more real and premium.
+
+LAYOUT & POSITIONING
+
+Place this new carousel EXACTLY where:
+
+The bar graph was
+
+The Total Users / Active Now cards were
+
+The new carousel container must:
+
+Match the same dark background as the rest of the dashboard
+
+Use the same card radius, padding, and glow style
+
+Blend seamlessly with the surrounding UI
+
+CAROUSEL CONTENT
+
+Use exactly 3 screenshots:
+
+Seraphim Zero Delay Suite (main dashboard)
+
+Seraphim FPS Boost Suite (dashboard)
+
+Seraphim Bloom Reducer (inject screen)
+
+Only ONE image visible at a time.
+
+CONTROLS (REQUIRED)
+Arrow Navigation
+
+Add left and right arrow buttons:
+
+Left arrow = previous screenshot
+
+Right arrow = next screenshot
+
+Arrows must:
+
+Be subtle gold/yellow
+
+Only appear on hover OR be low-opacity when idle
+
+NOT flash
+
+NOT glow aggressively
+
+NOT bob or animate
+
+INTERACTION RULES
+
+Clicking arrows switches screenshots instantly
+
+Optional: smooth fade or slide transition
+
+No autoplay
+
+No automatic switching
+
+User-controlled only
+
+STYLE RULES (CRITICAL)
+
+The carousel container must:
+
+Use deep black / dark gray background
+
+Have subtle inner glow like other cards
+
+Match Seraphim gold accent color
+
+Use same border radius as performance cards
+
+NOT use white backgrounds
+
+NOT look like a web slider
+
+NOT use bright blue UI elements
+
+BACKGROUND MATCHING
+
+The background behind this entire section must:
+
+Match the rest of the site’s main background
+
+NOT be a different shade
+
+NOT be lighter or flatter
+
+Blend into the dashboard naturally
+
+REMOVE FLUCTUATION
+
+This section must be STATIC:
+
+No fluctuating numbers
+
+No fake live data
+
+No pulsing
+
+No bobbing
+
+No hover movement
+
+No hover border flashing
+
+Only the arrow buttons should be interactive.
+
+FINAL QUALITY CHECK
+
+This section must:
+
+Look like a premium product showcase
+
+Feel native to Seraphim UI
+
+Replace fake analytics with real software previews
+
+Match gold/black elite aesthetic
+
+Feel like a professional SaaS dashboard feature
