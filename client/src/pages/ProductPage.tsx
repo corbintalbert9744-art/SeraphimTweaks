@@ -97,10 +97,10 @@ export default function ProductPage() {
               <button 
                 onClick={() => {
                   const destinations: Record<string, string> = {
-                    "zero-delay": "https://payhip.com/b/kjZgR",
-                    "fps-boost": "https://payhip.com/b/oRNea",
-                    "bloom-reducer": "https://payhip.com/b/uXWr4",
-                    "xbox-zero-delay": "https://payhip.com/b/JYnlv"
+                    "fps-boost": "https://payhip.com/buy?s=1&cart_links%5B%5D=oRNea&qty%5BoRNea%5D=1",
+                    "zero-delay": "https://payhip.com/buy?s=1&cart_links%5B%5D=kjZgR&qty%5BkjZgR%5D=1",
+                    "bloom-reducer": "https://payhip.com/buy?s=1&cart_links%5B%5D=uXWr4&qty%5BuXWr4%5D=1",
+                    "xbox-zero-delay": "https://payhip.com/buy?s=1&cart_links%5B%5D=JYnlv&qty%5BJYnlv%5D=1"
                   };
                   
                   if (product.id && destinations[product.id]) {
