@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.log
+.cache/
+.local/
+.vscode/
+.idea/
+.vs/
+/tmp/
