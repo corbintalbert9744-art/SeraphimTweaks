@@ -34,19 +34,13 @@ export default function ProductPage() {
       <nav className="fixed top-0 w-full z-50 bg-[#121212]/90 backdrop-blur-xl border-b border-[#1a1a1a]">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
           <Link href="/">
-            <a className="flex items-center gap-3 group cursor-pointer transition-opacity hover:opacity-90">
-              <img src="/logo.png" alt="Seraphim Logo" className="w-10 h-10 object-contain" />
-              <div className="bg-transparent">
-                <div className="flex items-center px-4 py-1.5 rounded-xl bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border border-yellow-500/10">
-                  <div className="leading-tight">
-                    <div className="text-lg font-bold text-white tracking-tight">
-                    Seraphim
-                    </div>
-                    <div className="text-xs font-semibold tracking-widest text-yellow-400 uppercase">
-                    Gaming Tweaks
-                    </div>
-                  </div>
-                </div>
+            <a className="flex items-center gap-4 group cursor-pointer transition-all duration-300">
+              <div className="w-12 h-12 rounded-xl bg-[#141414] border border-[#222] p-2 flex items-center justify-center shadow-lg group-hover:border-yellow-500/30 group-hover:shadow-yellow-500/10 transition-all">
+                <img src="/logo.png" alt="Seraphim Logo" className="w-full h-full object-contain" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xl font-bold text-yellow-500 leading-none mb-1">Seraphim</span>
+                <span className="text-[10px] font-black tracking-[0.2em] text-yellow-500/70 uppercase leading-none">Gaming Tweaks</span>
               </div>
             </a>
           </Link>
