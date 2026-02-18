@@ -326,12 +326,12 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center relative">
           <Link href="/">
             <a className="flex items-center gap-4 group cursor-pointer transition-all duration-300">
-              <div className="w-12 h-12 rounded-xl bg-[#141414] border border-[#222] p-2 flex items-center justify-center shadow-lg group-hover:border-yellow-500/30 group-hover:shadow-yellow-500/10 transition-all">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] border border-[#2a2a2a] p-2.5 flex items-center justify-center shadow-2xl group-hover:border-[#D4AF37]/30 transition-all">
                 <img src="/logo.png" alt="Seraphim Logo" className="w-full h-full object-contain" />
               </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-bold text-yellow-500 leading-none mb-1">Seraphim</span>
-                <span className="text-[10px] font-black tracking-[0.2em] text-yellow-500/70 uppercase leading-none">Gaming Tweaks</span>
+              <div className="flex flex-col justify-center">
+                <span className="text-2xl font-bold text-[#D4AF37] leading-tight tracking-tight">Seraphim</span>
+                <span className="text-[11px] font-bold tracking-[0.15em] text-[#D4AF37]/60 uppercase leading-none mt-0.5">Gaming Tweaks</span>
               </div>
             </a>
           </Link>
