@@ -324,16 +324,19 @@ export default function Home() {
       {/* Nav */}
       <nav className="fixed top-0 w-full z-50 bg-[#121212]/90 backdrop-blur-xl border-b border-[#1a1a1a]">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center relative">
-          <div className="flex items-center gap-2">
-            <div className="bg-transparent px-3 py-2">
-              <div className="flex items-center px-5 py-2 rounded-xl bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border border-yellow-500/10">
-                <div className="leading-tight">
-                  <div className="text-lg font-bold text-white">Seraphim</div>
-                  <div className="text-xs font-semibold tracking-widest text-yellow-400">GAMING TWEAKS</div>
+          <Link href="/">
+            <a className="flex items-center gap-3 group cursor-pointer transition-opacity hover:opacity-90">
+              <img src="/logo.png" alt="Seraphim Logo" className="w-10 h-10 object-contain" />
+              <div className="bg-transparent">
+                <div className="flex items-center px-4 py-1.5 rounded-xl bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border border-yellow-500/10">
+                  <div className="leading-tight">
+                    <div className="text-lg font-bold text-white">Seraphim</div>
+                    <div className="text-xs font-semibold tracking-widest text-yellow-400 uppercase">Gaming Tweaks</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </a>
+          </Link>
           
           <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-8">
             <a href="#features" className={`text-sm text-neutral-400 hover:text-white px-2 py-1 rounded-md ${clickableStyles}`}>Features</a>
