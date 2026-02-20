@@ -38,9 +38,9 @@ export default function ProductPage() {
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] border border-[#2a2a2a] p-2.5 flex items-center justify-center shadow-2xl group-hover:border-[#D4AF37]/30 transition-all">
                 <img src="/logo.png" alt="Seraphim Logo" className="w-full h-full object-contain" />
               </div>
-              <div className="flex flex-col justify-center">
-                <span className="text-2xl font-bold text-[#D4AF37] leading-tight tracking-tight">Seraphim</span>
-                <span className="text-[11px] font-bold tracking-[0.15em] text-[#D4AF37]/60 uppercase leading-none mt-0.5">Gaming Tweaks</span>
+              <div className="flex flex-col">
+                <span className="text-2xl font-bold text-white leading-tight tracking-tight">Seraphim</span>
+                <span className="text-[11px] font-bold tracking-[0.15em] text-[#D4AF37] uppercase leading-none mt-0.5">Gaming Tweaks</span>
               </div>
             </a>
           </Link>
@@ -201,7 +201,7 @@ export default function ProductPage() {
           <p className="text-sm text-neutral-500">© 2026 Seraphim Tweaks. All rights reserved.</p>
            <div className="flex items-center gap-8 text-sm text-neutral-400">
             <Link href="/"><a className="hover:text-yellow-500 transition-colors">Home</a></Link>
-            <a href="#" className="hover:text-white transition-colors">Support</a>
+            <a href="https://payhip.com/SeraphimTweaks/contact" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Support</a>
             <a href="#" className="hover:text-white transition-colors">Terms</a>
           </div>
         </div>

@@ -95,9 +95,9 @@ const pricing = [
 ]
 
 const testimonials = [
-  { quote: "Seraphim Tweaks completely transformed my PC performance. My FPS is higher, gameplay is smoother, and input delay feels way lower.", author: "Bray", role: "Token Professional", avatar: "B" },
-  { quote: "Improvements instantly. Zero Delay made everything feel more responsive instantly.", author: "Zyren", role: "Content Creator", avatar: "Z" },
-  { quote: "The speed difference is crazy. My game loads faster, stutters are gone, and everything just feels smmoother.", author: "ManMan", role: "Token Professional", avatar: "MM" },
+  { quote: "Went from 144 FPS to 240 stable after getting FPS tweaks.", author: "Bray", role: "Token Professional", avatar: "B" },
+  { quote: "Zero Delay makes it feel like I'm on 0 ping", author: "Zyren", role: "Content Creator", avatar: "Z" },
+  { quote: "Tweaks got me moving", author: "ManMan", role: "Token Professional", avatar: "MM" },
 ]
 
 const logos = ['MasterCard', 'Visa', 'Venmo', 'PayPal', 'Discover','Cashapp']
@@ -230,11 +230,10 @@ const PerformanceStats = () => {
         let nextDelayAfter = prev.delay.after + delayDelta;
         nextDelayAfter = Math.max(2, Math.min(8, Math.min(prev.delay.before - 5, nextDelayAfter)));
 
-        // After Ping: ±1 to ±3 (Range: 18-30)
-        // Must be <= Before - 15
-        const pingDelta = (Math.random() * 2 + 1) * (Math.random() > 0.5 ? 1 : -1);
+        // After Ping: ±0.5 to ±1 (Range: 2.5-4)
+        const pingDelta = (Math.random() * 0.5 + 0.1) * (Math.random() > 0.5 ? 1 : -1);
         let nextPingAfter = prev.ping.after + pingDelta;
-        nextPingAfter = Math.max(18, Math.min(30, Math.min(prev.ping.before - 15, nextPingAfter)));
+        nextPingAfter = Math.max(2, Math.min(4, nextPingAfter));
 
         return {
           ...prev,
@@ -254,6 +253,7 @@ const PerformanceStats = () => {
   const Card = ({ title, before, after, unit, isLowerBetter = false }: any) => {
     // Improvement % is static based on initial values
     const [improvement] = useState(() => {
+      if (title === 'Network Ping') return '94.1';
       const initialBefore = title === 'Average FPS' ? 156 : (title === 'Input Delay' ? 18.4 : 58);
       const initialAfter = title === 'Average FPS' ? 294 : (title === 'Input Delay' ? 4.2 : 24);
       return isLowerBetter 
@@ -329,9 +329,9 @@ export default function Home() {
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] border border-[#2a2a2a] p-2.5 flex items-center justify-center shadow-2xl group-hover:border-[#D4AF37]/30 transition-all">
                 <img src="/logo.png" alt="Seraphim Logo" className="w-full h-full object-contain" />
               </div>
-              <div className="flex flex-col justify-center">
-                <span className="text-2xl font-bold text-[#D4AF37] leading-tight tracking-tight">Seraphim</span>
-                <span className="text-[11px] font-bold tracking-[0.15em] text-[#D4AF37]/60 uppercase leading-none mt-0.5">Gaming Tweaks</span>
+              <div className="flex flex-col">
+                <span className="text-2xl font-bold text-white leading-tight tracking-tight">Seraphim</span>
+                <span className="text-[11px] font-bold tracking-[0.15em] text-[#D4AF37] uppercase leading-none mt-0.5">Gaming Tweaks</span>
               </div>
             </a>
           </Link>
@@ -521,7 +521,7 @@ export default function Home() {
           <div className="flex items-center gap-12 text-sm text-neutral-400">
             <a href="#" className={`hover:text-white px-2 py-1 rounded ${clickableStyles}`}>Privacy</a>
             <a href="#" className={`hover:text-white px-2 py-1 rounded ${clickableStyles}`}>Terms</a>
-            <a href="#" className={`hover:text-white px-2 py-1 rounded ${clickableStyles}`}>Contact</a>
+            <a href="https://payhip.com/SeraphimTweaks/contact" target="_blank" rel="noopener noreferrer" className={`hover:text-white px-2 py-1 rounded ${clickableStyles}`}>Contact</a>
           </div>
           <p className="text-sm text-neutral-500">© 2026 Seraphim. All rights reserved.</p>
         </div>
