@@ -184,7 +184,7 @@ const PerformanceStats = () => {
   const [stats, setStats] = useState({
     fps: { before: 130, after: 294 },
     delay: { before: 11.5, after: 4.2 },
-    ping: { before: 60, after: 24 }
+    ping: { before: 51, after: 3.2 }
   });
 
   useEffect(() => {
@@ -201,10 +201,10 @@ const PerformanceStats = () => {
         let nextDelayBefore = prev.delay.before + delayDelta;
         nextDelayBefore = Math.max(9, Math.min(14, nextDelayBefore));
 
-        // Before Ping: ±1 to ±3 (Range: 50-70)
+        // Before Ping: ±1 to ±3 (Range: 48-54)
         const pingDelta = (Math.random() * 2 + 1) * (Math.random() > 0.5 ? 1 : -1);
         let nextPingBefore = prev.ping.before + pingDelta;
-        nextPingBefore = Math.max(50, Math.min(70, nextPingBefore));
+        nextPingBefore = Math.max(48, Math.min(54, nextPingBefore));
 
         return {
           ...prev,
@@ -230,16 +230,16 @@ const PerformanceStats = () => {
         let nextDelayAfter = prev.delay.after + delayDelta;
         nextDelayAfter = Math.max(2, Math.min(8, Math.min(prev.delay.before - 5, nextDelayAfter)));
 
-        // After Ping: ±0.5 to ±1 (Range: 2.5-4)
-        const pingDelta = (Math.random() * 0.5 + 0.1) * (Math.random() > 0.5 ? 1 : -1);
+        // After Ping: ±0.1 to ±0.4 (Range: 2-6)
+        const pingDelta = (Math.random() * 0.3 + 0.1) * (Math.random() > 0.5 ? 1 : -1);
         let nextPingAfter = prev.ping.after + pingDelta;
-        nextPingAfter = Math.max(2, Math.min(4, nextPingAfter));
+        nextPingAfter = Math.max(2, Math.min(6, nextPingAfter));
 
         return {
           ...prev,
           fps: { ...prev.fps, after: Math.round(nextFpsAfter) },
           delay: { ...prev.delay, after: Number(nextDelayAfter.toFixed(1)) },
-          ping: { ...prev.ping, after: Math.round(nextPingAfter) }
+          ping: { ...prev.ping, after: Number(nextPingAfter.toFixed(1)) }
         };
       });
     }, 1000);
@@ -254,8 +254,8 @@ const PerformanceStats = () => {
     // Improvement % is static based on initial values
     const [improvement] = useState(() => {
       if (title === 'Network Ping') return '94.1';
-      const initialBefore = title === 'Average FPS' ? 156 : (title === 'Input Delay' ? 18.4 : 58);
-      const initialAfter = title === 'Average FPS' ? 294 : (title === 'Input Delay' ? 4.2 : 24);
+      const initialBefore = title === 'Average FPS' ? 156 : (title === 'Input Delay' ? 18.4 : 51);
+      const initialAfter = title === 'Average FPS' ? 294 : (title === 'Input Delay' ? 4.2 : 3.2);
       return isLowerBetter 
         ? ((initialBefore - initialAfter) / initialBefore * 100).toFixed(1)
         : ((initialAfter - initialBefore) / initialBefore * 100).toFixed(1);
