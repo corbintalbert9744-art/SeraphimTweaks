@@ -96,7 +96,7 @@ export default function ProductPage() {
                     "zero-delay": "https://payhip.com/buy?s=1&cart_links%5B%5D=kjZgR&qty%5BkjZgR%5D=1",
                     "bloom-reducer": "https://payhip.com/buy?s=1&cart_links%5B%5D=uXWr4&qty%5BuXWr4%5D=1",
                     "xbox-zero-delay": "https://payhip.com/buy?s=1&cart_links%5B%5D=JYnlv&qty%5BJYnlv%5D=1",
-                    "keyboard-macro": "https://payhip.com/b/Ff4v6"
+                    "keyboard-macro": "https://payhip.com/buy?s=1&cart_links%5B%5D=Ff4v6&qty%5BFf4v6%5D=1"
                   };
                   
                   if (product.id && destinations[product.id]) {
@@ -148,6 +148,24 @@ export default function ProductPage() {
                   <img
                     src="/keyboard-macro-2.png"
                     alt="Keyboard Macro Developer View"
+                    className="w-full rounded-xl object-cover border border-[#2a2a2a]"
+                  />
+                </div>
+              ) : product.id === 'zero-delay' ? (
+                <div className="space-y-3 p-3">
+                  <img
+                    src="/zero-delay-1.png"
+                    alt="Zero Delay Dashboard"
+                    className="w-full rounded-xl object-cover border border-[#2a2a2a]"
+                  />
+                  <img
+                    src="/zero-delay-2.png"
+                    alt="Zero Delay Storage View"
+                    className="w-full rounded-xl object-cover border border-[#2a2a2a]"
+                  />
+                  <img
+                    src="/zero-delay-3.png"
+                    alt="Zero Delay Hardware & Devices View"
                     className="w-full rounded-xl object-cover border border-[#2a2a2a]"
                   />
                 </div>

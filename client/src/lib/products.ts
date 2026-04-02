@@ -120,7 +120,7 @@ export const products: Record<string, Product> = {
     slug: "keyboard-macro",
     name: "Keyboard Macro",
     subtitle: "Instant edits at the press of a key",
-    price: "19.99",
+    price: "29.99",
     description: "This Keyboard macro with adjustable delays designed for the fastest possible edit speed and consistency with lifetime access",
     features: [
       "Instant Drag Edits",
@@ -135,7 +135,7 @@ export const products: Record<string, Product> = {
       "Compatible keyboard",
       "Internet connection for verification"
     ],
-    buyLink: "https://payhip.com/b/Ff4v6",
-    checkoutUrl: "https://payhip.com/b/Ff4v6"
+    buyLink: "https://payhip.com/buy?s=1&cart_links%5B%5D=Ff4v6&qty%5BFf4v6%5D=1",
+    checkoutUrl: "https://payhip.com/buy?s=1&cart_links%5B%5D=Ff4v6&qty%5BFf4v6%5D=1"
   }
 };

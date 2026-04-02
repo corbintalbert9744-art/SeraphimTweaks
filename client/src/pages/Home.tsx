@@ -71,14 +71,14 @@ const pricing = [
     popular: true 
   },
   { 
-    name: 'Bloom Reducer', 
-    slug: 'bloom-reducer',
-    price: '12.99', 
+    name: 'Keyboard Macro', 
+    slug: 'keyboard-macro',
+    price: '29.99', 
     period: 'one-time payment', 
-    desc: 'Tighter aim & better accuracy', 
-    features: ['Crosshair stability', 'Recoil optimization', 'Bloom reduction tweaks', 'Weapon accuracy enhancement'], 
+    desc: 'Instant edits at the press of a key', 
+    features: ['Instant Drag Edits', 'Single Press Double Edits', 'Instant Build Feature', 'Pick Up Macro', 'Safe and Undetectable'], 
     cta: 'Buy Now →', 
-    checkoutUrl: 'https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=uXWr4&qty%5BuXWr4%5D=1', 
+    checkoutUrl: 'https://payhip.com/buy?s=1&cart_links%5B%5D=Ff4v6&qty%5BFf4v6%5D=1', 
     popular: false 
   },
   { 
@@ -93,14 +93,14 @@ const pricing = [
     popular: false 
   },
   { 
-    name: 'Keyboard Macro', 
-    slug: 'keyboard-macro',
-    price: '19.99', 
+    name: 'Bloom Reducer', 
+    slug: 'bloom-reducer',
+    price: '12.99', 
     period: 'one-time payment', 
-    desc: 'Instant edits at the press of a key', 
-    features: ['Instant Drag Edits', 'Single Press Double Edits', 'Instant Build Feature', 'Pick Up Macro', 'Safe and Undetectable'], 
+    desc: 'Tighter aim & better accuracy', 
+    features: ['Crosshair stability', 'Recoil optimization', 'Bloom reduction tweaks', 'Weapon accuracy enhancement'], 
     cta: 'Buy Now →', 
-    checkoutUrl: 'https://payhip.com/b/Ff4v6', 
+    checkoutUrl: 'https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=uXWr4&qty%5BuXWr4%5D=1', 
     popular: false 
   },
 ]
