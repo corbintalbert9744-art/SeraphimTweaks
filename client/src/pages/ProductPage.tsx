@@ -138,7 +138,20 @@ export default function ProductPage() {
           <div className="space-y-8 animate-in slide-in-from-right duration-700 fade-in delay-100">
             {/* Screenshot */}
             <div className="bg-[#141414] rounded-2xl border border-[#2a2a2a] relative overflow-hidden group shadow-2xl">
-              {product.id === 'keyboard-macro' ? (
+              {product.id === 'fps-boost' ? (
+                <div className="space-y-3 p-3">
+                  <img
+                    src="/fps-boost-1.png"
+                    alt="FPS Boost Dashboard"
+                    className="w-full rounded-xl object-cover border border-[#2a2a2a]"
+                  />
+                  <img
+                    src="/fps-boost-2.png"
+                    alt="FPS Boost Optimizations"
+                    className="w-full rounded-xl object-cover border border-[#2a2a2a]"
+                  />
+                </div>
+              ) : product.id === 'keyboard-macro' ? (
                 <div className="space-y-3 p-3">
                   <img
                     src="/keyboard-macro-1.png"
