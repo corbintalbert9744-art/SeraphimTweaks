@@ -95,7 +95,8 @@ export default function ProductPage() {
                     "fps-boost": "https://payhip.com/buy?s=1&cart_links%5B%5D=oRNea&qty%5BoRNea%5D=1",
                     "zero-delay": "https://payhip.com/buy?s=1&cart_links%5B%5D=kjZgR&qty%5BkjZgR%5D=1",
                     "bloom-reducer": "https://payhip.com/buy?s=1&cart_links%5B%5D=uXWr4&qty%5BuXWr4%5D=1",
-                    "xbox-zero-delay": "https://payhip.com/buy?s=1&cart_links%5B%5D=JYnlv&qty%5BJYnlv%5D=1"
+                    "xbox-zero-delay": "https://payhip.com/buy?s=1&cart_links%5B%5D=JYnlv&qty%5BJYnlv%5D=1",
+                    "keyboard-macro": "https://payhip.com/b/Ff4v6"
                   };
                   
                   if (product.id && destinations[product.id]) {
@@ -135,27 +136,42 @@ export default function ProductPage() {
 
           {/* Right Column: Visuals & Features */}
           <div className="space-y-8 animate-in slide-in-from-right duration-700 fade-in delay-100">
-            {/* Screenshot Placeholder */}
-            <div className="aspect-video bg-[#141414] rounded-2xl border border-[#2a2a2a] relative overflow-hidden group shadow-2xl">
-               <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent opacity-50" />
-               
-               {/* Abstract Grid Graphic */}
-               <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="relative w-full h-full p-12 flex flex-col items-center justify-center text-neutral-700 group-hover:text-yellow-500/30 transition-colors duration-500">
-                     <Cpu className="w-24 h-24 mb-4 opacity-20" />
-                     <div className="w-full h-px bg-gradient-to-r from-transparent via-current to-transparent opacity-20" />
-                     <div className="w-full h-full absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-yellow-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            {/* Screenshot */}
+            <div className="bg-[#141414] rounded-2xl border border-[#2a2a2a] relative overflow-hidden group shadow-2xl">
+              {product.id === 'keyboard-macro' ? (
+                <div className="space-y-3 p-3">
+                  <img
+                    src="/keyboard-macro-1.png"
+                    alt="Keyboard Macro Dashboard"
+                    className="w-full rounded-xl object-cover border border-[#2a2a2a]"
+                  />
+                  <img
+                    src="/keyboard-macro-2.png"
+                    alt="Keyboard Macro Developer View"
+                    className="w-full rounded-xl object-cover border border-[#2a2a2a]"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="aspect-video relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent opacity-50" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="relative w-full h-full p-12 flex flex-col items-center justify-center text-neutral-700 group-hover:text-yellow-500/30 transition-colors duration-500">
+                        <Cpu className="w-24 h-24 mb-4 opacity-20" />
+                        <div className="w-full h-px bg-gradient-to-r from-transparent via-current to-transparent opacity-20" />
+                        <div className="w-full h-full absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-yellow-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                      </div>
+                    </div>
+                    <div className="absolute bottom-6 left-6 right-6 p-4 bg-[#0f0f0f]/80 backdrop-blur-md rounded-xl border border-[#2a2a2a] flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-xs font-mono text-neutral-400">STATUS: OPTIMIZED</span>
+                      </div>
+                      <span className="text-xs font-mono text-yellow-500">v3.2.0</span>
+                    </div>
                   </div>
-               </div>
-
-               {/* UI Mockup Elements */}
-               <div className="absolute bottom-6 left-6 right-6 p-4 bg-[#0f0f0f]/80 backdrop-blur-md rounded-xl border border-[#2a2a2a] flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-xs font-mono text-neutral-400">STATUS: OPTIMIZED</span>
-                  </div>
-                  <span className="text-xs font-mono text-yellow-500">v3.2.0</span>
-               </div>
+                </>
+              )}
             </div>
 
             {/* Features List */}

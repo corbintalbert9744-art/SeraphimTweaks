@@ -92,6 +92,17 @@ const pricing = [
     checkoutUrl: 'https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=JYnlv&qty%5BJYnlv%5D=1', 
     popular: false 
   },
+  { 
+    name: 'Keyboard Macro', 
+    slug: 'keyboard-macro',
+    price: '19.99', 
+    period: 'one-time payment', 
+    desc: 'Instant edits at the press of a key', 
+    features: ['Instant Drag Edits', 'Single Press Double Edits', 'Instant Build Feature', 'Pick Up Macro', 'Safe and Undetectable'], 
+    cta: 'Buy Now →', 
+    checkoutUrl: 'https://payhip.com/b/Ff4v6', 
+    popular: false 
+  },
 ]
 
 const testimonials = [

@@ -114,5 +114,28 @@ export const products: Record<string, Product> = {
     ],
     buyLink: "https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=JYnlv&qty%5BJYnlv%5D=1",
     checkoutUrl: "https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=JYnlv&qty%5BJYnlv%5D=1"
+  },
+  "keyboard-macro": {
+    id: "keyboard-macro",
+    slug: "keyboard-macro",
+    name: "Keyboard Macro",
+    subtitle: "Instant edits at the press of a key",
+    price: "19.99",
+    description: "This Keyboard macro with adjustable delays designed for the fastest possible edit speed and consistency with lifetime access",
+    features: [
+      "Instant Drag Edits",
+      "Single Press Double Edits",
+      "Instant Build Feature",
+      "Pick Up Macro",
+      "Safe and Undetectable"
+    ],
+    requirements: [
+      "Windows 10 or 11",
+      "Administrator privileges",
+      "Compatible keyboard",
+      "Internet connection for verification"
+    ],
+    buyLink: "https://payhip.com/b/Ff4v6",
+    checkoutUrl: "https://payhip.com/b/Ff4v6"
   }
 };
