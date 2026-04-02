@@ -176,9 +176,17 @@ export default function ProductPage() {
                     alt="Zero Delay Storage View"
                     className="w-full rounded-xl object-cover border border-[#2a2a2a]"
                   />
+                </div>
+              ) : product.id === 'bloom-reducer' ? (
+                <div className="space-y-3 p-3">
                   <img
-                    src="/zero-delay-3.png"
-                    alt="Zero Delay Hardware & Devices View"
+                    src="/bloom-reducer-1.png"
+                    alt="Bloom Reducer Main View"
+                    className="w-full rounded-xl object-cover border border-[#2a2a2a]"
+                  />
+                  <img
+                    src="/bloom-reducer-2.png"
+                    alt="Bloom Reducer Aim Tweaks"
                     className="w-full rounded-xl object-cover border border-[#2a2a2a]"
                   />
                 </div>
