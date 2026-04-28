@@ -338,8 +338,8 @@
   }
   body {
     background-image:
-      radial-gradient(ellipse 95% 70% at 50% 35%, rgba(212, 175, 55, 0.32), transparent 70%),
-      radial-gradient(ellipse 70% 55% at 50% 35%, rgba(234, 179, 8,  0.18), transparent 60%);
+      radial-gradient(ellipse 88% 64% at 50% 35%, rgba(212, 175, 55, 0.22), transparent 70%),
+      radial-gradient(ellipse 65% 50% at 50% 35%, rgba(234, 179, 8,  0.12), transparent 60%);
     background-attachment: fixed;
     background-repeat: no-repeat;
   }
