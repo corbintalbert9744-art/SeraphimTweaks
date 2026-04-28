@@ -32,7 +32,7 @@ export default function Pricing() {
               <a className={`text-sm text-neutral-400 hover:text-white px-2 py-1 rounded-md ${clickableStyles}`}>Home</a>
             </Link>
             <Link href="/pricing">
-              <a className={`text-sm text-white px-2 py-1 rounded-md ${clickableStyles}`}>Pricing</a>
+              <a className={`text-sm text-neutral-400 hover:text-white px-2 py-1 rounded-md ${clickableStyles}`}>Pricing</a>
             </Link>
             <button
               onClick={() => window.open('https://discord.gg/yP4uBqNyrP', '_blank')}
@@ -56,14 +56,14 @@ export default function Pricing() {
       <section className="pt-32 pb-24 px-6 bg-[#0b0b0b] min-h-screen">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 text-sm mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 text-sm mb-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
               <span>All Products</span>
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-4 text-white tracking-tight">Simple, transparent pricing</h1>
-            <p className="text-lg text-neutral-400">Pick the tweak that fits your setup. One-time payment, instant delivery.</p>
+            <h1 className="text-4xl md:text-6xl font-bold mb-4 text-white tracking-tight animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100">Simple, transparent pricing</h1>
+            <p className="text-lg text-neutral-400 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">Pick the tweak that fits your setup. One-time payment, instant delivery.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
             {pricingPlans.map((plan, i) => (
               <Link key={i} href={`/product/${plan.slug}`}>
                 <a

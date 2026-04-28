@@ -433,14 +433,19 @@ export default function Home() {
       </section>
 
       {/* Testimonials Section */}
-      <section id="testimonials" className="py-24 px-6">
+      <section id="testimonials" className="py-24 px-6 overflow-hidden">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">Loved by users everywhere</h2>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {testimonials.map((t, i) => (
-              <div key={i} className={`p-8 rounded-2xl bg-[#0f0f0f] border border-[#1a1a1a]/50 ${clickableStyles}`}>
+        </div>
+        <div className="marquee-mask overflow-hidden">
+          <div className="marquee-track flex gap-6">
+            {[...testimonials, ...testimonials, ...testimonials, ...testimonials].map((t, i) => (
+              <div
+                key={i}
+                className="shrink-0 w-[340px] md:w-[380px] p-8 rounded-2xl bg-[#0f0f0f] border border-[#1a1a1a]/50"
+              >
                 <p className="text-slate-300 mb-8 leading-relaxed text-lg">"{t.quote}"</p>
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500 to-amber-500 flex items-center justify-center font-bold text-black text-lg">
