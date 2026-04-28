@@ -11,9 +11,11 @@ const clickableStyles = "transition-all duration-300 ease-out hover:scale-[1.02]
 
 export default function Pricing() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="min-h-screen text-white relative">
+      {/* Golden ambient sparkles */}
+      <div className="gold-sparkles" />
       {/* Nav */}
-      <nav className="fixed top-0 w-full bg-black/80 backdrop-blur-xl border-b border-[#1a1a1a]/50 z-50">
+      <nav className="fixed top-0 w-full bg-black/70 backdrop-blur-xl border-b border-[#1a1a1a]/50 z-50">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between relative">
           <Link href="/">
             <a className="flex items-center gap-4 group cursor-pointer transition-all duration-300">
@@ -42,7 +44,7 @@ export default function Pricing() {
 
           <div className="flex items-center gap-3">
             <Link href="/pricing">
-              <a className={`text-sm font-medium bg-white text-slate-900 px-4 py-2 rounded-lg cursor-pointer inline-block ${clickableStyles}`}>
+              <a className={`btn-3d text-sm font-medium bg-white text-slate-900 px-4 py-2 rounded-lg cursor-pointer inline-block ${clickableStyles}`}>
                 🛒 Buy Now
               </a>
             </Link>
@@ -51,7 +53,7 @@ export default function Pricing() {
       </nav>
 
       {/* Pricing Section */}
-      <section className="pt-32 pb-24 px-6 bg-[#0b0b0b] min-h-screen">
+      <section className="pt-32 pb-24 px-6 min-h-screen relative">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 text-sm mb-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
@@ -67,8 +69,8 @@ export default function Pricing() {
                 <a
                   className={`relative p-8 rounded-2xl border block h-full ${clickableStyles} ${
                     plan.popular
-                      ? 'bg-gradient-to-b from-yellow-500/5 to-neutral-950 border-yellow-500/50 shadow-2xl shadow-yellow-500/10'
-                      : 'bg-[#0f0f0f] border-[#1a1a1a]'
+                      ? 'card-3d card-3d-popular border-yellow-500/50'
+                      : 'card-3d border-[#1a1a1a]'
                   }`}
                 >
                   {plan.popular && (
@@ -93,9 +95,9 @@ export default function Pricing() {
                     ))}
                   </ul>
                   <div
-                    className={`w-full inline-flex justify-center items-center py-4 rounded-xl font-bold transition-all ${
+                    className={`btn-3d w-full inline-flex justify-center items-center py-4 rounded-xl font-bold transition-all ${
                       plan.popular
-                        ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
+                        ? 'bg-yellow-500 text-black'
                         : 'bg-[#141414] border border-neutral-800 text-white'
                     }`}
                   >
@@ -109,7 +111,7 @@ export default function Pricing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-6 border-t border-[#1a1a1a]/50 bg-[#0a0a0a]">
+      <footer className="py-12 px-6 border-t border-[#1a1a1a]/50 bg-black/60 backdrop-blur-sm relative">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex items-center gap-12 text-sm text-neutral-400">
             <a href="#" className={`hover:text-white px-2 py-1 rounded ${clickableStyles}`}>Privacy</a>

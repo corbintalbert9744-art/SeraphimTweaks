@@ -270,15 +270,16 @@ export default function Home() {
   const clickableStyles = "transition-all duration-300 hover:outline hover:outline-1 hover:outline-yellow-500/50 hover:shadow-[0_0_15px_rgba(234,179,8,0.3)]";
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] text-white font-sans">
-      {/* Background */}
-      <div className="fixed inset-0 -z-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-gradient-to-b from-yellow-500/10 via-amber-500/5 to-transparent rounded-full blur-3xl" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff10_1px,transparent_1px),linear-gradient(to_bottom,#ffffff10_1px,transparent_1px)] bg-[size:4rem_4rem]" />
+    <div className="min-h-screen text-white font-sans relative">
+      {/* Golden ambient sparkles */}
+      <div className="gold-sparkles" />
+      {/* Subtle grid overlay */}
+      <div className="fixed inset-0 -z-10 pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:4rem_4rem]" />
       </div>
 
       {/* Nav */}
-      <nav className="fixed top-0 w-full z-50 bg-[#121212]/90 backdrop-blur-xl border-b border-[#1a1a1a]">
+      <nav className="fixed top-0 w-full z-50 bg-black/70 backdrop-blur-xl border-b border-[#1a1a1a]">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center relative">
           <Link href="/">
             <a className="flex items-center gap-4 group cursor-pointer transition-all duration-300">
@@ -335,13 +336,13 @@ export default function Home() {
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
             <Link href="/pricing">
-              <a className={`w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-xl font-semibold text-lg text-black shadow-lg shadow-yellow-500/25 ${clickableStyles}`}>
+              <a className={`btn-3d w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-xl font-semibold text-lg text-black ${clickableStyles}`}>
                 Buy Now 🛒
               </a>
             </Link>
             <button
               onClick={() => window.open('https://discord.gg/yP4uBqNyrP', '_blank')}
-              className={`w-full sm:w-auto px-8 py-4 bg-[#141414] border border-neutral-700 rounded-xl font-semibold text-lg text-white ${clickableStyles}`}
+              className={`btn-3d w-full sm:w-auto px-8 py-4 bg-[#141414] border border-neutral-700 rounded-xl font-semibold text-lg text-white ${clickableStyles}`}
             >
               Discord
             </button>
@@ -356,7 +357,7 @@ export default function Home() {
       <DashboardPreview />
 
       {/* 3. Trusted Logos Section (Social Proof) */}
-      <section className="py-16 px-6 border-y border-[#1a1a1a]/50 bg-[#0a0a0a]">
+      <section className="py-16 px-6 border-y border-[#1a1a1a]/50 bg-black/50 backdrop-blur-sm relative">
         <div className="max-w-6xl mx-auto">
           <p className="text-center text-sm text-neutral-500 font-semibold mb-8 uppercase tracking-widest">Trusted by 2k+ people worldwide</p>
           <div className="flex justify-center items-center gap-12 flex-wrap opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
@@ -376,7 +377,7 @@ export default function Home() {
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, i) => (
-              <div key={i} className={`group p-8 rounded-2xl bg-[#0f0f0f] border border-[#1a1a1a] hover:-translate-y-1 ${clickableStyles}`}>
+              <div key={i} className={`card-3d group p-8 rounded-2xl border border-[#1a1a1a] ${clickableStyles}`}>
                 <div className="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-400 mb-6 group-hover:bg-yellow-500/20 transition-colors">
                   <feature.icon />
                 </div>
@@ -389,7 +390,7 @@ export default function Home() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-24 px-6 bg-[#0b0b0b]">
+      <section id="pricing" className="py-24 px-6 bg-black/40 backdrop-blur-sm relative">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">Simple, transparent pricing</h2>
@@ -398,7 +399,7 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-8">
             {pricing.map((plan, i) => (
               <Link key={i} href={`/product/${plan.slug}`}>
-                <a className={`relative p-8 rounded-2xl border block h-full ${clickableStyles} ${plan.popular ? 'bg-gradient-to-b from-yellow-500/5 to-neutral-950 border-yellow-500/50 scale-105 shadow-2xl shadow-yellow-500/10' : 'bg-[#0f0f0f] border-[#1a1a1a]'}`}>
+                <a className={`relative p-8 rounded-2xl border block h-full ${clickableStyles} ${plan.popular ? 'card-3d card-3d-popular border-yellow-500/50 scale-105' : 'card-3d border-[#1a1a1a]'}`}>
                   {plan.popular && (
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-yellow-500 text-black rounded-full text-xs font-bold uppercase tracking-wider shadow-lg shadow-yellow-500/20">
                       Most Popular
@@ -422,7 +423,7 @@ export default function Home() {
                       </li>
                     ))}
                   </ul>
-                  <div className={`w-full inline-flex justify-center items-center py-4 rounded-xl font-bold transition-all ${plan.popular ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-[#141414] border border-neutral-800 text-white'}`}>
+                  <div className={`btn-3d w-full inline-flex justify-center items-center py-4 rounded-xl font-bold transition-all ${plan.popular ? 'bg-yellow-500 text-black' : 'bg-[#141414] border border-neutral-800 text-white'}`}>
                     {plan.cta}
                   </div>
                 </a>
@@ -444,7 +445,7 @@ export default function Home() {
             {[...testimonials, ...testimonials, ...testimonials, ...testimonials].map((t, i) => (
               <div
                 key={i}
-                className="shrink-0 w-[340px] md:w-[380px] p-8 rounded-2xl bg-[#0f0f0f] border border-[#1a1a1a]/50"
+                className="card-3d shrink-0 w-[340px] md:w-[380px] p-8 rounded-2xl border border-[#1a1a1a]/50"
               >
                 <p className="text-slate-300 mb-8 leading-relaxed text-lg">"{t.quote}"</p>
                 <div className="flex items-center gap-4">
@@ -470,7 +471,7 @@ export default function Home() {
             <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white relative z-10">Ready to get started?</h2>
             <p className="text-xl text-neutral-400 mb-10 max-w-lg mx-auto relative z-10">Join 2,000+ people already using Seraphim to improve their gameplay.</p>
             <Link href="/pricing">
-              <a className={`inline-block px-10 py-5 bg-white text-slate-900 rounded-xl font-bold text-xl relative z-10 cursor-pointer ${clickableStyles}`}>
+              <a className={`btn-3d inline-block px-10 py-5 bg-white text-slate-900 rounded-xl font-bold text-xl relative z-10 cursor-pointer ${clickableStyles}`}>
                 🛒 Buy Now →
               </a>
             </Link>
@@ -479,7 +480,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-6 border-t border-[#1a1a1a]/50 bg-[#0a0a0a]">
+      <footer className="py-12 px-6 border-t border-[#1a1a1a]/50 bg-black/60 backdrop-blur-sm relative">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex items-center gap-12 text-sm text-neutral-400">
             <a href="#" className={`hover:text-white px-2 py-1 rounded ${clickableStyles}`}>Privacy</a>

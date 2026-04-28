@@ -22,16 +22,16 @@ export default function ProductPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] text-white font-sans selection:bg-yellow-500/30">
-      {/* Background Ambience */}
+    <div className="min-h-screen text-white font-sans selection:bg-yellow-500/30 relative">
+      {/* Golden ambient sparkles */}
+      <div className="gold-sparkles" />
+      {/* Subtle grid */}
       <div className="fixed inset-0 -z-10 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-b from-yellow-500/5 via-amber-500/5 to-transparent rounded-full blur-3xl opacity-30 translate-x-1/3 -translate-y-1/3" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-t from-yellow-500/5 via-amber-500/5 to-transparent rounded-full blur-3xl opacity-20 -translate-x-1/3 translate-y-1/3" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:4rem_4rem]" />
       </div>
 
       {/* Nav */}
-      <nav className="fixed top-0 w-full z-50 bg-[#121212]/90 backdrop-blur-xl border-b border-[#1a1a1a]">
+      <nav className="fixed top-0 w-full z-50 bg-black/70 backdrop-blur-xl border-b border-[#1a1a1a]">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
           <Link href="/">
             <a className="flex items-center gap-4 group cursor-pointer transition-all duration-300">
@@ -50,10 +50,10 @@ export default function ProductPage() {
             <Link href="/"><a className="text-sm text-neutral-400 hover:text-white transition-colors">Customers</a></Link>
           </div>
           <div className="flex items-center gap-3">
-             <Link href="/">
-               <button className="text-sm font-medium bg-white text-slate-900 px-4 py-2 rounded-lg transition-colors hover:bg-neutral-200">
+             <Link href="/pricing">
+               <a className="btn-3d text-sm font-medium bg-white text-slate-900 px-4 py-2 rounded-lg transition-colors hover:bg-neutral-200 inline-block cursor-pointer">
                  🛒 Buy Now
-               </button>
+               </a>
              </Link>
           </div>
         </div>
