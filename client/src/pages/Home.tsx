@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from "wouter";
+import { pricingPlans } from "@/lib/products";
 
 // Icons
 const CheckIcon = () => (
@@ -47,63 +48,7 @@ const features = [
   { icon: ChartIcon, title: 'Advanced PC Optimization', desc: 'Deep system tweaks to unlock hidden performance and reduce stutters.' },
 ]
 
-const pricing = [
-  { 
-    name: 'FPS Boost', 
-    slug: 'fps-boost',
-    price: '12.99', 
-    period: 'one-time payment', 
-    desc: 'Maximize frame rates instantly', 
-    features: ['Increases FPS', 'Removes all FPS stutters', ' Optimizes CPU and GPU performance', 'Improves frame stability & smoothness'], 
-    cta: 'Buy Now →', 
-    checkoutUrl: 'https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=oRNea&qty%5BoRNea%5D=1', 
-    popular: false 
-  },
-  { 
-    name: 'Zero Delay', 
-    slug: 'zero-delay',
-    price: '19.99', 
-    period: 'one-time payment', 
-    desc: 'Ultra-low input latency', 
-    features: ['Registry tweaks', ' PC & Xbox supported', 'Optimized settings for Fortnite', 'Background service optimization', 'Smoother FPS and frame pacing', 'Reduced input delay & faster response'], 
-    cta: 'Buy Now →', 
-    checkoutUrl: 'https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=kjZgR&qty%5BkjZgR%5D=1', 
-    popular: true 
-  },
-  { 
-    name: 'Keyboard Macro', 
-    slug: 'keyboard-macro',
-    price: '29.99', 
-    period: 'one-time payment', 
-    desc: 'Instant edits at the press of a key', 
-    features: ['Instant Drag Edits', 'Single Press Double Edits', 'Instant Build Feature', 'Pick Up Macro', 'Safe and Undetectable'], 
-    cta: 'Buy Now →', 
-    checkoutUrl: 'https://payhip.com/buy?s=1&cart_links%5B%5D=Ff4v6&qty%5BFf4v6%5D=1', 
-    popular: false 
-  },
-  { 
-    name: 'Xbox Zero Delay', 
-    slug: 'xbox-zero-delay',
-    price: '9.99', 
-    period: 'one-time payment', 
-    desc: 'Optimized for Xbox Series X/S', 
-    features: ['Optimized for Xbox Series X/S', 'Reduced input latency', 'Smoother gameplay', 'Enhanced response time', 'Safe and reversible tweaks', 'Instant activation'], 
-    cta: 'Buy Now →', 
-    checkoutUrl: 'https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=JYnlv&qty%5BJYnlv%5D=1', 
-    popular: false 
-  },
-  { 
-    name: 'Bloom Reducer', 
-    slug: 'bloom-reducer',
-    price: '12.99', 
-    period: 'one-time payment', 
-    desc: 'Tighter aim & better accuracy', 
-    features: ['Crosshair stability', 'Recoil optimization', 'Bloom reduction tweaks', 'Weapon accuracy enhancement'], 
-    cta: 'Buy Now →', 
-    checkoutUrl: 'https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=uXWr4&qty%5BuXWr4%5D=1', 
-    popular: false 
-  },
-]
+const pricing = pricingPlans;
 
 const testimonials = [
   { quote: "Went from 144 FPS to 240 stable after getting FPS tweaks.", author: "Bray", role: "Token Professional", avatar: "B" },
@@ -349,17 +294,18 @@ export default function Home() {
           
           <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-8">
             <a href="#features" className={`text-sm text-neutral-400 hover:text-white px-2 py-1 rounded-md ${clickableStyles}`}>Features</a>
-            <a href="#pricing" className={`text-sm text-neutral-400 hover:text-white px-2 py-1 rounded-md ${clickableStyles}`}>Pricing</a>
+            <Link href="/pricing">
+              <a className={`text-sm text-neutral-400 hover:text-white px-2 py-1 rounded-md ${clickableStyles}`}>Pricing</a>
+            </Link>
             <a href="#testimonials" className={`text-sm text-neutral-400 hover:text-white px-2 py-1 rounded-md ${clickableStyles}`}>Customers</a>
           </div>
 
           <div className="flex items-center gap-3">
-            <button 
-              onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-              className={`text-sm font-medium bg-white text-slate-900 px-4 py-2 rounded-lg cursor-pointer ${clickableStyles}`}
-            >
-              🛒 Buy Now
-            </button>
+            <Link href="/pricing">
+              <a className={`text-sm font-medium bg-white text-slate-900 px-4 py-2 rounded-lg cursor-pointer inline-block ${clickableStyles}`}>
+                🛒 Buy Now
+              </a>
+            </Link>
           </div>
         </div>
       </nav>
@@ -388,11 +334,13 @@ export default function Home() {
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
-            <button onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })} className={`w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-xl font-semibold text-lg text-black shadow-lg shadow-yellow-500/25 ${clickableStyles}`}>
-              Buy Now 🛒
-            </button>
+            <Link href="/pricing">
+              <a className={`w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-xl font-semibold text-lg text-black shadow-lg shadow-yellow-500/25 ${clickableStyles}`}>
+                Buy Now 🛒
+              </a>
+            </Link>
             <button
-              onClick={() => window.open('https://discord.gg/seraphimservices', '_blank')}
+              onClick={() => window.open('https://discord.gg/yP4uBqNyrP', '_blank')}
               className={`w-full sm:w-auto px-8 py-4 bg-[#141414] border border-neutral-700 rounded-xl font-semibold text-lg text-white ${clickableStyles}`}
             >
               Discord
@@ -516,12 +464,11 @@ export default function Home() {
             <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
             <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white relative z-10">Ready to get started?</h2>
             <p className="text-xl text-neutral-400 mb-10 max-w-lg mx-auto relative z-10">Join 2,000+ people already using Seraphim to improve their gameplay.</p>
-            <button 
-              onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-              className={`px-10 py-5 bg-white text-slate-900 rounded-xl font-bold text-xl relative z-10 cursor-pointer ${clickableStyles}`}
-            >
-              🛒 Buy Now →
-            </button>
+            <Link href="/pricing">
+              <a className={`inline-block px-10 py-5 bg-white text-slate-900 rounded-xl font-bold text-xl relative z-10 cursor-pointer ${clickableStyles}`}>
+                🛒 Buy Now →
+              </a>
+            </Link>
           </div>
         </div>
       </section>

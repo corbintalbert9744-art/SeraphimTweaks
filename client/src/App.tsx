@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import ProductPage from "@/pages/ProductPage";
+import Pricing from "@/pages/Pricing";
 
 function ScrollToTop() {
   const [location] = useLocation();
@@ -21,6 +22,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/pricing" component={Pricing} />
       <Route path="/product/:id" component={ProductPage} />
       <Route component={NotFound} />
     </Switch>

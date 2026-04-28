@@ -13,6 +13,76 @@ export interface Product {
   checkoutUrl: string;
 }
 
+export interface PricingPlan {
+  name: string;
+  slug: string;
+  price: string;
+  period: string;
+  desc: string;
+  features: string[];
+  cta: string;
+  checkoutUrl: string;
+  popular: boolean;
+}
+
+export const pricingPlans: PricingPlan[] = [
+  {
+    name: 'FPS Boost',
+    slug: 'fps-boost',
+    price: '12.99',
+    period: 'one-time payment',
+    desc: 'Maximize frame rates instantly',
+    features: ['Increases FPS', 'Removes all FPS stutters', ' Optimizes CPU and GPU performance', 'Improves frame stability & smoothness'],
+    cta: 'Buy Now →',
+    checkoutUrl: 'https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=oRNea&qty%5BoRNea%5D=1',
+    popular: false,
+  },
+  {
+    name: 'Zero Delay',
+    slug: 'zero-delay',
+    price: '19.99',
+    period: 'one-time payment',
+    desc: 'Ultra-low input latency',
+    features: ['Registry tweaks', ' PC & Xbox supported', 'Optimized settings for Fortnite', 'Background service optimization', 'Smoother FPS and frame pacing', 'Reduced input delay & faster response'],
+    cta: 'Buy Now →',
+    checkoutUrl: 'https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=kjZgR&qty%5BkjZgR%5D=1',
+    popular: true,
+  },
+  {
+    name: 'Keyboard Macro',
+    slug: 'keyboard-macro',
+    price: '29.99',
+    period: 'one-time payment',
+    desc: 'Instant edits at the press of a key',
+    features: ['Instant Drag Edits', 'Single Press Double Edits', 'Instant Build Feature', 'Pick Up Macro', 'Safe and Undetectable'],
+    cta: 'Buy Now →',
+    checkoutUrl: 'https://payhip.com/buy?s=1&cart_links%5B%5D=Ff4v6&qty%5BFf4v6%5D=1',
+    popular: false,
+  },
+  {
+    name: 'Xbox Zero Delay',
+    slug: 'xbox-zero-delay',
+    price: '9.99',
+    period: 'one-time payment',
+    desc: 'Optimized for Xbox Series X/S',
+    features: ['Optimized for Xbox Series X/S', 'Reduced input latency', 'Smoother gameplay', 'Enhanced response time', 'Safe and reversible tweaks', 'Instant activation'],
+    cta: 'Buy Now →',
+    checkoutUrl: 'https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=JYnlv&qty%5BJYnlv%5D=1',
+    popular: false,
+  },
+  {
+    name: 'Bloom Reducer',
+    slug: 'bloom-reducer',
+    price: '12.99',
+    period: 'one-time payment',
+    desc: 'Tighter aim & better accuracy',
+    features: ['Crosshair stability', 'Recoil optimization', 'Bloom reduction tweaks', 'Weapon accuracy enhancement'],
+    cta: 'Buy Now →',
+    checkoutUrl: 'https://seraphimtweaks.com/buy?s=1&cart_links%5B%5D=uXWr4&qty%5BuXWr4%5D=1',
+    popular: false,
+  },
+];
+
 export const products: Record<string, Product> = {
   "fps-boost": {
     id: "fps-boost",
