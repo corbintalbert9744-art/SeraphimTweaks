@@ -32,7 +32,7 @@ export default function Pricing() {
               <a className={`text-sm text-neutral-400 hover:text-white px-2 py-1 rounded-md ${clickableStyles}`}>Home</a>
             </Link>
             <Link href="/pricing">
-              <a className={`text-sm text-neutral-400 hover:text-white px-2 py-1 rounded-md ${clickableStyles}`}>Pricing</a>
+              <a className={`text-sm text-neutral-400 px-2 py-1 rounded-md ${clickableStyles}`}>Pricing</a>
             </Link>
             <button
               onClick={() => window.open('https://discord.gg/yP4uBqNyrP', '_blank')}
