@@ -338,10 +338,13 @@
   }
   body {
     background-image:
+      linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px),
       radial-gradient(ellipse 88% 64% at 50% 35%, rgba(212, 175, 55, 0.22), transparent 70%),
       radial-gradient(ellipse 65% 50% at 50% 35%, rgba(234, 179, 8,  0.12), transparent 60%);
+    background-size: 64px 64px, 64px 64px, 100% 100%, 100% 100%;
     background-attachment: fixed;
-    background-repeat: no-repeat;
+    background-repeat: repeat, repeat, no-repeat, no-repeat;
   }
 }
 

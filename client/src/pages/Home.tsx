@@ -282,14 +282,9 @@ export default function Home() {
       <nav className="fixed top-0 w-full z-50 bg-black/70 backdrop-blur-xl border-b border-[#1a1a1a]">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center relative">
           <Link href="/">
-            <a className="flex items-center gap-4 group cursor-pointer transition-all duration-300">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] border border-[#2a2a2a] p-2.5 flex items-center justify-center shadow-2xl group-hover:border-[#D4AF37]/30 transition-all">
-                <img src="/logo.png" alt="Seraphim Logo" className="w-full h-full object-contain" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-2xl font-bold text-white leading-tight tracking-tight">Seraphim</span>
-                <span className="text-[11px] font-bold tracking-[0.15em] text-[#D4AF37] uppercase leading-none mt-0.5">Gaming Tweaks</span>
-              </div>
+            <a className="flex items-center gap-3 group cursor-pointer transition-all duration-300">
+              <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow-[0_0_10px_4px_rgba(234,179,8,0.75)] block flex-shrink-0 group-hover:shadow-[0_0_14px_6px_rgba(234,179,8,0.9)] transition-all" />
+              <span className="text-xl font-bold text-white tracking-tight">Seraphim Tweaks</span>
             </a>
           </Link>
           
