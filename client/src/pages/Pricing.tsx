@@ -45,6 +45,9 @@ export default function Pricing() {
         </div>
       </nav>
 
+      {/* Page content wrapper — entrance animation */}
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+
       {/* Pricing Section */}
       <section className="pt-32 pb-24 px-6 min-h-screen relative">
         <div className="max-w-6xl mx-auto">
@@ -114,6 +117,7 @@ export default function Pricing() {
           <p className="text-sm text-neutral-500">© 2026 Seraphim. All rights reserved.</p>
         </div>
       </footer>
+      </div>{/* end page content animation wrapper */}
     </div>
   );
 }

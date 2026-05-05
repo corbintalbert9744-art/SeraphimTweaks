@@ -312,6 +312,9 @@ export default function Home() {
         </div>
       </nav>
 
+      {/* Page content wrapper — entrance animation */}
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+
       {/* Hero */}
       <section className="pt-32 pb-20 px-6">
         <div className="max-w-6xl mx-auto text-center">
@@ -449,6 +452,7 @@ export default function Home() {
           <p className="text-sm text-neutral-500">© 2026 Seraphim. All rights reserved.</p>
         </div>
       </footer>
+      </div>{/* end page content animation wrapper */}
     </div>
   )
 }
