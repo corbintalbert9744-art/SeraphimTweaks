@@ -9,6 +9,8 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import ProductPage from "@/pages/ProductPage";
 import Pricing from "@/pages/Pricing";
+import Reviews from "@/pages/Reviews";
+import Terms from "@/pages/Terms";
 
 function ScrollToTop() {
   const [location] = useLocation();
@@ -23,6 +25,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/reviews" component={Reviews} />
+      <Route path="/terms" component={Terms} />
       <Route path="/product/:id" component={ProductPage} />
       <Route component={NotFound} />
     </Switch>

@@ -1,0 +1,97 @@
+Terms of Service
+© 2025 VTweaks. All rights reserved.
+
+By purchasing, downloading, accessing, or using any VTweaks products, services, or digital content, you expressly acknowledge that you have read, understood, and agree to be legally bound by the following terms and conditions. If you do not agree to these terms, do not purchase or use our products.
+
+1
+License & Permitted Use
+VTweaks grants you a limited, non-exclusive, non-transferable, revocable license for personal use only. This license is granted solely to the individual who completed the purchase and is tied to that individual's account. The following actions are strictly prohibited and constitute grounds for immediate license termination without refund:
+
+Redistribution, resale, sharing, or sublicensing of any VTweaks products
+Reverse engineering, decompiling, disassembling, or attempting to extract source code
+Modifying, adapting, rebranding, or creating derivative works
+Removing, altering, or obscuring any proprietary notices or watermarks
+Using the product for commercial purposes or on behalf of third parties
+Sharing account credentials or allowing unauthorized access to purchased content
+2
+No Refund Policy
+All sales are final and non-refundable. Due to the digital nature of our products and the immediate delivery of downloadable content, refunds, exchanges, chargebacks, or cancellations are not permitted under any circumstances, except where explicitly required by applicable law in your jurisdiction. By completing a purchase, you waive any right to a refund and acknowledge that:
+
+You have reviewed all product information, descriptions, and system requirements prior to purchase
+You accept full responsibility for verifying compatibility with your system
+Dissatisfaction with product performance, results, or personal expectations does not constitute grounds for a refund
+Filing a chargeback or payment dispute will result in permanent account termination, blacklisting, and potential legal action to recover losses and fees incurred
+3
+User Responsibility & Assumption of Risk
+You acknowledge and agree that the use of VTweaks products is entirely at your own risk. By using our products, you assume full responsibility for any and all outcomes, including but not limited to:
+
+System performance changes, instability, or unexpected behavior
+Data loss, file corruption, or configuration changes
+Compatibility issues with hardware, software, operating systems, or third-party applications
+Any consequences resulting from improper installation, configuration, or usage
+Violations of third-party terms of service (e.g., game publishers, software providers)
+You are solely responsible for creating backups and restore points before applying any modifications. VTweaks strongly recommends creating a full system backup prior to installation.
+
+4
+Disclaimer of Warranties
+VTweaks products are provided "AS IS" and "AS AVAILABLE" without warranties of any kind, whether express, implied, statutory, or otherwise. To the fullest extent permitted by law, VTweaks expressly disclaims all warranties, including but not limited to:
+
+Implied warranties of merchantability, fitness for a particular purpose, and non-infringement
+Any warranty that products will meet your specific requirements or expectations
+Any warranty that products will be uninterrupted, error-free, secure, or free of harmful components
+Any warranty regarding the accuracy, reliability, or completeness of results
+Performance results may vary significantly based on individual system configurations, hardware specifications, software environments, and user implementation. Any performance claims, benchmarks, or testimonials are for illustrative purposes only and do not guarantee identical results.
+
+5
+Limitation of Liability
+To the maximum extent permitted by applicable law, VTweaks, its owners, operators, affiliates, partners, and employees shall not be liable for any direct, indirect, incidental, special, consequential, punitive, or exemplary damages arising from or related to:
+
+Your purchase, download, installation, or use of any VTweaks products
+Any inability to use our products or services
+Any errors, bugs, viruses, or inaccuracies in our products
+Any third-party actions, products, or services
+Any loss of data, profits, revenue, business opportunities, or goodwill
+Any other matter relating to our products or services
+In no event shall VTweaks' total cumulative liability exceed the amount you paid for the specific product giving rise to the claim.
+
+6
+Product Delivery
+All products are delivered digitally. Upon successful payment, you will receive access to your purchased content via email and/or your account dashboard. If you do not receive your purchase within a reasonable timeframe:
+
+Check your spam/junk folder for delivery emails
+Verify the email address associated with your purchase
+Contact our support team with your order confirmation for assistance
+You are responsible for carefully following all provided delivery, download, and installation instructions. VTweaks is not liable for issues arising from failure to follow instructions.
+
+7
+Intellectual Property
+All VTweaks products, content, trademarks, logos, designs, documentation, and associated intellectual property are the exclusive property of VTweaks and are protected by applicable copyright, trademark, and intellectual property laws. Your purchase grants you a license to use the product—it does not transfer ownership of any intellectual property rights. Unauthorized use, reproduction, or distribution may result in civil and criminal penalties.
+
+8
+Account Termination
+VTweaks reserves the right to suspend or permanently terminate your license and access to all products and services, without prior notice or refund, for any violation of these terms, including but not limited to:
+
+Breach of any provision in these Terms of Service
+Fraudulent activity, chargebacks, or payment disputes
+Unauthorized redistribution or sharing of products
+Abusive, threatening, or inappropriate behavior toward staff or other users
+Any activity that VTweaks deems harmful to its business or community
+9
+Modifications to Terms
+VTweaks reserves the right to update, modify, or replace these Terms of Service at any time, at our sole discretion. Changes will be effective immediately upon posting. Your continued use of VTweaks products or services after any modifications constitutes your acceptance of the revised terms. It is your responsibility to review these terms periodically for updates. Material changes may be announced through our official channels, but we are not obligated to provide individual notice.
+
+10
+Governing Law & Disputes
+These Terms of Service shall be governed by and construed in accordance with applicable laws, without regard to conflict of law principles. Any disputes arising from or related to these terms or your use of VTweaks products shall be resolved through good-faith negotiation. If a resolution cannot be reached, disputes shall be submitted to binding arbitration or the appropriate courts in the jurisdiction of VTweaks' principal place of business. You agree to waive any right to participate in class action lawsuits or class-wide arbitration.
+
+11
+Severability
+If any provision of these Terms of Service is found to be invalid, illegal, or unenforceable by a court of competent jurisdiction, such provision shall be modified to the minimum extent necessary to make it enforceable, or severed if modification is not possible. All remaining provisions shall continue in full force and effect.
+
+12
+Contact Information
+For questions, concerns, or support requests regarding these Terms of Service or any VTweaks products, please contact us through our official Discord server or support channels. Response times may vary based on volume and complexity of inquiries.
+
+By using VTweaks products or services, you confirm that you have read, understood, and agree to be bound by these Terms of Service in their entirety.
+
+Last Updated: January 2025 | Effective Immediately Upon Posting
