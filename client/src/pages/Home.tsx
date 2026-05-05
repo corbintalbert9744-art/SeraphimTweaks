@@ -312,18 +312,15 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Page content wrapper — entrance animation */}
-      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-
       {/* Hero */}
       <section className="pt-32 pb-20 px-6">
         <div className="max-w-6xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 text-sm mb-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 text-sm mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '0ms' }}>
             <SparklesIcon />
             <span>Premium PC & Console Optimization</span>
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1] animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100">
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1] animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '80ms' }}>
             Seraphim{' '}
             <span className="text-yellow-400 drop-shadow-[0_0_18px_rgba(234,179,8,0.8)]">
                 Tweaks
@@ -334,11 +331,11 @@ export default function Home() {
             </span>
           </h1>
           
-          <p className="text-xl text-neutral-400 max-w-2xl mx-auto mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+          <p className="text-xl text-neutral-400 max-w-2xl mx-auto mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '160ms' }}>
             System level optimization module focused on reducing latency. Engineered for stability, safety, and reversibility as core priorities.
           </p>
           
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '240ms' }}>
             <Link href="/pricing">
               <a className={`btn-3d w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-white rounded-2xl font-semibold text-lg text-black ${clickableStyles}`}>
                 View Products
@@ -452,7 +449,6 @@ export default function Home() {
           <p className="text-sm text-neutral-500">© 2026 Seraphim. All rights reserved.</p>
         </div>
       </footer>
-      </div>{/* end page content animation wrapper */}
     </div>
   )
 }

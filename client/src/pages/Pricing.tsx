@@ -45,21 +45,18 @@ export default function Pricing() {
         </div>
       </nav>
 
-      {/* Page content wrapper — entrance animation */}
-      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-
       {/* Pricing Section */}
       <section className="pt-32 pb-24 px-6 min-h-screen relative">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 text-sm mb-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 text-sm mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '0ms' }}>
               <span>All Products</span>
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-4 text-white tracking-tight animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100">Simple, transparent pricing</h1>
-            <p className="text-lg text-neutral-400 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">Pick the tweak that fits your setup. One-time payment, instant delivery.</p>
+            <h1 className="text-4xl md:text-6xl font-bold mb-4 text-white tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '80ms' }}>Simple, transparent pricing</h1>
+            <p className="text-lg text-neutral-400 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '160ms' }}>Pick the tweak that fits your setup. One-time payment, instant delivery.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '240ms' }}>
             {pricingPlans.map((plan, i) => (
               <Link key={i} href={`/product/${plan.slug}`}>
                 <a
@@ -117,7 +114,6 @@ export default function Pricing() {
           <p className="text-sm text-neutral-500">© 2026 Seraphim. All rights reserved.</p>
         </div>
       </footer>
-      </div>{/* end page content animation wrapper */}
     </div>
   );
 }
