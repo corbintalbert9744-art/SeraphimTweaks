@@ -272,7 +272,7 @@ const PerformanceStats = () => {
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const clickableStyles = "transition-all duration-300 hover:outline hover:outline-1 hover:outline-yellow-500/50 hover:shadow-[0_0_15px_rgba(234,179,8,0.3)]";
+  const clickableStyles = "transition-all duration-300 hover:shadow-[0_0_15px_rgba(234,179,8,0.45)]";
 
   return (
     <div className="min-h-screen text-white font-sans relative">
