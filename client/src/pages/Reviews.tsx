@@ -26,15 +26,15 @@ const VerifiedBadge = () => (
 const reviews = [
   {
     quote: "ngl i was skeptical at first but this actually cracked. went from 140 fps with drops to a clean 240 locked. ain't no way tf",
-    author: "Anonymous", product: "Zero Delay Tweaks", time: "2d ago", stars: 5, verified: false,
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "2d ago", stars: 5, verified: true,
   },
   {
     quote: "bloom reducer is disgusting fr. flicks feel buttery, shots actually register now. paid for itself after one tourney lowkey",
-    author: "Anonymous", product: "Bloom Reducer", time: "5d ago", stars: 5, verified: false,
+    author: "Anonymous", product: "Bloom Reducer", time: "5d ago", stars: 5, verified: true,
   },
   {
     quote: "macro hits different bro. double edits on controller feel like im on kbm fr. delay adjustment is clutch for diff scenarios",
-    author: "Anonymous", product: "Seraphim Macro", time: "6d ago", stars: 5, verified: false,
+    author: "Anonymous", product: "Seraphim Macro", time: "6d ago", stars: 5, verified: true,
   },
   {
     quote: "bro my xbox was cooked before this. running cod no stutters now idk what they did but it works. worth every dollar",
@@ -106,7 +106,7 @@ export default function Reviews() {
               Real customers, real results
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">What people are saying</h1>
-            <p className="text-neutral-400 max-w-xl mx-auto">Thousands of players trust Seraphim to level up their performance.</p>
+            <p className="text-neutral-400 max-w-xl mx-auto">Hundreds of players trust Seraphim to level up their performance.</p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
