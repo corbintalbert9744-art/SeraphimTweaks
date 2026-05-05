@@ -136,7 +136,7 @@ export default function Terms() {
           <Link href="/">
             <a className="flex items-center gap-3 group cursor-pointer transition-all duration-300">
               <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow-[0_0_10px_4px_rgba(234,179,8,0.75)] block flex-shrink-0 group-hover:shadow-[0_0_14px_6px_rgba(234,179,8,0.9)] transition-all" />
-              <span className="text-xl font-bold text-white tracking-tight">Seraphim Tweaks</span>
+              <span className="text-sm font-bold text-white tracking-tight">Seraphim Tweaks</span>
             </a>
           </Link>
 
