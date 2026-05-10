@@ -152,7 +152,7 @@ export default function Terms() {
 
           <Link href="/pricing">
             <a className={`text-sm font-medium bg-white text-slate-900 px-4 py-2 rounded-lg cursor-pointer inline-block ${clickableStyles}`}>
-              Buy Now →
+              Purchase Now →
             </a>
           </Link>
         </div>

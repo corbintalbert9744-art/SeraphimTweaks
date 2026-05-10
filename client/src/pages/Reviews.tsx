@@ -34,31 +34,127 @@ const reviews = [
   },
   {
     quote: "macro hits different bro. double edits on controller feel like im on kbm fr. delay adjustment is clutch for diff scenarios",
-    author: "Anonymous", product: "Seraphim Macro", time: "6d ago", stars: 5, verified: true,
+    author: "Anonymous", product: "Keyboard Macro", time: "6d ago", stars: 5, verified: true,
   },
   {
     quote: "bro my xbox was cooked before this. running cod no stutters now idk what they did but it works. worth every dollar",
-    author: "Anonymous", product: "Xbox Tweaks", time: "2w ago", stars: 5, verified: true,
+    author: "Anonymous", product: "Xbox Zero Delay", time: "2w ago", stars: 5, verified: true,
   },
   {
     quote: "tried other macros and they all flagged lookin sus. this one clean, undetectable, and consistent af. runs like butter on mnk too",
-    author: "Anonymous", product: "Seraphim Macro", time: "2w ago", stars: 5, verified: true,
+    author: "Anonymous", product: "Keyboard Macro", time: "2w ago", stars: 5, verified: true,
   },
   {
     quote: "been using tweaks for 3 months no issues. updates drop every couple weeks too which is nuts. set n forget type beat",
     author: "Anonymous", product: "Zero Delay Tweaks", time: "3m ago", stars: 5, verified: true,
   },
   {
-    quote: "Went from 144 FPS to 240 stable after getting FPS tweaks. genuinely insane difference in competitive lobbies",
-    author: "Bray", product: "FPS Boost", time: "1m ago", stars: 5, verified: true,
+    quote: "10/10 made my game smooth as butter, highly recommend",
+    author: "Anonymous", product: "FPS Boost", time: "12/30/2025", stars: 5, verified: true,
   },
   {
-    quote: "Zero Delay makes it feel like I'm on 0 ping. inputs register so clean now, night and day difference fr",
-    author: "Zyren", product: "Zero Delay Tweaks", time: "1m ago", stars: 5, verified: true,
+    quote: "vouch 5 star shit makes delay feel like its not a thing highly recommended",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "1/1/2026", stars: 5, verified: true,
   },
   {
-    quote: "Tweaks got me moving. finally hitting my shots consistently, the bloom fix alone was worth every cent",
-    author: "ManMan", product: "Bloom Reducer", time: "2m ago", stars: 5, verified: true,
+    quote: "10/10 im a goat now",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "1/1/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "10/10 I have better fps and lower delay my game feels so smooth",
+    author: "Anonymous", product: "FPS Boost", time: "1/1/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "tweak had me flying",
+    author: "Anonymous", product: "FPS Boost", time: "1/1/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "10/10 lowest delay i have ever had",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "1/2/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "8/10 can feel less delay def recommend",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "1/2/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "10/10 veryy good tweaks feel like im macroing",
+    author: "Anonymous", product: "Keyboard Macro", time: "1/3/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "this shit is beautiful 0 delay and cheap asl",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "1/7/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "10/10 w tweaks would recommend made my game WAY smoother",
+    author: "Anonymous", product: "FPS Boost", time: "1/10/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "+rep for everything they all work perfect and honestly the network thing in the tweaks lowered my ping i went from 60+ to 20+ im honestly so happy with the results",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "1/18/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "10/10, go buy the tweaks! Highly Recommended",
+    author: "Anonymous", product: "FPS Boost", time: "1/18/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "10/10 SEE A DIFFERENCE INSTANT",
+    author: "Anonymous", product: "FPS Boost", time: "1/18/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "mouse feels more responsive and stable 240 +rep 0 delay",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "1/21/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "lower ping/delay 100% works 10/10",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "1/21/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "Lower Delay 10/10 (xbox tweaks)",
+    author: "Anonymous", product: "Xbox Zero Delay", time: "1/23/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "10/10 Xbox tweaks! Highly recommended",
+    author: "Anonymous", product: "Xbox Zero Delay", time: "1/26/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "vouch more responsive and makes it feel like there is no delay +rep 0 delay",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "1/26/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "Vouch 10/10 tweaks",
+    author: "Anonymous", product: "FPS Boost", time: "1/28/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "Super vouch they really good",
+    author: "Anonymous", product: "FPS Boost", time: "1/29/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "W tweaks deadass got so much better",
+    author: "Anonymous", product: "FPS Boost", time: "1/30/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "good ass tweaks got me moving",
+    author: "Anonymous", product: "FPS Boost", time: "2/6/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "0 delay works insane",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "2/13/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "10/10 the best of the best 0 delay tweaks",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "2/13/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "10/10 best tweaks on the market",
+    author: "Anonymous", product: "FPS Boost", time: "2/24/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "11/10 vouch best tweaks on the market",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "2/27/2026", stars: 5, verified: true,
+  },
+  {
+    quote: "10/10 best spot to get tweaks ima need more",
+    author: "Anonymous", product: "Zero Delay Tweaks", time: "2/28/2026", stars: 5, verified: true,
   },
 ];
 
@@ -89,7 +185,7 @@ export default function Reviews() {
 
           <Link href="/pricing">
             <a className={`text-sm font-medium bg-white text-slate-900 px-4 py-2 rounded-lg cursor-pointer inline-block ${clickableStyles}`}>
-              Buy Now →
+              Purchase Now →
             </a>
           </Link>
         </div>

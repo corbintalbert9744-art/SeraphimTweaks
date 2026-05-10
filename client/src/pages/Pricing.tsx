@@ -38,7 +38,7 @@ export default function Pricing() {
           <div className="flex items-center gap-3">
             <Link href="/pricing">
               <a className={`btn-3d text-sm font-medium bg-white text-slate-900 px-4 py-2 rounded-lg cursor-pointer inline-block ${clickableStyles}`}>
-                🛒 Buy Now
+                Purchase Now →
               </a>
             </Link>
           </div>
