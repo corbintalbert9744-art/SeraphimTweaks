@@ -428,7 +428,7 @@ export default function Home() {
           <div className={`p-16 rounded-3xl bg-gradient-to-r from-yellow-500/10 via-amber-500/10 to-transparent border border-yellow-500/20 relative overflow-hidden group ${clickableStyles}`}>
             <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
             <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white relative z-10">Ready to get started?</h2>
-            <p className="text-xl text-neutral-400 mb-10 max-w-lg mx-auto relative z-10">Join 2,000+ people already using Seraphim to improve their gameplay.</p>
+            <p className="text-xl text-neutral-400 mb-10 max-w-lg mx-auto relative z-10">Join hundreds of people already using Seraphim to improve their gameplay.</p>
             <Link href="/pricing">
               <a className={`btn-3d inline-block px-10 py-5 bg-white text-slate-900 rounded-xl font-bold text-xl relative z-10 cursor-pointer ${clickableStyles}`}>
                 🛒 Buy Now →
