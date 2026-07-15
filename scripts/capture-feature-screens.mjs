@@ -2,6 +2,12 @@ import puppeteer from "puppeteer-core";
 import fs from "fs";
 import path from "path";
 
+/**
+ * Captures live Seraphim IQ UI sections for marketing feature examples.
+ * Requires: npm run dev on :5000, and puppeteer-core + system Chrome.
+ *
+ * Each image is a tight screenshot of the matching [data-feature] section.
+ */
 const OUT = path.resolve("client/public/marketing/features");
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -12,6 +18,12 @@ const MEMBERSHIP = {
   billingInterval: "monthly",
 };
 
+const CHROME_CSS = `
+  .card-3d, .card-3d:hover, .card-3d-popular, .card-3d-popular:hover { transform: none !important; }
+  header, aside, [class*="sticky"] { display: none !important; }
+  main { margin: 0 !important; padding: 24px !important; max-width: none !important; }
+`;
+
 async function wait(ms) {
   await new Promise((r) => setTimeout(r, ms));
 }
@@ -20,8 +32,8 @@ async function main() {
   const browser = await puppeteer.launch({
     executablePath: "/usr/local/bin/google-chrome",
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--window-size=1440,900"],
-    defaultViewport: { width: 1440, height: 900, deviceScaleFactor: 1 },
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    defaultViewport: { width: 1440, height: 1100, deviceScaleFactor: 1 },
   });
 
   const page = await browser.newPage();
@@ -31,73 +43,64 @@ async function main() {
 
   async function goto(url) {
     await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
-    await wait(2200);
+    await wait(2000);
+    await page.addStyleTag({ content: CHROME_CSS });
+    await wait(400);
     console.log("at", page.url());
   }
 
-  async function shotMain(file) {
-    const el = await page.$("main");
-    if (!el) throw new Error("main not found for " + file);
+  async function shot(file, sel) {
+    const el = await page.$(sel);
+    if (!el) throw new Error("missing " + sel);
+    await el.evaluate((n) => n.scrollIntoView({ block: "center" }));
+    await wait(300);
     await el.screenshot({ path: path.join(OUT, file), type: "png" });
-    console.log("saved", file);
+    const title = await el.evaluate((n) => (n.innerText || "").split("\n")[0]);
+    console.log("saved", file, "→", title);
   }
 
-  async function shotSelector(file, selector) {
-    const el = await page.$(selector);
-    if (!el) {
-      console.warn("missing", selector, "fallback main");
-      await shotMain(file);
-      return;
-    }
-    await el.screenshot({ path: path.join(OUT, file), type: "png" });
-    console.log("saved", file, selector);
-  }
-
-  // Historical hit rates + no-vig live on NBA board
-  await goto("http://127.0.0.1:5000/app/nba");
-  await shotMain("hit-rates.png");
-  await shotMain("no-vig.png");
-
-  // Prop detail — research score / AI / line movement
   await goto("http://127.0.0.1:5000/app/prop/nba-tatum-pts");
-  await shotMain("research-score.png");
-  await page.evaluate(() => {
-    const el = [...document.querySelectorAll("h2,h3,p")].find((n) =>
-      /analysis|why|research score|line/i.test(n.textContent || ""),
-    );
-    el?.scrollIntoView({ block: "start" });
-  });
-  await wait(500);
-  await shotMain("ai-analysis.png");
-  await page.evaluate(() => {
-    const el = [...document.querySelectorAll("h2,h3")].find((n) =>
-      /line|movement|books/i.test(n.textContent || ""),
-    );
-    el?.scrollIntoView({ block: "start" });
-  });
-  await wait(500);
-  await shotMain("line-movement.png");
+  await shot("hit-rates.png", '[data-feature="hit-rates"]');
+  await shot("no-vig.png", '[data-feature="metrics-row"]');
+  await shot("research-score.png", '[data-feature="research-score"]');
+  await shot("ai-analysis.png", '[data-feature="ai-analysis"]');
+  await shot("line-movement.png", '[data-feature="line-movement"]');
 
   await goto("http://127.0.0.1:5000/app/player/tatum");
-  await shotMain("player-reports.png");
-
-  // Seed a leg so parlay builder isn't empty
-  await goto("http://127.0.0.1:5000/app/nba");
-  await page.evaluate(() => {
-    const btn = [...document.querySelectorAll("button")].find((b) =>
-      /add/i.test(b.textContent || ""),
-    );
-    btn?.click();
+  const report = await page.$('[data-feature="player-report"]');
+  const perf = await page.$('[data-feature="player-performance"]');
+  await report.evaluate((n) => n.scrollIntoView({ block: "start" }));
+  await wait(300);
+  const rb = await report.boundingBox();
+  const pb = await perf.boundingBox();
+  await page.screenshot({
+    path: path.join(OUT, "player-reports.png"),
+    type: "png",
+    clip: {
+      x: Math.min(rb.x, pb.x),
+      y: rb.y,
+      width: Math.max(rb.width, pb.width),
+      height: pb.y + pb.height - rb.y + 8,
+    },
   });
-  await wait(400);
-  await goto("http://127.0.0.1:5000/app/parlay-builder");
-  await shotMain("parlay-builder.png");
+  console.log("saved player-reports.png");
 
-  await goto("http://127.0.0.1:5000/app");
-  await shotMain("command-center.png");
+  await goto("http://127.0.0.1:5000/app/parlay-builder");
+  await page.evaluate(() => {
+    [...document.querySelectorAll('[data-feature="parlay-builder"] button')]
+      .filter((b) => (b.textContent || "").includes("L10"))
+      .slice(0, 3)
+      .forEach((b) => b.click());
+  });
+  await wait(800);
+  await shot("parlay-builder.png", '[data-feature="parlay-l10"]');
+
+  // Drop unused full-page leftover if present
+  const leftover = path.join(OUT, "command-center.png");
+  if (fs.existsSync(leftover)) fs.unlinkSync(leftover);
 
   await browser.close();
-  console.log("files", fs.readdirSync(OUT));
+  console.log("done", fs.readdirSync(OUT));
 }
 
 main().catch((err) => {

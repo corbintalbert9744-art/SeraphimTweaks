@@ -215,17 +215,20 @@ export default function PropDetailPage() {
         ))}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" data-feature="metrics-row">
         <Metric label="Best line" value={`${best.line} @ ${formatAmericanOdds(selectedOdds)}`} sub={best.book} />
-        <Metric label="No-Vig" value={`${(selectedNoVig * 100).toFixed(1)}%`} />
+        <Metric label="No-Vig" value={`${(selectedNoVig * 100).toFixed(1)}%`} dataFeature="no-vig" />
         <Metric label="EV" value={`+${selectedEv.toFixed(1)}%`} accent="emerald" />
         <Metric label="Confidence" value={`${prop.confidence}`} accent="gold" />
-        <Metric label="Research Score" value={`${prop.researchScore}`} accent="gold" />
+        <Metric label="Research Score" value={`${prop.researchScore}`} accent="gold" dataFeature="research-score-metric" />
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
-          <section className="card-3d rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/[0.07] to-transparent p-5">
+          <section
+            data-feature="research-score"
+            className="card-3d rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/[0.07] to-transparent p-5"
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-yellow-500/90">
@@ -256,7 +259,7 @@ export default function PropDetailPage() {
             </ul>
           </section>
 
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
+          <section data-feature="hit-rates" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
             <h2 className="text-base font-semibold text-white">Hit-rate visualization</h2>
             <p className="mt-1 text-xs text-neutral-500">Clear rate at the current line</p>
             <div className="mt-4">
@@ -264,7 +267,7 @@ export default function PropDetailPage() {
             </div>
           </section>
 
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
+          <section data-feature="line-movement" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
             <h2 className="text-base font-semibold text-white">Line movement timeline</h2>
             <p className="mt-1 text-xs text-neutral-500">Open → current (mock series)</p>
             <div className="mt-4">
@@ -272,7 +275,7 @@ export default function PropDetailPage() {
             </div>
           </section>
 
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
+          <section data-feature="ai-analysis" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
             <h2 className="text-base font-semibold text-white">AI explanation</h2>
             <ul className="mt-3 space-y-2">
               {prop.analysis.map((line) => (
@@ -374,14 +377,19 @@ function Metric({
   value,
   sub,
   accent,
+  dataFeature,
 }: {
   label: string;
   value: string;
   sub?: string;
   accent?: "emerald" | "gold";
+  dataFeature?: string;
 }) {
   return (
-    <div className="card-3d rounded-2xl border border-[#1a1a1a] p-4">
+    <div
+      data-feature={dataFeature}
+      className="card-3d rounded-2xl border border-[#1a1a1a] p-4"
+    >
       <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{label}</p>
       <p
         className={cn(

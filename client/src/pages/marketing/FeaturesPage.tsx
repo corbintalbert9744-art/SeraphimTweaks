@@ -4,45 +4,45 @@ import { MarketingShell } from "@/components/marketing/MarketingShell";
 const features = [
   {
     title: "Historical Hit Rates",
-    body: "See L5, L10, L20, and season hit rates beside every market so recent form is never a guessing game.",
+    body: "L5, L10, L20, and season clear rates at the current line — shown as hit-rate bars on every research report.",
     image: "/marketing/features/hit-rates.png",
-    imageAlt: "NBA research board showing historical hit rates",
+    imageAlt: "Hit-rate visualization with L5 L10 L20 and season bars",
   },
   {
     title: "No-Vig Edge",
-    body: "We remove sportsbook juice to show fair probability — then compare that to the price you’re offered.",
+    body: "Fair no-vig probability next to EV and confidence, so you can see the edge after juice is removed.",
     image: "/marketing/features/no-vig.png",
-    imageAlt: "Prop detail showing no-vig probability and EV",
+    imageAlt: "No-Vig probability EV confidence and Research Score metrics",
   },
   {
     title: "Research Score",
-    body: "A transparent 0–100 composite built from hit rates, matchup, books, movement, and injury checks.",
+    body: "A transparent 0–100 score with the checklist behind it — hit rates, matchup, books, movement, and injuries.",
     image: "/marketing/features/research-score.png",
-    imageAlt: "Command Center with Research Score and Prop of the Day",
+    imageAlt: "Research Score checklist explaining why a prop is rated highly",
   },
   {
     title: "AI Analysis",
-    body: "Short, readable analysis that highlights the drivers behind a prop — not generic copy.",
+    body: "Short AI explanation bullets that call out no-vig, hit rates, and matchup context for the prop.",
     image: "/marketing/features/ai-analysis.png",
-    imageAlt: "Prop research detail with analysis sections",
+    imageAlt: "AI explanation writeup on a research report",
   },
   {
     title: "Line Movement",
-    body: "Track open → now so you can see whether the market is confirming or fading the lean.",
+    body: "Open → now line timeline so you can see whether the market is confirming or fading the lean.",
     image: "/marketing/features/line-movement.png",
-    imageAlt: "Prop detail line movement and books view",
+    imageAlt: "Line movement timeline chart from open to now",
   },
   {
     title: "Player Reports",
-    body: "Member player pages with recent props, form context, and links into full research detail.",
+    body: "Full player profiles with season averages, workload, data quality, and performance vs the betting line.",
     image: "/marketing/features/player-reports.png",
-    imageAlt: "Player report page with research score and props",
+    imageAlt: "Player profile report with averages and performance chart",
   },
   {
     title: "Parlay Builder",
-    body: "Assemble legs with shared L10 hit context and keep a live draft as you research the slate.",
+    body: "Build slips with Over/Under toggles and an L10 hit/miss chart for the focused leg.",
     image: "/marketing/features/parlay-builder.png",
-    imageAlt: "Parlay builder slip summary and legs",
+    imageAlt: "Parlay builder L10 hit miss chart for a focused leg",
   },
 ];
 
@@ -77,11 +77,11 @@ export default function FeaturesPage() {
                   <p className="mt-3 max-w-md text-sm leading-relaxed text-neutral-400">{f.body}</p>
                 </div>
                 <div className={imageLeft ? "lg:order-1" : undefined}>
-                  <div className="overflow-hidden rounded-2xl border border-[#222] bg-[#0c0c0c] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.9)]">
+                  <div className="overflow-hidden rounded-2xl border border-[#222] bg-[#0a0a0a] p-2 shadow-[0_24px_60px_-28px_rgba(0,0,0,0.9)] sm:p-3">
                     <img
                       src={f.image}
                       alt={f.imageAlt}
-                      className="max-h-[420px] w-full object-cover object-top"
+                      className="w-full rounded-xl object-contain"
                       loading="lazy"
                     />
                   </div>

@@ -13,37 +13,37 @@ const sports = [
 const features = [
   {
     title: "Historical Hit Rates",
-    body: "L5, L10, and season hit rates on every prop.",
+    body: "L5, L10, L20, and season clear rates as bars on every report.",
     image: "/marketing/features/hit-rates.png",
   },
   {
     title: "No-Vig Edge",
-    body: "Fair probability stripped of book juice.",
+    body: "Fair probability and EV after sportsbook juice is removed.",
     image: "/marketing/features/no-vig.png",
   },
   {
     title: "Research Score",
-    body: "A single 0–100 score grounded in explainable checks.",
+    body: "Checklist-backed 0–100 score — not a black box.",
     image: "/marketing/features/research-score.png",
   },
   {
     title: "AI Analysis",
-    body: "Concise writeups that surface what actually matters.",
+    body: "Short writeups that surface no-vig, form, and matchup drivers.",
     image: "/marketing/features/ai-analysis.png",
   },
   {
     title: "Line Movement",
-    body: "Open-to-now tracking so you see where the market moved.",
+    body: "Open-to-now timeline on every research report.",
     image: "/marketing/features/line-movement.png",
   },
   {
     title: "Player Reports",
-    body: "Profiles built for research — not highlight reels.",
+    body: "Profiles with averages, workload, and performance vs line.",
     image: "/marketing/features/player-reports.png",
   },
   {
     title: "Parlay Builder",
-    body: "Combine legs with shared hit-rate context.",
+    body: "L10 hit/miss charts for every focused leg in your slip.",
     image: "/marketing/features/parlay-builder.png",
   },
 ];
@@ -122,11 +122,11 @@ export default function MarketingHomePage() {
                 key={f.title}
                 className="overflow-hidden rounded-2xl border border-[#1a1a1a] bg-[#111]/40"
               >
-                <div className="aspect-[16/10] overflow-hidden border-b border-[#1a1a1a] bg-[#0a0a0a]">
+                <div className="aspect-[16/10] overflow-hidden border-b border-[#1a1a1a] bg-[#0a0a0a] p-2">
                   <img
                     src={f.image}
                     alt={`${f.title} from the Seraphim IQ app`}
-                    className="h-full w-full object-cover object-top"
+                    className="h-full w-full rounded-lg object-contain"
                     loading="lazy"
                   />
                 </div>

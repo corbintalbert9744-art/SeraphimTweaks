@@ -10,7 +10,7 @@ export function NbaPropTable({ rows }: { rows: NbaProp[] }) {
   const { addLeg, hasLeg } = useParlayDraft();
 
   return (
-    <section className="card-3d overflow-hidden rounded-2xl border border-[#1a1a1a]">
+    <section data-feature="prop-board" className="card-3d overflow-hidden rounded-2xl border border-[#1a1a1a]">
       <div className="flex items-center justify-between border-b border-[#1a1a1a] px-5 py-4">
         <div>
           <h2 className="text-base font-semibold text-white">NBA Prop Board</h2>

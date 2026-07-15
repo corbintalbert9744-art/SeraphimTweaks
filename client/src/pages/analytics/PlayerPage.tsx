@@ -202,7 +202,7 @@ export default function PlayerPage() {
         }
       />
 
-      <div className="card-3d mb-6 rounded-2xl border border-[#1a1a1a] p-5">
+      <div data-feature="player-report" className="card-3d mb-6 rounded-2xl border border-[#1a1a1a] p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-yellow-500/30 bg-gradient-to-br from-yellow-400/20 to-amber-700/10 text-lg font-semibold text-yellow-300">
@@ -244,7 +244,7 @@ export default function PlayerPage() {
 
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
+          <section data-feature="player-performance" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
             <h2 className="text-base font-semibold text-white">Performance vs line</h2>
             <p className="mt-1 text-xs text-neutral-500">Primary market with betting line overlay</p>
             <div className="mt-4">

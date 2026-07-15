@@ -55,7 +55,7 @@ export default function ParlayBuilderPage() {
 
       <div className="grid gap-6 xl:grid-cols-5">
         {/* Builder slip — matches mock card layout */}
-        <section className="card-3d rounded-2xl border border-[#1a1a1a] bg-[#0a0a0a] p-5 xl:col-span-2">
+        <section data-feature="parlay-builder" className="card-3d rounded-2xl border border-[#1a1a1a] bg-[#0a0a0a] p-5 xl:col-span-2">
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <h2 className="text-lg font-semibold text-white">Parlay Builder</h2>
@@ -146,9 +146,14 @@ export default function ParlayBuilderPage() {
           </section>
 
           {focused ? (
-            <L10HitMissChart leg={focused} className="card-3d animate-in fade-in duration-300" />
+            <div data-feature="parlay-l10">
+              <L10HitMissChart leg={focused} className="card-3d animate-in fade-in duration-300" />
+            </div>
           ) : (
-            <div className="card-3d rounded-2xl border border-dashed border-[#222] px-6 py-16 text-center text-sm text-neutral-500">
+            <div
+              data-feature="parlay-l10"
+              className="card-3d rounded-2xl border border-dashed border-[#222] px-6 py-16 text-center text-sm text-neutral-500"
+            >
               Add a leg to unlock the Last 10 hit/miss chart.
             </div>
           )}
