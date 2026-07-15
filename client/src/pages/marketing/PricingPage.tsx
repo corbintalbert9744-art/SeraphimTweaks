@@ -24,65 +24,57 @@ const INTERVAL_CTA: Record<BillingInterval, string> = {
 
 const STANDARD_FEATURES = [
   "All active sports (NBA, NFL, MLB, ATP, WTA, WNBA)",
-  "Hit rates, EV%, Research Score & line movement",
-  "Parlay builder + player reports",
-  "Sportsbook comparisons",
+  "Hit rates (L5 / L10 / L20 / Season & H2H)",
+  "EV%, no-vig, confidence & Research Score",
+  "Live line movement + sportsbook comparisons",
+  "Player reports + Parlay Builder",
+];
+
+const STANDARD_EXCLUDED = [
+  "AI research analysis on props & players",
+  "Premium insight writeups (Prop of the Day)",
+  "Private Discord premium picks",
+  "Early access to new features",
 ];
 
 const PRO_FEATURES = [
-  "My premium picks in a private Discord channel",
-  "AI research & premium insight tools",
   "Everything in Standard",
+  "Private Discord premium picks (live)",
+  "AI research analysis on every prop & player",
+  "Premium insight tools & Prop of the Day writeups",
+  "Expanded sportsbook depth + early feature access",
 ];
 
 type CompareValue = { kind: "check" } | { kind: "x" } | { kind: "text"; text: string };
 
-const COMPARISON: Array<{
-  label: string;
-  standard: CompareValue;
-  pro: CompareValue;
-  highlight?: boolean;
-}> = [
+const SHARED_ROWS: Array<{ label: string; standard: CompareValue; pro: CompareValue }> = [
   {
     label: "Sports covered",
     standard: { kind: "text", text: "All active sports" },
-    pro: { kind: "text", text: "All active sports + early access" },
+    pro: { kind: "text", text: "All sports + early access" },
   },
+  { label: "Hit rates (L5 / L10 / L20)", standard: { kind: "check" }, pro: { kind: "check" } },
+  { label: "Season & H2H hit rates", standard: { kind: "check" }, pro: { kind: "check" } },
+  { label: "Expected Value (EV%)", standard: { kind: "check" }, pro: { kind: "check" } },
+  { label: "Live line movement", standard: { kind: "check" }, pro: { kind: "check" } },
+  { label: "Parlay builder", standard: { kind: "check" }, pro: { kind: "check" } },
   {
-    label: "Hit rates (L5 / L10 / L20)",
-    standard: { kind: "check" },
-    pro: { kind: "check" },
-  },
-  {
-    label: "Season & H2H hit rates",
-    standard: { kind: "check" },
-    pro: { kind: "check" },
-  },
-  {
-    label: "Expected Value (EV%)",
-    standard: { kind: "check" },
-    pro: { kind: "check" },
-  },
-  {
-    label: "Live line movement",
+    label: "Player reports (stats & matchup)",
     standard: { kind: "check" },
     pro: { kind: "check" },
   },
   {
     label: "Sportsbook comparisons",
-    standard: { kind: "check" },
+    standard: { kind: "text", text: "Core books" },
     pro: { kind: "text", text: "Expanded depth" },
   },
-  {
-    label: "Parlay builder",
-    standard: { kind: "check" },
-    pro: { kind: "check" },
-  },
-  {
-    label: "Player reports",
-    standard: { kind: "check" },
-    pro: { kind: "check" },
-  },
+];
+
+const PRO_ONLY_ROWS: Array<{
+  label: string;
+  standard: CompareValue;
+  pro: CompareValue;
+}> = [
   {
     label: "Premium insight tools",
     standard: { kind: "x" },
@@ -97,7 +89,6 @@ const COMPARISON: Array<{
     label: "Premium picks (private Discord)",
     standard: { kind: "x" },
     pro: { kind: "check" },
-    highlight: true,
   },
   {
     label: "New feature access",
@@ -110,15 +101,41 @@ function formatPrice(n: number) {
   return n.toFixed(2).replace(/\.00$/, "");
 }
 
-function CellValue({ value, emphasize }: { value: CompareValue; emphasize?: boolean }) {
+function CheckIcon() {
+  return <Check className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" strokeWidth={2.5} />;
+}
+
+function XIcon() {
+  return <X className="mt-0.5 h-4 w-4 shrink-0 text-neutral-600" strokeWidth={2} />;
+}
+
+function CellValue({
+  value,
+  emphasize,
+}: {
+  value: CompareValue;
+  emphasize?: boolean;
+}) {
   if (value.kind === "check") {
-    return <Check className={cn("mx-auto h-4 w-4", emphasize ? "text-yellow-400" : "text-yellow-400/90")} strokeWidth={2.5} />;
+    return (
+      <Check
+        className={cn("mx-auto h-4 w-4", emphasize ? "text-yellow-400" : "text-yellow-400/90")}
+        strokeWidth={2.5}
+      />
+    );
   }
   if (value.kind === "x") {
     return <X className="mx-auto h-4 w-4 text-neutral-600" strokeWidth={2} />;
   }
+  const isDenied =
+    value.text === "Not included" || value.text === "Standard release" || value.text === "Core books";
   return (
-    <span className={cn("text-sm", emphasize ? "text-yellow-300" : "text-neutral-300")}>
+    <span
+      className={cn(
+        "text-sm",
+        emphasize ? "font-medium text-yellow-300" : isDenied ? "text-neutral-500" : "text-neutral-300",
+      )}
+    >
       {value.text}
     </span>
   );
@@ -190,24 +207,42 @@ export default function PricingPage() {
           {/* Standard */}
           <article className="flex flex-col rounded-2xl border border-[#222] bg-[#0c0c0c] p-6 sm:p-7">
             <div className="flex items-start justify-between gap-4">
-              <h2 className="text-xl font-semibold text-white">Standard</h2>
+              <div>
+                <h2 className="text-xl font-semibold text-white">Standard</h2>
+                <p className="mt-1 text-xs font-medium uppercase tracking-wide text-neutral-500">
+                  Research only
+                </p>
+              </div>
               <p className="text-right text-xl font-semibold tabular-nums text-white">
                 ${formatPrice(prices.standard)}
                 <span className="text-sm font-medium text-neutral-500"> {suffix}</span>
               </p>
             </div>
             <p className="mt-4 text-sm leading-relaxed text-neutral-400">
-              Full research boards for serious daily prop work: hit rates, EV, and transparent
-              scores across every supported sport.
+              Full research boards for daily prop work. No Discord picks. No AI. No early-access
+              sports.
             </p>
-            <ul className="mt-6 flex-1 space-y-3">
+            <ul className="mt-6 space-y-3">
               {STANDARD_FEATURES.map((item) => (
                 <li key={item} className="flex items-start gap-3 text-sm text-neutral-200">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-400" />
+                  <CheckIcon />
                   {item}
                 </li>
               ))}
             </ul>
+            <div className="mt-6 rounded-xl border border-[#2a2a2a] bg-[#080808] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                Not included on Standard
+              </p>
+              <ul className="mt-3 space-y-2.5">
+                {STANDARD_EXCLUDED.map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-sm text-neutral-500">
+                    <XIcon />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
             <Link
               href={planHref("standard")}
               className="mt-8 flex w-full items-center justify-center rounded-xl border border-[#2a2a2a] bg-[#141414] px-4 py-3 text-sm font-semibold text-white transition hover:border-neutral-500"
@@ -225,13 +260,14 @@ export default function PricingPage() {
                   Includes My Picks
                 </span>
               </div>
-              <p className="text-right text-xl font-semibold tabular-nums text-white">
+              <p className="text-right text-xl font-semibold tabular-nums text-yellow-400">
                 ${formatPrice(prices.pro)}
-                <span className="text-sm font-medium text-neutral-500"> {suffix}</span>
+                <span className="text-sm font-medium text-yellow-400/60"> {suffix}</span>
               </p>
             </div>
             <p className="mt-4 text-sm leading-relaxed text-neutral-400">
-              Everything in Standard, plus my premium picks delivered live in a private Discord.
+              Everything in Standard, plus the Pro-only layer: private Discord picks, AI research,
+              and early access.
             </p>
 
             <div className="mt-5 flex gap-3 rounded-xl border border-yellow-500/25 bg-yellow-500/[0.06] p-4">
@@ -244,14 +280,14 @@ export default function PricingPage() {
               </svg>
               <p className="text-sm leading-relaxed text-neutral-200">
                 <span className="font-semibold text-yellow-300">My premium picks</span>, delivered
-                live in a private Discord channel, the biggest reason people go Pro.
+                live in a private Discord channel — the biggest reason people go Pro.
               </p>
             </div>
 
             <ul className="mt-6 flex-1 space-y-3">
               {PRO_FEATURES.map((item) => (
                 <li key={item} className="flex items-start gap-3 text-sm text-neutral-200">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-400" />
+                  <CheckIcon />
                   {item}
                 </li>
               ))}
@@ -269,8 +305,7 @@ export default function PricingPage() {
         <section className="mt-20">
           <h2 className="text-2xl font-semibold tracking-tight text-white">Compare memberships</h2>
           <p className="mt-2 text-sm text-neutral-400">
-            Both memberships unlock the full research workflow. Pro adds private Discord picks and
-            AI tools.
+            Shared research tools below. The yellow rows are Pro-only — Standard does not get them.
           </p>
 
           <div className="mt-8 overflow-hidden rounded-2xl border border-[#222]">
@@ -292,15 +327,37 @@ export default function PricingPage() {
               </div>
             </div>
 
-            {COMPARISON.map((row) => (
+            <div className="border-b border-[#222] bg-[#0a0a0a] px-4 py-2.5 sm:px-6">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                Included in both
+              </p>
+            </div>
+            {SHARED_ROWS.map((row) => (
               <div
                 key={row.label}
-                className={cn(
-                  "grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] items-center border-b border-[#1a1a1a] px-4 py-4 last:border-b-0 sm:px-6",
-                  row.highlight && "bg-yellow-500/[0.05]",
-                )}
+                className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] items-center border-b border-[#1a1a1a] px-4 py-4 sm:px-6"
               >
                 <p className="pr-3 text-sm text-neutral-300">{row.label}</p>
+                <div className="text-center">
+                  <CellValue value={row.standard} />
+                </div>
+                <div className="text-center">
+                  <CellValue value={row.pro} emphasize />
+                </div>
+              </div>
+            ))}
+
+            <div className="border-b border-yellow-500/20 bg-yellow-500/[0.08] px-4 py-2.5 sm:px-6">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-yellow-400">
+                Pro unlocks — not on Standard
+              </p>
+            </div>
+            {PRO_ONLY_ROWS.map((row) => (
+              <div
+                key={row.label}
+                className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] items-center border-b border-[#1a1a1a] bg-yellow-500/[0.04] px-4 py-4 last:border-b-0 sm:px-6"
+              >
+                <p className="pr-3 text-sm font-medium text-yellow-100/90">{row.label}</p>
                 <div className="text-center">
                   <CellValue value={row.standard} />
                 </div>
@@ -312,11 +369,11 @@ export default function PricingPage() {
           </div>
 
           <p className="mt-6 text-center text-sm text-neutral-500">
-            Ready?{" "}
+            Want Discord picks and AI?{" "}
             <Link href={checkoutHref} className="text-yellow-400 hover:underline">
               Become a Pro Member
-            </Link>{" "}
-            or choose Standard above.
+            </Link>
+            . Research-only? Choose Standard above.
           </p>
         </section>
       </div>
