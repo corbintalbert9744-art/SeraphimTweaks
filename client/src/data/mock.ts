@@ -1,4 +1,4 @@
-export type LeagueCode = "NBA" | "NFL" | "ATP" | "WTA" | "WNBA";
+export type LeagueCode = "NBA" | "NFL" | "ATP" | "WTA" | "WNBA" | "MLB";
 
 export type ResearchCheckStatus = "pass" | "warn" | "fail" | "unknown";
 
@@ -414,5 +414,11 @@ export const leagueMeta: Record<
     blurb: "Player props and pace/matchup context for the WNBA slate.",
     gamesToday: 4,
     propsLive: 142,
+  },
+  MLB: {
+    name: "MLB",
+    blurb: "Hits, strikeouts, and counting props with daily slate research.",
+    gamesToday: 12,
+    propsLive: 268,
   },
 };

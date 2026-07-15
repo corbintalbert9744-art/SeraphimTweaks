@@ -3,10 +3,10 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import type { LeagueCode } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
-const leagueOptions: LeagueCode[] = ["NBA", "NFL", "WNBA", "ATP", "WTA"];
+const leagueOptions: LeagueCode[] = ["NBA", "NFL", "MLB", "WNBA", "ATP", "WTA"];
 
 export default function SettingsPage() {
-  const [leagues, setLeagues] = useState<LeagueCode[]>(["NBA", "NFL", "WNBA"]);
+  const [leagues, setLeagues] = useState<LeagueCode[]>(["NBA", "NFL", "MLB", "WNBA"]);
   const [oddsFormat, setOddsFormat] = useState<"american" | "decimal">("american");
   const [minResearch, setMinResearch] = useState(70);
 

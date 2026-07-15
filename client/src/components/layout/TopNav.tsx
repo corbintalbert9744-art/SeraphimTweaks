@@ -4,6 +4,7 @@ import { Bell, LogOut, Menu, Search, Settings, User } from "lucide-react";
 import { mockPlayers, type PlayerSearchResult } from "@/data/mock";
 import { getPlayerProfile, listPlayerProfiles } from "@/data/playersMock";
 import { useToast } from "@/hooks/use-toast";
+import { useMembership } from "@/context/MembershipContext";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 
@@ -33,6 +34,7 @@ function hrefForPlayer(player: PlayerSearchResult): string {
   if (getPlayerProfile(player.id)) return `/player/${player.id}`;
   if (player.league === "NBA") return "/nba";
   if (player.league === "NFL") return "/nfl";
+  if (player.league === "MLB") return "/mlb";
   if (player.league === "WNBA") return "/wnba";
   if (player.league === "ATP") return "/atp";
   if (player.league === "WTA") return "/wta";
@@ -43,11 +45,12 @@ export function TopNav() {
   const { collapsed, setMobileOpen } = useSidebar();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user, membershipActive, signOut } = useMembership();
+  const signedIn = Boolean(user);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [signedIn, setSignedIn] = useState(true);
   const wrapRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -83,20 +86,12 @@ export function TopNav() {
 
   function handleSignOut() {
     setProfileOpen(false);
-    setSignedIn(false);
+    signOut();
     toast({
       title: "Signed out",
-      description: "You’re signed out of this mock session. Auth wiring comes next.",
+      description: "You’ve left the members dashboard.",
     });
-  }
-
-  function handleSignIn() {
-    setSignedIn(true);
-    setProfileOpen(false);
-    toast({
-      title: "Welcome back",
-      description: "Signed in as Analyst · Pro (mock).",
-    });
+    setLocation("~/");
   }
 
   return (
@@ -223,10 +218,12 @@ export function TopNav() {
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-yellow-400/25 to-amber-700/20 text-yellow-400">
               <User className="h-4 w-4" />
             </span>
-            <span className="hidden text-left sm:block">
-              <span className="block text-xs font-medium text-white">{signedIn ? "Analyst" : "Guest"}</span>
+              <span className="hidden text-left sm:block">
+              <span className="block text-xs font-medium text-white">
+                {signedIn ? user?.name || "Member" : "Guest"}
+              </span>
               <span className="block text-[10px] text-neutral-500">
-                {signedIn ? "Pro · Mock" : "Signed out"}
+                {signedIn && membershipActive ? "Pro Member" : signedIn ? "No membership" : "Signed out"}
               </span>
             </span>
           </button>
@@ -239,8 +236,8 @@ export function TopNav() {
               {signedIn ? (
                 <>
                   <div className="border-b border-[#1a1a1a] px-4 py-3">
-                    <p className="text-sm font-medium text-white">Analyst</p>
-                    <p className="text-xs text-neutral-500">analyst@seraphim.mock</p>
+                    <p className="text-sm font-medium text-white">{user?.name || "Member"}</p>
+                    <p className="text-xs text-neutral-500">{user?.email}</p>
                   </div>
 
                   <div className="border-b border-[#1a1a1a] px-4 py-3">
@@ -252,15 +249,14 @@ export function TopNav() {
                         Pro
                       </span>
                     </div>
-                    <p className="mt-2 text-sm text-neutral-200">Seraphim Pro</p>
+                    <p className="mt-2 text-sm text-neutral-200">Seraphim IQ Professional</p>
                     <p className="mt-1 text-xs leading-relaxed text-neutral-500">
-                      Full research boards, Prop of the Day, Parlay Builder, and alerts. Renews monthly ·
-                      mock billing.
+                      Members-only research boards, Prop of the Day, Parlay Builder, and alerts.
                     </p>
                     <ul className="mt-2 space-y-1 text-[11px] text-neutral-400">
-                      <li>· Live ESPN NBA slate access</li>
+                      <li>· NBA · NFL · MLB · ATP · WTA · WNBA</li>
                       <li>· Research Score + DQS on props</li>
-                      <li>· Saved parlays (coming with auth)</li>
+                      <li>· AI analysis & unlimited props</li>
                     </ul>
                   </div>
 
@@ -292,14 +288,17 @@ export function TopNav() {
                 <div className="p-4">
                   <p className="text-sm font-medium text-white">You’re signed out</p>
                   <p className="mt-1 text-xs text-neutral-500">
-                    Sign back in to restore Pro membership features (mock session).
+                    Return to the marketing site to log in or activate membership.
                   </p>
                   <button
                     type="button"
                     className="mt-3 w-full rounded-lg bg-yellow-500 px-3 py-2 text-sm font-semibold text-black transition hover:bg-yellow-400"
-                    onClick={handleSignIn}
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setLocation("~/login");
+                    }}
                   >
-                    Sign in
+                    Log in
                   </button>
                 </div>
               )}

@@ -65,7 +65,8 @@ export function Sidebar() {
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {navItems.map((item) => {
-          const active = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+          const active =
+            location === item.href || (item.href !== "/" && location.startsWith(item.href));
           const Icon = item.icon;
           return (
             <Link
@@ -104,7 +105,7 @@ export function Sidebar() {
             <>
               <p className="text-[11px] font-medium uppercase tracking-wider text-yellow-500/90">Sports bar</p>
               <p className="mt-1 text-xs leading-relaxed text-neutral-400">
-                Switch NBA · NFL · ATP · WTA · WNBA from the tabs above the board.
+                Switch NBA · NFL · MLB · ATP · WTA · WNBA from the tabs above the board.
               </p>
             </>
           ) : (
