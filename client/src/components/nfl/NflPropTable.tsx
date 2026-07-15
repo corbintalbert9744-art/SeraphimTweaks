@@ -1,18 +1,18 @@
 import { Plus, Check } from "lucide-react";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
-import { formatAmericanOdds, type NbaProp } from "@/data/nbaMock";
-import { nbaToBuilderLeg } from "@/lib/builderMappers";
+import { formatAmericanOdds, type NflProp } from "@/data/nflMock";
+import { nflToBuilderLeg } from "@/lib/builderMappers";
 import { cn } from "@/lib/utils";
 
-export function NbaPropTable({ rows }: { rows: NbaProp[] }) {
+export function NflPropTable({ rows }: { rows: NflProp[] }) {
   const { addLeg, hasLeg } = useParlayDraft();
 
   return (
     <section className="card-3d overflow-hidden rounded-2xl border border-[#1a1a1a]">
       <div className="flex items-center justify-between border-b border-[#1a1a1a] px-5 py-4">
         <div>
-          <h2 className="text-base font-semibold text-white">NBA Prop Board</h2>
+          <h2 className="text-base font-semibold text-white">NFL Prop Board</h2>
           <p className="text-xs text-neutral-500">
             Hit rates · No-Vig · EV · Confidence (Research Score)
           </p>
@@ -45,12 +45,12 @@ export function NbaPropTable({ rows }: { rows: NbaProp[] }) {
                   <td className="px-4 py-3.5">
                     <p className="font-medium text-neutral-100">{row.player}</p>
                     <p className="text-xs text-neutral-500">
-                      {row.team} vs {row.opponent} · {row.position} · {row.tipTime}
+                      {row.team} vs {row.opponent} · {row.position} · W{row.week} · {row.tipTime}
                     </p>
                   </td>
                   <td className="px-4 py-3.5 text-neutral-300">{row.market}</td>
                   <td className="px-4 py-3.5 tabular-nums text-neutral-200">
-                    {row.side} {row.line}
+                    {row.market === "Anytime TD" ? "Yes" : `${row.side} ${row.line}`}
                   </td>
                   <td className="px-4 py-3.5 tabular-nums text-neutral-200">
                     {formatAmericanOdds(row.americanOdds)}
@@ -74,7 +74,7 @@ export function NbaPropTable({ rows }: { rows: NbaProp[] }) {
                     <button
                       type="button"
                       disabled={added}
-                      onClick={() => addLeg(nbaToBuilderLeg(row))}
+                      onClick={() => addLeg(nflToBuilderLeg(row))}
                       className={cn(
                         "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
                         added

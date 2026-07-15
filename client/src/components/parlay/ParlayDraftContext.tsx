@@ -1,9 +1,9 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import type { NbaProp } from "@/data/nbaMock";
+import type { BuilderLeg } from "@/data/builderTypes";
 
 interface ParlayDraftContextValue {
-  legs: NbaProp[];
-  addLeg: (prop: NbaProp) => void;
+  legs: BuilderLeg[];
+  addLeg: (prop: BuilderLeg) => void;
   removeLeg: (id: string) => void;
   hasLeg: (id: string) => boolean;
   clear: () => void;
@@ -12,7 +12,7 @@ interface ParlayDraftContextValue {
 const ParlayDraftContext = createContext<ParlayDraftContextValue | null>(null);
 
 export function ParlayDraftProvider({ children }: { children: ReactNode }) {
-  const [legs, setLegs] = useState<NbaProp[]>([]);
+  const [legs, setLegs] = useState<BuilderLeg[]>([]);
 
   const value = useMemo<ParlayDraftContextValue>(
     () => ({

@@ -4,14 +4,19 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { LeagueBadge } from "@/components/shared/LeagueBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
-import { formatAmericanOdds, mockNbaProps } from "@/data/nbaMock";
+import { mockNbaProps } from "@/data/nbaMock";
+import { mockNflProps, formatAmericanOdds } from "@/data/nflMock";
+import { nbaToBuilderLeg, nflToBuilderLeg } from "@/lib/builderMappers";
 import { cn } from "@/lib/utils";
 import { Plus, Trash2 } from "lucide-react";
 
 export default function ParlayBuilderPage() {
   const { legs, addLeg, removeLeg, hasLeg, clear } = useParlayDraft();
 
-  const available = mockNbaProps.filter((p) => !hasLeg(p.id)).slice(0, 8);
+  const quickAdds = [
+    ...mockNbaProps.slice(0, 4).map(nbaToBuilderLeg),
+    ...mockNflProps.slice(0, 4).map(nflToBuilderLeg),
+  ].filter((p) => !hasLeg(p.id));
 
   const combinedEv =
     legs.length === 0
@@ -19,7 +24,7 @@ export default function ParlayBuilderPage() {
       : legs.reduce((sum, l) => sum + l.evPercent, 0) / legs.length;
 
   const sameEventRisk = useMemo(() => {
-    const keys = legs.map((l) => `${l.team}-${l.opponent}-${l.tipTime}`);
+    const keys = legs.map((l) => l.eventKey);
     return keys.some((key, i) => keys.indexOf(key) !== i);
   }, [legs]);
 
@@ -28,14 +33,22 @@ export default function ParlayBuilderPage() {
       <PageHeader
         eyebrow="Tools"
         title="Parlay Builder"
-        description="Legs added from the NBA board appear here. Pricing is mocked until the calc API is connected."
+        description="Legs from NBA and NFL boards land here. Pricing is mocked until the calc API is connected."
         actions={
-          <Link
-            href="/nba"
-            className="rounded-xl border border-[#1a1a1a] bg-[#111] px-4 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
-          >
-            Back to NBA board
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/nba"
+              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-4 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
+            >
+              NBA board
+            </Link>
+            <Link
+              href="/nfl"
+              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-4 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
+            >
+              NFL board
+            </Link>
+          </div>
         }
       />
 
@@ -66,7 +79,7 @@ export default function ParlayBuilderPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium text-neutral-100">{leg.player}</p>
-                    <LeagueBadge league="NBA" />
+                    <LeagueBadge league={leg.league} />
                     <ResearchScoreBadge score={leg.confidence} size="sm" />
                   </div>
                   <p className="mt-1 text-sm text-neutral-400">
@@ -91,19 +104,23 @@ export default function ParlayBuilderPage() {
               <p className="rounded-xl border border-dashed border-[#222] px-4 py-10 text-center text-sm text-neutral-500">
                 No legs yet. Add props from the{" "}
                 <Link href="/nba" className="text-yellow-400 hover:underline">
-                  NBA board
-                </Link>
-                .
+                  NBA
+                </Link>{" "}
+                or{" "}
+                <Link href="/nfl" className="text-yellow-400 hover:underline">
+                  NFL
+                </Link>{" "}
+                board.
               </p>
             )}
           </ul>
 
           <div className="mt-6">
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-              Quick add from NBA mock board
+              Quick add
             </h3>
             <div className="grid gap-2 sm:grid-cols-2">
-              {available.map((prop) => (
+              {quickAdds.map((prop) => (
                 <button
                   key={prop.id}
                   type="button"
@@ -113,7 +130,7 @@ export default function ParlayBuilderPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm text-neutral-100">{prop.player}</p>
                     <p className="truncate text-xs text-neutral-500">
-                      {prop.market} {prop.side} {prop.line}
+                      {prop.league} · {prop.market} {prop.side} {prop.line}
                     </p>
                   </div>
                   <Plus className="h-4 w-4 shrink-0 text-yellow-400" />

@@ -9,6 +9,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ParlayDraftProvider } from "@/components/parlay/ParlayDraftContext";
 import DashboardPage from "@/pages/analytics/DashboardPage";
 import NbaPage from "@/pages/analytics/NbaPage";
+import NflPage from "@/pages/analytics/NflPage";
 import LeaguePage from "@/pages/analytics/LeaguePage";
 import ParlayBuilderPage from "@/pages/analytics/ParlayBuilderPage";
 import SettingsPage from "@/pages/analytics/SettingsPage";
@@ -34,7 +35,7 @@ function Router() {
         <Switch>
           <Route path="/" component={DashboardPage} />
           <Route path="/nba" component={NbaPage} />
-          <Route path="/nfl">{() => <LeagueRoute league="NFL" />}</Route>
+          <Route path="/nfl" component={NflPage} />
           <Route path="/atp">{() => <LeagueRoute league="ATP" />}</Route>
           <Route path="/wta">{() => <LeagueRoute league="WTA" />}</Route>
           <Route path="/wnba">{() => <LeagueRoute league="WNBA" />}</Route>

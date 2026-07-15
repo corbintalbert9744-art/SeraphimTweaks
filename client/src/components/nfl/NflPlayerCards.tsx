@@ -2,11 +2,11 @@ import { Link } from "wouter";
 import { Plus, Check } from "lucide-react";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
-import { mockNbaProps, type NbaPlayerCard } from "@/data/nbaMock";
-import { nbaToBuilderLeg } from "@/lib/builderMappers";
+import { mockNflProps, type NflPlayerCard } from "@/data/nflMock";
+import { nflToBuilderLeg } from "@/lib/builderMappers";
 import { cn } from "@/lib/utils";
 
-export function NbaPlayerCards({ players }: { players: NbaPlayerCard[] }) {
+export function NflPlayerCards({ players }: { players: NflPlayerCard[] }) {
   const { addLeg, hasLeg } = useParlayDraft();
 
   return (
@@ -14,13 +14,13 @@ export function NbaPlayerCards({ players }: { players: NbaPlayerCard[] }) {
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-white">Featured Players</h2>
-          <p className="text-xs text-neutral-500">Quick cards with season context + top lean</p>
+          <p className="text-xs text-neutral-500">Week 12 cards with usage + matchup context</p>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {players.map((player) => {
-          const topProp = mockNbaProps.find((p) => p.id === player.topPropId);
+          const topProp = mockNflProps.find((p) => p.id === player.topPropId);
           const added = topProp ? hasLeg(topProp.id) : false;
 
           return (
@@ -46,14 +46,24 @@ export function NbaPlayerCards({ players }: { players: NbaPlayerCard[] }) {
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-[#1a1a1a] bg-black/25 p-3">
-                <Avg label="PTS" value={player.seasonAvg.pts} />
-                <Avg label="REB" value={player.seasonAvg.reb} />
-                <Avg label="AST" value={player.seasonAvg.ast} />
+                {player.seasonAvg.passYds != null && (
+                  <Avg label="PASS" value={player.seasonAvg.passYds} />
+                )}
+                {player.seasonAvg.rushYds != null && (
+                  <Avg label="RUSH" value={player.seasonAvg.rushYds} />
+                )}
+                {player.seasonAvg.recYds != null && (
+                  <Avg label="REC YD" value={player.seasonAvg.recYds} />
+                )}
+                {player.seasonAvg.receptions != null && (
+                  <Avg label="REC" value={player.seasonAvg.receptions} />
+                )}
               </div>
 
               <p className="mt-3 text-xs leading-relaxed text-neutral-400">{player.matchupNote}</p>
               <p className="mt-2 text-[11px] text-neutral-500">
-                Proj. minutes · <span className="text-neutral-300">{player.projectedMinutes}</span>
+                Proj. snap % ·{" "}
+                <span className="text-neutral-300">{player.projectedSnapPct}%</span>
               </p>
 
               {topProp && (
@@ -68,7 +78,7 @@ export function NbaPlayerCards({ players }: { players: NbaPlayerCard[] }) {
                   <button
                     type="button"
                     disabled={added}
-                    onClick={() => addLeg(nbaToBuilderLeg(topProp))}
+                    onClick={() => addLeg(nflToBuilderLeg(topProp))}
                     className={cn(
                       "inline-flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
                       added
@@ -87,7 +97,7 @@ export function NbaPlayerCards({ players }: { players: NbaPlayerCard[] }) {
       </div>
 
       <p className="mt-3 text-center text-[11px] text-neutral-600">
-        Player detail pages come next — cards are research shortcuts for now.{" "}
+        Cross-league builder supported.{" "}
         <Link href="/parlay-builder" className="text-yellow-500/80 hover:text-yellow-400">
           Open Parlay Builder
         </Link>
