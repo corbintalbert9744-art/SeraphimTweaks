@@ -35,7 +35,11 @@ export function NbaPlayerCards({ players }: { players: NbaPlayerCard[] }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="truncate font-semibold text-white">{player.name}</h3>
+                      <h3 className="truncate font-semibold text-white">
+                        <Link href={`/player/${player.id}`} className="hover:text-yellow-400">
+                          {player.name}
+                        </Link>
+                      </h3>
                       <p className="text-xs text-neutral-500">
                         {player.team} vs {player.opponent} · {player.position}
                       </p>

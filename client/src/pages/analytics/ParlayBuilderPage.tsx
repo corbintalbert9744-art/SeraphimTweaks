@@ -6,6 +6,8 @@ import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { mockNbaProps } from "@/data/nbaMock";
 import { mockNflProps, formatAmericanOdds } from "@/data/nflMock";
+import { mockTennisProps, tennisToBuilderLeg } from "@/data/tennisMock";
+import { mockWnbaProps, wnbaToBuilderLeg } from "@/data/wnbaMock";
 import { nbaToBuilderLeg, nflToBuilderLeg } from "@/lib/builderMappers";
 import { cn } from "@/lib/utils";
 import { Plus, Trash2 } from "lucide-react";
@@ -14,8 +16,10 @@ export default function ParlayBuilderPage() {
   const { legs, addLeg, removeLeg, hasLeg, clear } = useParlayDraft();
 
   const quickAdds = [
-    ...mockNbaProps.slice(0, 4).map(nbaToBuilderLeg),
-    ...mockNflProps.slice(0, 4).map(nflToBuilderLeg),
+    ...mockNbaProps.slice(0, 2).map(nbaToBuilderLeg),
+    ...mockNflProps.slice(0, 2).map(nflToBuilderLeg),
+    ...mockTennisProps.slice(0, 2).map(tennisToBuilderLeg),
+    ...mockWnbaProps.slice(0, 2).map(wnbaToBuilderLeg),
   ].filter((p) => !hasLeg(p.id));
 
   const combinedEv =
@@ -35,18 +39,36 @@ export default function ParlayBuilderPage() {
         title="Parlay Builder"
         description="Legs from NBA and NFL boards land here. Pricing is mocked until the calc API is connected."
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link
               href="/nba"
-              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-4 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
+              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
             >
-              NBA board
+              NBA
             </Link>
             <Link
               href="/nfl"
-              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-4 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
+              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
             >
-              NFL board
+              NFL
+            </Link>
+            <Link
+              href="/wnba"
+              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
+            >
+              WNBA
+            </Link>
+            <Link
+              href="/atp"
+              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
+            >
+              ATP
+            </Link>
+            <Link
+              href="/wta"
+              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
+            >
+              WTA
             </Link>
           </div>
         }

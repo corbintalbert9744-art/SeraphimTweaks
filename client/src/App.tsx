@@ -7,14 +7,17 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import { ParlayDraftProvider } from "@/components/parlay/ParlayDraftContext";
+import "@/data/registerLeagueProps";
 import DashboardPage from "@/pages/analytics/DashboardPage";
 import NbaPage from "@/pages/analytics/NbaPage";
 import NflPage from "@/pages/analytics/NflPage";
-import LeaguePage from "@/pages/analytics/LeaguePage";
+import TennisPage from "@/pages/analytics/TennisPage";
+import WnbaPage from "@/pages/analytics/WnbaPage";
+import PlayerPage from "@/pages/analytics/PlayerPage";
+import PropDetailPage from "@/pages/analytics/PropDetailPage";
 import ParlayBuilderPage from "@/pages/analytics/ParlayBuilderPage";
 import SettingsPage from "@/pages/analytics/SettingsPage";
 import NotFound from "@/pages/not-found";
-import type { LeagueCode } from "@/data/mock";
 
 function ScrollToTop() {
   const [location] = useLocation();
@@ -22,10 +25,6 @@ function ScrollToTop() {
     window.scrollTo(0, 0);
   }, [location]);
   return null;
-}
-
-function LeagueRoute({ league }: { league: LeagueCode }) {
-  return <LeaguePage league={league} />;
 }
 
 function Router() {
@@ -36,9 +35,11 @@ function Router() {
           <Route path="/" component={DashboardPage} />
           <Route path="/nba" component={NbaPage} />
           <Route path="/nfl" component={NflPage} />
-          <Route path="/atp">{() => <LeagueRoute league="ATP" />}</Route>
-          <Route path="/wta">{() => <LeagueRoute league="WTA" />}</Route>
-          <Route path="/wnba">{() => <LeagueRoute league="WNBA" />}</Route>
+          <Route path="/atp">{() => <TennisPage tour="ATP" />}</Route>
+          <Route path="/wta">{() => <TennisPage tour="WTA" />}</Route>
+          <Route path="/wnba" component={WnbaPage} />
+          <Route path="/player/:id" component={PlayerPage} />
+          <Route path="/prop/:id" component={PropDetailPage} />
           <Route path="/parlay-builder" component={ParlayBuilderPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route component={NotFound} />

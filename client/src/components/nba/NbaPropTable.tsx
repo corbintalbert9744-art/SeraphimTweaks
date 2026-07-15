@@ -1,4 +1,5 @@
 import { Plus, Check } from "lucide-react";
+import { Link } from "wouter";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { formatAmericanOdds, type NbaProp } from "@/data/nbaMock";
@@ -43,12 +44,18 @@ export function NbaPropTable({ rows }: { rows: NbaProp[] }) {
               return (
                 <tr key={row.id} className="transition hover:bg-yellow-500/[0.03]">
                   <td className="px-4 py-3.5">
-                    <p className="font-medium text-neutral-100">{row.player}</p>
+                    <Link href={`/player/${row.playerId}`} className="font-medium text-neutral-100 hover:text-yellow-400">
+                      {row.player}
+                    </Link>
                     <p className="text-xs text-neutral-500">
                       {row.team} vs {row.opponent} · {row.position} · {row.tipTime}
                     </p>
                   </td>
-                  <td className="px-4 py-3.5 text-neutral-300">{row.market}</td>
+                  <td className="px-4 py-3.5">
+                    <Link href={`/prop/${row.id}`} className="text-neutral-300 hover:text-yellow-400">
+                      {row.market}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3.5 tabular-nums text-neutral-200">
                     {row.side} {row.line}
                   </td>
