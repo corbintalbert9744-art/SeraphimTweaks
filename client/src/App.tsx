@@ -18,6 +18,7 @@ import ResearchHubPage from "@/pages/analytics/ResearchHubPage";
 import PlayerPage from "@/pages/analytics/PlayerPage";
 import PropDetailPage from "@/pages/analytics/PropDetailPage";
 import ParlayBuilderPage from "@/pages/analytics/ParlayBuilderPage";
+import AlertsPage from "@/pages/analytics/AlertsPage";
 import SettingsPage from "@/pages/analytics/SettingsPage";
 import NotFound from "@/pages/not-found";
 
@@ -45,6 +46,7 @@ function Router() {
           <Route path="/player/:id" component={PlayerPage} />
           <Route path="/prop/:id" component={PropDetailPage} />
           <Route path="/parlay-builder" component={ParlayBuilderPage} />
+          <Route path="/alerts" component={AlertsPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route component={NotFound} />
         </Switch>

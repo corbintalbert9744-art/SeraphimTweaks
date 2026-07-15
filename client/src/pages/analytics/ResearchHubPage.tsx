@@ -11,9 +11,17 @@ export default function ResearchHubPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Reports"
+        eyebrow="Research"
         title="Research Reports"
-        description="Full prop write-ups with Over/Under, sportsbook comparison, no-vig, EV, Confidence, Research Score, hit rates, and line movement."
+        description="Full prop write-ups with Over/Under, sportsbook comparison, no-vig, EV, Confidence, Research Score, hit rates, and line movement. Use the sport tabs above to open a league board."
+        actions={
+          <Link
+            href="/players"
+            className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
+          >
+            Player Profiles
+          </Link>
+        }
       />
 
       <div className="card-3d overflow-hidden rounded-2xl border border-[#1a1a1a]">

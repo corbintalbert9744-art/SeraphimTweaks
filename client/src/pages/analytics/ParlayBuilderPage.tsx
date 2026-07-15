@@ -50,26 +50,7 @@ export default function ParlayBuilderPage() {
       <PageHeader
         eyebrow="Tools"
         title="Parlay Builder"
-        description="Build slips with Over/Under toggles, L10 hit rates, and the game log behind every number."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {[
-              ["/nba", "NBA"],
-              ["/nfl", "NFL"],
-              ["/wnba", "WNBA"],
-              ["/atp", "ATP"],
-              ["/wta", "WTA"],
-            ].map(([href, label]) => (
-              <Link
-                key={href}
-                href={href}
-                className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        }
+        description="Build slips with Over/Under toggles, L10 hit rates, and the game log behind every number. Switch leagues from the sport tabs above."
       />
 
       <div className="grid gap-6 xl:grid-cols-5">

@@ -1,32 +1,22 @@
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
-  Trophy,
-  CircleDot,
-  Activity,
-  Target,
-  Users,
   Layers,
   Settings,
   ChevronLeft,
   ChevronRight,
   X,
-  UserRound,
   FileSearch,
+  BellRing,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/nba", label: "NBA", icon: CircleDot },
-  { href: "/nfl", label: "NFL", icon: Trophy },
-  { href: "/players", label: "Player Profiles", icon: UserRound },
-  { href: "/research", label: "Research Reports", icon: FileSearch },
-  { href: "/atp", label: "ATP Tennis", icon: Activity },
-  { href: "/wta", label: "WTA Tennis", icon: Target },
-  { href: "/wnba", label: "WNBA", icon: Users },
+  { href: "/research", label: "Research", icon: FileSearch },
   { href: "/parlay-builder", label: "Parlay Builder", icon: Layers },
+  { href: "/alerts", label: "Alerts", icon: BellRing },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -42,8 +32,8 @@ export function Sidebar() {
       )}
     >
       <div className={cn("flex h-16 items-center border-b border-[#1a1a1a] px-4", collapsed ? "justify-center" : "justify-between")}>
-        <Link href="/" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 min-w-0">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-yellow-400/20 to-amber-600/10 border border-yellow-500/30">
+        <Link href="/" onClick={() => setMobileOpen(false)} className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-yellow-500/30 bg-gradient-to-br from-yellow-400/20 to-amber-600/10">
             <span className="h-2.5 w-2.5 rounded-full bg-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.8)]" />
           </span>
           {!collapsed && (
@@ -55,7 +45,7 @@ export function Sidebar() {
         </Link>
         <button
           type="button"
-          className="hidden lg:flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 hover:bg-white/5 hover:text-yellow-400 transition-colors"
+          className="hidden h-8 w-8 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-white/5 hover:text-yellow-400 lg:flex"
           onClick={() => setCollapsed(!collapsed)}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
@@ -63,7 +53,7 @@ export function Sidebar() {
         </button>
         <button
           type="button"
-          className="lg:hidden flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 hover:bg-white/5"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 hover:bg-white/5 lg:hidden"
           onClick={() => setMobileOpen(false)}
           aria-label="Close menu"
         >
@@ -71,7 +61,7 @@ export function Sidebar() {
         </button>
       </div>
 
-      <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {navItems.map((item) => {
           const active = location === item.href || (item.href !== "/" && location.startsWith(item.href));
           const Icon = item.icon;
@@ -81,15 +71,20 @@ export function Sidebar() {
               href={item.href}
               onClick={() => setMobileOpen(false)}
               className={cn(
-                "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200",
+                "group flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-all duration-200",
                 active
-                  ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 shadow-[0_0_24px_-8px_rgba(234,179,8,0.45)]"
-                  : "text-neutral-400 border border-transparent hover:bg-white/[0.03] hover:text-neutral-100",
+                  ? "border-yellow-500/20 bg-yellow-500/10 text-yellow-400 shadow-[0_0_24px_-8px_rgba(234,179,8,0.45)]"
+                  : "border-transparent text-neutral-400 hover:bg-white/[0.03] hover:text-neutral-100",
                 collapsed && "justify-center px-0",
               )}
               title={collapsed ? item.label : undefined}
             >
-              <Icon className={cn("h-4 w-4 shrink-0", active ? "text-yellow-400" : "text-neutral-500 group-hover:text-neutral-300")} />
+              <Icon
+                className={cn(
+                  "h-4 w-4 shrink-0",
+                  active ? "text-yellow-400" : "text-neutral-500 group-hover:text-neutral-300",
+                )}
+              />
               {!collapsed && <span className="truncate font-medium">{item.label}</span>}
             </Link>
           );
@@ -105,9 +100,9 @@ export function Sidebar() {
         >
           {!collapsed ? (
             <>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-yellow-500/90">Research first</p>
+              <p className="text-[11px] font-medium uppercase tracking-wider text-yellow-500/90">Sports bar</p>
               <p className="mt-1 text-xs leading-relaxed text-neutral-400">
-                Edge + Research Score + Data Quality on every prop.
+                Switch NBA · NFL · ATP · WTA · WNBA from the tabs above the board.
               </p>
             </>
           ) : (
