@@ -10,6 +10,7 @@ import {
   authenticateUser,
   createUser,
   ensureOwnerAccount,
+  ensureStandardDemoAccount,
   getPublicUser,
   isOwnerEmail,
   protectOwnerMembership,
@@ -56,8 +57,9 @@ export function registerAuthAndBillingRoutes(app: Express) {
   configureSession(app);
   app.use(loadSessionUser);
 
-  // Seed owner account so it always exists with Active Pro access.
+  // Seed owner + Standard demo accounts.
   void ensureOwnerAccount().catch((err) => console.error("[owner] seed failed", err));
+  void ensureStandardDemoAccount().catch((err) => console.error("[standard-demo] seed failed", err));
 
   app.post("/api/auth/signup", async (req: AuthedRequest, res) => {
     try {

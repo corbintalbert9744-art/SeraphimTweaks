@@ -268,7 +268,10 @@ export function TopNav() {
                       {plan === "pro" ? (
                         <li>· Private Discord picks + AI analysis</li>
                       ) : (
-                        <li>· Full research boards & unlimited props</li>
+                        <>
+                          <li>· Full research boards & unlimited props</li>
+                          <li className="text-neutral-600">· No AI writeups or Discord picks</li>
+                        </>
                       )}
                     </ul>
                   </div>

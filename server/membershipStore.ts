@@ -388,6 +388,79 @@ export async function ensureOwnerAccount(): Promise<PublicUser> {
   return toPublic(user);
 }
 
+/** Demo Standard member for previewing gated Pro features. */
+export const STANDARD_DEMO_EMAIL = "standard@seraphim.iq";
+export const STANDARD_DEMO_PASSWORD = "Standard123!";
+
+export async function ensureStandardDemoAccount(): Promise<PublicUser> {
+  const passwordHash = await hashPassword(STANDARD_DEMO_PASSWORD);
+  const periodEnd = new Date();
+  periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+  const existing = await findUserByEmail(STANDARD_DEMO_EMAIL);
+  if (existing) {
+    await updateUserMembership(existing.id, {
+      membershipStatus: "active",
+      plan: "standard",
+      billingInterval: "monthly",
+      currentPeriodEnd: periodEnd,
+    });
+    if (isDatabaseConfigured()) {
+      const db = getDb();
+      await db
+        .update(users)
+        .set({ passwordHash, displayName: "Standard Member", updatedAt: new Date() })
+        .where(eq(users.id, existing.id));
+    } else {
+      const memUser = mem.get(existing.id);
+      if (memUser) {
+        memUser.passwordHash = passwordHash;
+        memUser.displayName = "Standard Member";
+        indexMem(memUser);
+      }
+    }
+    const fresh = await findUserById(existing.id);
+    return toPublic(fresh!);
+  }
+
+  if (isDatabaseConfigured()) {
+    const db = getDb();
+    const [row] = await db
+      .insert(users)
+      .values({
+        email: STANDARD_DEMO_EMAIL,
+        username: STANDARD_DEMO_EMAIL,
+        passwordHash,
+        displayName: "Standard Member",
+        membershipStatus: "active",
+        plan: "standard",
+        billingInterval: "monthly",
+        currentPeriodEnd: periodEnd,
+      })
+      .returning();
+    return toPublic(fromDbRow(row));
+  }
+
+  const now = new Date();
+  const user: MembershipRecord = {
+    id: randomUUID(),
+    email: STANDARD_DEMO_EMAIL,
+    username: STANDARD_DEMO_EMAIL,
+    passwordHash,
+    displayName: "Standard Member",
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    membershipStatus: "active",
+    plan: "standard",
+    billingInterval: "monthly",
+    currentPeriodEnd: periodEnd,
+    createdAt: now,
+    updatedAt: now,
+  };
+  indexMem(user);
+  return toPublic(user);
+}
+
 /** Keep owner membership Active even if a webhook tries to revoke it. */
 export async function protectOwnerMembership(userId: string): Promise<PublicUser | null> {
   const user = await findUserById(userId);

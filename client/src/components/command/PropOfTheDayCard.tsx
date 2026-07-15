@@ -4,6 +4,7 @@ import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { withLegHitData } from "@/lib/legStats";
 import { cn } from "@/lib/utils";
+import { useIsPro } from "@/components/membership/ProOnly";
 
 export type WhyPillar = {
   id: string;
@@ -50,8 +51,9 @@ export type PropOfDay = {
 
 export function PropOfTheDayCard({ prop }: { prop: PropOfDay }) {
   const { addLeg, hasLeg } = useParlayDraft();
+  const isPro = useIsPro();
   const added = hasLeg(prop.id);
-  const why = prop.why;
+  const why = isPro ? prop.why : undefined;
   const initials = (prop.shortName ?? prop.player)
     .split(/\s+/)
     .map((p) => p[0])
@@ -129,6 +131,15 @@ export function PropOfTheDayCard({ prop }: { prop: PropOfDay }) {
 
       {why && (
         <p className="mt-3 text-xs leading-relaxed text-neutral-400">{why.headline}</p>
+      )}
+      {!isPro && (
+        <p className="mt-3 rounded-lg border border-yellow-500/20 bg-yellow-500/[0.04] px-3 py-2 text-xs text-neutral-400">
+          Premium insight writeup is Pro-only. Standard still includes EV, confidence, Research Score,
+          L10, and the checklist.{" "}
+          <Link href="/pricing" className="font-medium text-yellow-400 hover:underline">
+            Upgrade to Pro
+          </Link>
+        </p>
       )}
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums text-neutral-300">

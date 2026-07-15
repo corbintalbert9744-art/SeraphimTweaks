@@ -9,6 +9,7 @@ import { getPropsForPlayer, formatAmericanOdds } from "@/data/propsCatalog";
 import "@/data/registerLeagueProps";
 import { propIdToBuilderLeg } from "@/lib/addPropToBuilder";
 import { cn } from "@/lib/utils";
+import { ProOnly } from "@/components/membership/ProOnly";
 
 function PerformanceChart({
   logs,
@@ -403,23 +404,28 @@ export default function PlayerPage() {
         <div className="space-y-6">
           <ResearchChecklist profile={profile} />
 
-          <section
-            className={cn(
-              "card-3d rounded-2xl border p-5",
-              profile.aiExplain.verdict === "strong" && "border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.08] to-transparent",
-              profile.aiExplain.verdict === "weak" && "border-red-500/25 bg-gradient-to-br from-red-500/[0.08] to-transparent",
-              profile.aiExplain.verdict === "neutral" && "border-[#1a1a1a]",
-            )}
+          <ProOnly
+            title="AI explainability"
+            description="Pro unlocks AI writeups on every player profile. Standard keeps Research Score, splits, streaks, and matchup context."
           >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-yellow-500/90">
-              AI explainability
-            </p>
-            <h2 className="mt-2 text-base font-semibold text-white">{profile.aiExplain.headline}</h2>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-400">{profile.aiExplain.body}</p>
-            <p className="mt-3 text-[10px] uppercase tracking-wider text-neutral-600">
-              Verdict: {profile.aiExplain.verdict}
-            </p>
-          </section>
+            <section
+              className={cn(
+                "card-3d rounded-2xl border p-5",
+                profile.aiExplain.verdict === "strong" && "border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.08] to-transparent",
+                profile.aiExplain.verdict === "weak" && "border-red-500/25 bg-gradient-to-br from-red-500/[0.08] to-transparent",
+                profile.aiExplain.verdict === "neutral" && "border-[#1a1a1a]",
+              )}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-yellow-500/90">
+                AI explainability
+              </p>
+              <h2 className="mt-2 text-base font-semibold text-white">{profile.aiExplain.headline}</h2>
+              <p className="mt-3 text-sm leading-relaxed text-neutral-400">{profile.aiExplain.body}</p>
+              <p className="mt-3 text-[10px] uppercase tracking-wider text-neutral-600">
+                Verdict: {profile.aiExplain.verdict}
+              </p>
+            </section>
+          </ProOnly>
 
           <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
             <h2 className="text-base font-semibold text-white">{profile.matchup.title}</h2>

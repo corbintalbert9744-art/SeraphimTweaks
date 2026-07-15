@@ -15,6 +15,7 @@ import "@/data/registerLeagueProps";
 import { propIdToBuilderLeg } from "@/lib/addPropToBuilder";
 import { recomputeLegSide } from "@/lib/legStats";
 import { cn } from "@/lib/utils";
+import { ProOnly } from "@/components/membership/ProOnly";
 
 function MovementChart({
   points,
@@ -275,17 +276,22 @@ export default function PropDetailPage() {
             </div>
           </section>
 
-          <section data-feature="ai-analysis" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
-            <h2 className="text-base font-semibold text-white">AI explanation</h2>
-            <ul className="mt-3 space-y-2">
-              {prop.analysis.map((line) => (
-                <li key={line} className="text-sm leading-relaxed text-neutral-400">
-                  <span className="mr-2 text-yellow-500">•</span>
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </section>
+          <ProOnly
+            title="AI explanation"
+            description="Pro members get prop-level AI writeups that call out no-vig, hit rates, and matchup context. Standard includes Research Score, hit rates, and books without the AI narrative."
+          >
+            <section data-feature="ai-analysis" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
+              <h2 className="text-base font-semibold text-white">AI explanation</h2>
+              <ul className="mt-3 space-y-2">
+                {prop.analysis.map((line) => (
+                  <li key={line} className="text-sm leading-relaxed text-neutral-400">
+                    <span className="mr-2 text-yellow-500">•</span>
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </ProOnly>
 
           {similar.length > 0 && (
             <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">

@@ -3,9 +3,11 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { LeagueBadge } from "@/components/shared/LeagueBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { listPlayerProfiles } from "@/data/playersMock";
+import { useIsPro } from "@/components/membership/ProOnly";
 
 export default function PlayersHubPage() {
   const players = listPlayerProfiles().sort((a, b) => b.researchScore - a.researchScore);
+  const isPro = useIsPro();
 
   return (
     <div>
@@ -48,7 +50,15 @@ export default function PlayersHubPage() {
                 {player.injury === "None" ? "Healthy" : player.injury}
               </span>
             </div>
-            <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-neutral-400">{player.aiExplain.headline}</p>
+            {isPro ? (
+              <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-neutral-400">
+                {player.aiExplain.headline}
+              </p>
+            ) : (
+              <p className="mt-3 text-xs text-neutral-500">
+                Research Score {player.researchScore} · AI writeups on Pro
+              </p>
+            )}
             <p className="mt-4 text-[11px] font-medium uppercase tracking-wider text-yellow-500/80">
               Open Player Profile →
             </p>
