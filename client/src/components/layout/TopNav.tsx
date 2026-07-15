@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Bell, Menu, Search, User } from "lucide-react";
+import { Bell, LogOut, Menu, Search, Settings, User } from "lucide-react";
 import { mockPlayers, type PlayerSearchResult } from "@/data/mock";
 import { getPlayerProfile, listPlayerProfiles } from "@/data/playersMock";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 
@@ -13,7 +14,6 @@ function buildSearchIndex(): PlayerSearchResult[] {
     byId.set(p.id, p);
   }
 
-  // Prefer rich profile records (same ids power /player/:id)
   for (const profile of listPlayerProfiles()) {
     byId.set(profile.id, {
       id: profile.id,
@@ -31,7 +31,6 @@ const SEARCH_INDEX = buildSearchIndex();
 
 function hrefForPlayer(player: PlayerSearchResult): string {
   if (getPlayerProfile(player.id)) return `/player/${player.id}`;
-  // No full profile yet — land on Research with a usable fallback board
   if (player.league === "NBA") return "/nba";
   if (player.league === "NFL") return "/nfl";
   if (player.league === "WNBA") return "/wnba";
@@ -43,10 +42,15 @@ function hrefForPlayer(player: PlayerSearchResult): string {
 export function TopNav() {
   const { collapsed, setMobileOpen } = useSidebar();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [signedIn, setSignedIn] = useState(true);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -62,20 +66,37 @@ export function TopNav() {
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) {
-        setOpen(false);
-        setNotifOpen(false);
-      }
+      const target = e.target as Node;
+      if (!wrapRef.current?.contains(target)) setOpen(false);
+      if (!notifRef.current?.contains(target)) setNotifOpen(false);
+      if (!profileRef.current?.contains(target)) setProfileOpen(false);
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
   function goToPlayer(player: PlayerSearchResult) {
-    const href = hrefForPlayer(player);
     setQuery("");
     setOpen(false);
-    setLocation(href);
+    setLocation(hrefForPlayer(player));
+  }
+
+  function handleSignOut() {
+    setProfileOpen(false);
+    setSignedIn(false);
+    toast({
+      title: "Signed out",
+      description: "You’re signed out of this mock session. Auth wiring comes next.",
+    });
+  }
+
+  function handleSignIn() {
+    setSignedIn(true);
+    setProfileOpen(false);
+    toast({
+      title: "Welcome back",
+      description: "Signed in as Analyst · Pro (mock).",
+    });
   }
 
   return (
@@ -88,7 +109,7 @@ export function TopNav() {
     >
       <button
         type="button"
-        className="lg:hidden flex h-10 w-10 items-center justify-center rounded-lg border border-[#1a1a1a] bg-[#111] text-neutral-300 hover:text-yellow-400"
+        className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#1a1a1a] bg-[#111] text-neutral-300 hover:text-yellow-400 lg:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="Open sidebar"
       >
@@ -157,11 +178,14 @@ export function TopNav() {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <div className="relative">
+        <div className="relative" ref={notifRef}>
           <button
             type="button"
             className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-[#1a1a1a] bg-[#111] text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
-            onClick={() => setNotifOpen((v) => !v)}
+            onClick={() => {
+              setNotifOpen((v) => !v);
+              setProfileOpen(false);
+            }}
             aria-label="Notifications"
           >
             <Bell className="h-4 w-4" />
@@ -182,18 +206,106 @@ export function TopNav() {
           )}
         </div>
 
-        <button
-          type="button"
-          className="flex items-center gap-2 rounded-xl border border-[#1a1a1a] bg-[#111] py-1.5 pl-1.5 pr-3 text-sm text-neutral-200 transition hover:border-yellow-500/30"
-        >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-yellow-400/25 to-amber-700/20 text-yellow-400">
-            <User className="h-4 w-4" />
-          </span>
-          <span className="hidden sm:block">
-            <span className="block text-xs font-medium text-white">Analyst</span>
-            <span className="block text-[10px] text-neutral-500">Pro · Mock</span>
-          </span>
-        </button>
+        <div className="relative" ref={profileRef}>
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={profileOpen}
+            onClick={() => {
+              setProfileOpen((v) => !v);
+              setNotifOpen(false);
+            }}
+            className={cn(
+              "flex items-center gap-2 rounded-xl border bg-[#111] py-1.5 pl-1.5 pr-3 text-sm text-neutral-200 transition",
+              profileOpen ? "border-yellow-500/40" : "border-[#1a1a1a] hover:border-yellow-500/30",
+            )}
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-yellow-400/25 to-amber-700/20 text-yellow-400">
+              <User className="h-4 w-4" />
+            </span>
+            <span className="hidden text-left sm:block">
+              <span className="block text-xs font-medium text-white">{signedIn ? "Analyst" : "Guest"}</span>
+              <span className="block text-[10px] text-neutral-500">
+                {signedIn ? "Pro · Mock" : "Signed out"}
+              </span>
+            </span>
+          </button>
+
+          {profileOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-[calc(100%+8px)] w-72 overflow-hidden rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] shadow-2xl animate-in fade-in slide-in-from-top-1 duration-200"
+            >
+              {signedIn ? (
+                <>
+                  <div className="border-b border-[#1a1a1a] px-4 py-3">
+                    <p className="text-sm font-medium text-white">Analyst</p>
+                    <p className="text-xs text-neutral-500">analyst@seraphim.mock</p>
+                  </div>
+
+                  <div className="border-b border-[#1a1a1a] px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-neutral-500">
+                        Membership
+                      </p>
+                      <span className="rounded border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-400">
+                        Pro
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-neutral-200">Seraphim Pro</p>
+                    <p className="mt-1 text-xs leading-relaxed text-neutral-500">
+                      Full research boards, Prop of the Day, Parlay Builder, and alerts. Renews monthly ·
+                      mock billing.
+                    </p>
+                    <ul className="mt-2 space-y-1 text-[11px] text-neutral-400">
+                      <li>· Live ESPN NBA slate access</li>
+                      <li>· Research Score + DQS on props</li>
+                      <li>· Saved parlays (coming with auth)</li>
+                    </ul>
+                  </div>
+
+                  <div className="p-1.5">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-neutral-300 transition hover:bg-white/[0.04] hover:text-white"
+                      onClick={() => {
+                        setProfileOpen(false);
+                        setLocation("/settings");
+                      }}
+                    >
+                      <Settings className="h-4 w-4 text-neutral-500" />
+                      Settings
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-red-300 transition hover:bg-red-500/10"
+                      onClick={handleSignOut}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign out
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="p-4">
+                  <p className="text-sm font-medium text-white">You’re signed out</p>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    Sign back in to restore Pro membership features (mock session).
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-3 w-full rounded-lg bg-yellow-500 px-3 py-2 text-sm font-semibold text-black transition hover:bg-yellow-400"
+                    onClick={handleSignIn}
+                  >
+                    Sign in
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
