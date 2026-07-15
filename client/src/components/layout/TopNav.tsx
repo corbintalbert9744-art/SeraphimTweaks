@@ -1,11 +1,48 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { Bell, Menu, Search, User } from "lucide-react";
 import { mockPlayers, type PlayerSearchResult } from "@/data/mock";
+import { getPlayerProfile, listPlayerProfiles } from "@/data/playersMock";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 
+function buildSearchIndex(): PlayerSearchResult[] {
+  const byId = new Map<string, PlayerSearchResult>();
+
+  for (const p of mockPlayers) {
+    byId.set(p.id, p);
+  }
+
+  // Prefer rich profile records (same ids power /player/:id)
+  for (const profile of listPlayerProfiles()) {
+    byId.set(profile.id, {
+      id: profile.id,
+      name: profile.name,
+      league: profile.league,
+      team: profile.team,
+      position: profile.position,
+    });
+  }
+
+  return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const SEARCH_INDEX = buildSearchIndex();
+
+function hrefForPlayer(player: PlayerSearchResult): string {
+  if (getPlayerProfile(player.id)) return `/player/${player.id}`;
+  // No full profile yet — land on Research with a usable fallback board
+  if (player.league === "NBA") return "/nba";
+  if (player.league === "NFL") return "/nfl";
+  if (player.league === "WNBA") return "/wnba";
+  if (player.league === "ATP") return "/atp";
+  if (player.league === "WTA") return "/wta";
+  return "/players";
+}
+
 export function TopNav() {
   const { collapsed, setMobileOpen } = useSidebar();
+  const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -14,12 +51,13 @@ export function TopNav() {
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [] as PlayerSearchResult[];
-    return mockPlayers.filter(
+    return SEARCH_INDEX.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.team.toLowerCase().includes(q) ||
-        p.league.toLowerCase().includes(q),
-    );
+        p.league.toLowerCase().includes(q) ||
+        p.position.toLowerCase().includes(q),
+    ).slice(0, 8);
   }, [query]);
 
   useEffect(() => {
@@ -32,6 +70,13 @@ export function TopNav() {
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
+
+  function goToPlayer(player: PlayerSearchResult) {
+    const href = hrefForPlayer(player);
+    setQuery("");
+    setOpen(false);
+    setLocation(href);
+  }
 
   return (
     <header
@@ -50,7 +95,7 @@ export function TopNav() {
         <Menu className="h-4 w-4" />
       </button>
 
-      <div className="relative flex-1 max-w-xl" ref={wrapRef}>
+      <div className="relative max-w-xl flex-1" ref={wrapRef}>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
           <input
@@ -60,8 +105,20 @@ export function TopNav() {
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
-            placeholder="Search players across NBA, NFL, WNBA, ATP, WTA…"
-            className="h-11 w-full rounded-xl border border-[#1a1a1a] bg-[#111]/90 pl-10 pr-4 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none transition focus:border-yellow-500/40 focus:ring-2 focus:ring-yellow-500/15"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && results[0]) {
+                e.preventDefault();
+                goToPlayer(results[0]);
+              }
+              if (e.key === "Escape") {
+                setOpen(false);
+                setQuery("");
+              }
+            }}
+            placeholder="Search players…"
+            className="h-11 w-full rounded-xl border border-[#1a1a1a] bg-[#111]/90 pl-10 pr-4 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-500 focus:border-yellow-500/40 focus:ring-2 focus:ring-yellow-500/15"
+            aria-autocomplete="list"
+            aria-expanded={open && query.trim().length > 0}
           />
         </div>
         {open && query.trim() && (
@@ -69,29 +126,30 @@ export function TopNav() {
             {results.length === 0 ? (
               <p className="px-4 py-6 text-sm text-neutral-500">No players match “{query}”.</p>
             ) : (
-              <ul className="max-h-72 overflow-y-auto py-1">
-                {results.map((player) => (
-                  <li key={player.id}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-white/[0.03]"
-                      onClick={() => {
-                        setQuery(player.name);
-                        setOpen(false);
-                      }}
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-neutral-100">{player.name}</p>
-                        <p className="text-xs text-neutral-500">
-                          {player.team} · {player.position}
-                        </p>
-                      </div>
-                      <span className="rounded-md border border-yellow-500/20 bg-yellow-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-yellow-400">
-                        {player.league}
-                      </span>
-                    </button>
-                  </li>
-                ))}
+              <ul className="max-h-72 overflow-y-auto py-1" role="listbox">
+                {results.map((player) => {
+                  const hasProfile = Boolean(getPlayerProfile(player.id));
+                  return (
+                    <li key={player.id} role="option">
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-white/[0.04]"
+                        onClick={() => goToPlayer(player)}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-neutral-100">{player.name}</p>
+                          <p className="truncate text-xs text-neutral-500">
+                            {player.team} · {player.position}
+                            {hasProfile ? " · Open profile" : " · Board"}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-md border border-yellow-500/20 bg-yellow-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-yellow-400">
+                          {player.league}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

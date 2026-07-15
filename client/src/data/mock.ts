@@ -353,14 +353,14 @@ export const mockFeed: FeedItem[] = [
 ];
 
 export const mockPlayers: PlayerSearchResult[] = [
-  { id: "pl1", name: "Jayson Tatum", league: "NBA", team: "Boston Celtics", position: "SF" },
-  { id: "pl2", name: "Shai Gilgeous-Alexander", league: "NBA", team: "OKC Thunder", position: "PG" },
-  { id: "pl3", name: "Patrick Mahomes", league: "NFL", team: "Kansas City Chiefs", position: "QB" },
-  { id: "pl4", name: "Caitlin Clark", league: "WNBA", team: "Indiana Fever", position: "G" },
-  { id: "pl5", name: "Jannik Sinner", league: "ATP", team: "Italy", position: "RHB" },
-  { id: "pl6", name: "Iga Swiatek", league: "WTA", team: "Poland", position: "RHB" },
-  { id: "pl7", name: "A'ja Wilson", league: "WNBA", team: "Las Vegas Aces", position: "F" },
-  { id: "pl8", name: "Justin Jefferson", league: "NFL", team: "Minnesota Vikings", position: "WR" },
+  { id: "tatum", name: "Jayson Tatum", league: "NBA", team: "Boston Celtics", position: "SF" },
+  { id: "sga", name: "Shai Gilgeous-Alexander", league: "NBA", team: "OKC Thunder", position: "PG" },
+  { id: "mahomes", name: "Patrick Mahomes", league: "NFL", team: "Kansas City Chiefs", position: "QB" },
+  { id: "jefferson", name: "Justin Jefferson", league: "NFL", team: "Minnesota Vikings", position: "WR" },
+  { id: "clark", name: "Caitlin Clark", league: "WNBA", team: "Indiana Fever", position: "G" },
+  { id: "wilson", name: "A'ja Wilson", league: "WNBA", team: "Las Vegas Aces", position: "F" },
+  { id: "sinner", name: "Jannik Sinner", league: "ATP", team: "Italy", position: "RHB" },
+  { id: "swiatek", name: "Iga Swiatek", league: "WTA", team: "Poland", position: "RHB" },
 ];
 
 export const mockChartEvTrend = [
