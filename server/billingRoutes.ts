@@ -170,6 +170,7 @@ export function registerAuthAndBillingRoutes(app: Express) {
   app.get("/api/billing/config", (_req, res) => {
     res.json({
       stripeConfigured: isStripeConfigured(),
+      webhookConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET?.trim() && !process.env.STRIPE_WEBHOOK_SECRET.includes("...")),
       intervals: ["monthly", "yearly"],
       plans: ["standard", "pro"],
       pricesConfigured: Boolean(
