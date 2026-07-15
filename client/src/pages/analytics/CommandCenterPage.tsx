@@ -35,17 +35,17 @@ export default function CommandCenterPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         eyebrow="Command Center"
-        title="Where is the edge today?"
-        description="Best EV, highest confidence, injury alerts, top props, and games on the clock — answered in one screen."
+        title="Edge today"
+        description="Best EV, confidence, injuries, and the featured prop — without the noise."
         actions={
           <button
             type="button"
             onClick={() => refetch()}
             disabled={isFetching}
-            className="btn-3d rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-4 py-2 text-sm font-semibold text-black transition hover:brightness-105 disabled:opacity-60"
+            className="rounded-lg border border-[#1a1a1a] bg-[#111] px-3 py-1.5 text-xs font-medium text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400 disabled:opacity-60"
           >
             {isFetching ? "Refreshing…" : "Refresh"}
           </button>
@@ -227,11 +227,11 @@ function MetricCard({
   accent?: "emerald" | "gold";
 }) {
   return (
-    <div className="card-3d rounded-2xl border border-[#1a1a1a] p-4 transition duration-300 hover:-translate-y-0.5 hover:border-yellow-500/25">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{label}</p>
+    <div className="rounded-xl border border-[#1a1a1a] bg-[#0c0c0c] p-3 transition hover:border-neutral-700">
+      <p className="text-[10px] font-medium uppercase tracking-wider text-neutral-500">{label}</p>
       <p
         className={cn(
-          "mt-2 text-2xl font-semibold tabular-nums",
+          "mt-1 text-xl font-semibold tabular-nums",
           accent === "emerald" && "text-emerald-300",
           accent === "gold" && "text-yellow-400",
           !accent && "text-white",
@@ -239,7 +239,7 @@ function MetricCard({
       >
         {value}
       </p>
-      <p className="mt-1 truncate text-xs text-neutral-500">{sub}</p>
+      <p className="mt-0.5 truncate text-[11px] text-neutral-500">{sub}</p>
     </div>
   );
 }
