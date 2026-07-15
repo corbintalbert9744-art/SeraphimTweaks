@@ -9,6 +9,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ParlayDraftProvider } from "@/components/parlay/ParlayDraftContext";
 import "@/data/registerLeagueProps";
 import DashboardPage from "@/pages/analytics/DashboardPage";
+import CommandCenterPage from "@/pages/analytics/CommandCenterPage";
 import NbaPage from "@/pages/analytics/NbaPage";
 import NflPage from "@/pages/analytics/NflPage";
 import TennisPage from "@/pages/analytics/TennisPage";
@@ -35,7 +36,8 @@ function Router() {
     <ParlayDraftProvider>
       <AppShell>
         <Switch>
-          <Route path="/" component={DashboardPage} />
+          <Route path="/" component={CommandCenterPage} />
+          <Route path="/dashboard" component={DashboardPage} />
           <Route path="/nba" component={NbaPage} />
           <Route path="/nfl" component={NflPage} />
           <Route path="/players" component={PlayersHubPage} />

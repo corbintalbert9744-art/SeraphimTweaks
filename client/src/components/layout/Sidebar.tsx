@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/", label: "Command Center", icon: LayoutDashboard },
   { href: "/research", label: "Research", icon: FileSearch },
   { href: "/parlay-builder", label: "Parlay Builder", icon: Layers },
   { href: "/alerts", label: "Alerts", icon: BellRing },
