@@ -36,8 +36,8 @@ export default function FeaturesPage() {
   return (
     <MarketingShell>
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--mkt-gold)]/80">Features</p>
-        <h1 className="mt-4 font-[family-name:var(--font-mkt-display)] text-4xl text-white sm:text-6xl">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-yellow-500/90">Features</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
           Built for serious prop research
         </h1>
         <p className="mt-5 max-w-2xl text-lg text-neutral-400">
@@ -62,13 +62,13 @@ export default function FeaturesPage() {
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
             href="/signup"
-            className="rounded-full bg-[var(--mkt-gold)] px-6 py-3 text-sm font-semibold text-black transition hover:brightness-110"
+            className="rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-6 py-3 text-sm font-semibold text-black transition hover:brightness-110"
           >
             Start Free Trial
           </Link>
           <Link
             href="/pricing"
-            className="rounded-full border border-white/15 px-6 py-3 text-sm text-white transition hover:border-[var(--mkt-gold)]/40"
+            className="rounded-full border border-white/15 px-6 py-3 text-sm text-white transition hover:border-yellow-500/40"
           >
             View Pricing
           </Link>

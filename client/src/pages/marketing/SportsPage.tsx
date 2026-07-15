@@ -32,10 +32,10 @@ export default function SportsPage() {
   return (
     <MarketingShell>
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--mkt-gold)]/80">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-yellow-500/90">
           Supported Sports
         </p>
-        <h1 className="mt-4 font-[family-name:var(--font-mkt-display)] text-4xl text-white sm:text-6xl">
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
           Research across six leagues
         </h1>
         <p className="mt-5 max-w-2xl text-lg text-neutral-400">
@@ -45,7 +45,7 @@ export default function SportsPage() {
         <div className="mt-16 grid gap-8 md:grid-cols-2">
           {sports.map((sport) => (
             <article key={sport.name} className="border-t border-white/10 pt-6">
-              <h2 className="font-[family-name:var(--font-mkt-display)] text-3xl text-white">{sport.name}</h2>
+              <h2 className="text-2xl font-semibold tracking-tight text-white">{sport.name}</h2>
               <p className="mt-3 text-neutral-400">{sport.blurb}</p>
             </article>
           ))}
@@ -53,7 +53,7 @@ export default function SportsPage() {
 
         <Link
           href="/signup"
-          className="mt-14 inline-flex rounded-full bg-[var(--mkt-gold)] px-6 py-3 text-sm font-semibold text-black transition hover:brightness-110"
+          className="mt-14 inline-flex rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-6 py-3 text-sm font-semibold text-black transition hover:brightness-110"
         >
           Become a Member
         </Link>

@@ -27,8 +27,8 @@ export default function FaqPage() {
   return (
     <MarketingShell>
       <div className="mx-auto max-w-3xl px-5 py-20 sm:px-8">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--mkt-gold)]/80">FAQ</p>
-        <h1 className="mt-4 font-[family-name:var(--font-mkt-display)] text-4xl text-white sm:text-5xl">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-yellow-500/90">FAQ</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
           Answers for members
         </h1>
         <p className="mt-5 text-lg text-neutral-400">
@@ -44,7 +44,7 @@ export default function FaqPage() {
               <summary className="cursor-pointer list-none text-lg text-white marker:content-none [&::-webkit-details-marker]:hidden">
                 <span className="flex items-start justify-between gap-4">
                   {item.q}
-                  <span className="mt-1 text-[var(--mkt-gold)] transition group-open:rotate-45">+</span>
+                  <span className="mt-1 text-yellow-400 transition group-open:rotate-45">+</span>
                 </span>
               </summary>
               <p className="mt-4 leading-relaxed text-neutral-400">{item.a}</p>
