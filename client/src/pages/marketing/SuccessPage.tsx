@@ -13,6 +13,7 @@ export default function SuccessPage() {
   const [tries, setTries] = useState(0);
   const [timedOut, setTimedOut] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (membershipActive) {
@@ -21,10 +22,11 @@ export default function SuccessPage() {
     }
   }, [membershipActive, setLocation]);
 
-  // Prefer retrieving the Checkout Session from Stripe (works without local webhook forwarding).
+  // Confirm from Stripe session_id even if the browser session cookie was lost.
   useEffect(() => {
-    if (!sessionId || membershipActive || loading || !isAuthenticated) return;
+    if (!sessionId || membershipActive || loading || confirming) return;
     let cancelled = false;
+    setConfirming(true);
     (async () => {
       try {
         const res = await fetch("/api/checkout/confirm", {
@@ -36,22 +38,26 @@ export default function SuccessPage() {
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as { error?: string };
           if (!cancelled) setConfirmError(data.error || res.statusText);
+        } else if (!cancelled) {
+          setConfirmError(null);
         }
         if (!cancelled) await refresh();
       } catch (err) {
         if (!cancelled) {
           setConfirmError(err instanceof Error ? err.message : "Could not confirm checkout");
         }
+      } finally {
+        if (!cancelled) setConfirming(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [sessionId, membershipActive, loading, isAuthenticated, refresh]);
+  }, [sessionId, membershipActive, loading, confirming, refresh]);
 
   useEffect(() => {
-    if (membershipActive || loading) return;
-    if (tries >= 12) {
+    if (membershipActive || loading || confirming) return;
+    if (tries >= 8) {
       setTimedOut(true);
       return;
     }
@@ -59,7 +65,35 @@ export default function SuccessPage() {
       void refresh().finally(() => setTries((n) => n + 1));
     }, 1500);
     return () => window.clearTimeout(t);
-  }, [membershipActive, loading, tries, refresh]);
+  }, [membershipActive, loading, confirming, tries, refresh]);
+
+  async function retryConfirm() {
+    setTimedOut(false);
+    setTries(0);
+    setConfirmError(null);
+    if (!sessionId) {
+      await refresh();
+      return;
+    }
+    setConfirming(true);
+    try {
+      const res = await fetch("/api/checkout/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sessionId }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setConfirmError(data.error || res.statusText);
+      }
+      await refresh();
+    } catch (err) {
+      setConfirmError(err instanceof Error ? err.message : "Could not confirm checkout");
+    } finally {
+      setConfirming(false);
+    }
+  }
 
   return (
     <MarketingShell>
@@ -78,7 +112,11 @@ export default function SuccessPage() {
           </p>
           {sessionId ? (
             <p className="mt-3 break-all text-[11px] text-neutral-600">Session {sessionId}</p>
-          ) : null}
+          ) : (
+            <p className="mt-3 text-sm text-amber-200/90">
+              Missing Checkout session id. If you already paid, log in and open the dashboard.
+            </p>
+          )}
           {confirmError ? (
             <p className="mt-3 text-sm text-amber-200/90">{confirmError}</p>
           ) : null}
@@ -86,17 +124,11 @@ export default function SuccessPage() {
           {timedOut && !membershipActive ? (
             <div className="mt-6 space-y-3">
               <p className="text-sm text-amber-200/90">
-                Still waiting on confirmation. Retry below, or ensure webhooks are forwarded to{" "}
-                <code className="text-yellow-300">/api/stripe/webhook</code>.
+                Still waiting on confirmation. Retry below — this re-checks Stripe directly.
               </p>
               <button
                 type="button"
-                onClick={() => {
-                  setTimedOut(false);
-                  setTries(0);
-                  setConfirmError(null);
-                  void refresh();
-                }}
+                onClick={() => void retryConfirm()}
                 className="rounded-xl bg-yellow-400 px-4 py-2.5 text-sm font-semibold text-black"
               >
                 Check again
@@ -105,19 +137,24 @@ export default function SuccessPage() {
           ) : (
             <div className="mt-6 flex items-center gap-2 text-sm text-neutral-400">
               <span className="h-2 w-2 animate-pulse rounded-full bg-yellow-400" />
-              {membershipActive ? "Redirecting…" : "Verifying payment…"}
+              {membershipActive ? "Redirecting…" : confirming ? "Confirming with Stripe…" : "Verifying payment…"}
             </div>
           )}
 
           <div className="mt-8 flex flex-wrap gap-3 text-sm">
-            {isAuthenticated && membershipActive ? (
+            {membershipActive ? (
               <Link href="/app" className="text-yellow-400 hover:underline">
                 Open dashboard
               </Link>
             ) : (
-              <Link href="/pricing" className="text-neutral-400 hover:text-yellow-400">
-                Back to pricing
-              </Link>
+              <>
+                <Link href="/login" className="text-yellow-400 hover:underline">
+                  Log in
+                </Link>
+                <Link href="/pricing" className="text-neutral-400 hover:text-yellow-400">
+                  Back to pricing
+                </Link>
+              </>
             )}
           </div>
         </div>

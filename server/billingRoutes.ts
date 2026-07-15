@@ -147,17 +147,20 @@ export function registerAuthAndBillingRoutes(app: Express) {
     }
   });
 
-  app.post("/api/checkout/confirm", requireAuth, async (req: AuthedRequest, res) => {
+  // Public confirm: restores the login session from a paid Stripe Checkout Session.
+  app.post("/api/checkout/confirm", async (req: AuthedRequest, res) => {
     try {
       if (!isStripeConfigured()) {
         return res.status(503).json({ error: "Stripe is not configured" });
       }
       const body = confirmSchema.parse(req.body);
       const result = await confirmCheckoutSession({
-        userId: req.user!.id,
+        userId: req.user?.id ?? null,
         sessionId: body.sessionId,
       });
-      const fresh = await getPublicUser(req.user!.id);
+      req.session.userId = result.userId;
+      const fresh = await getPublicUser(result.userId);
+      req.user = fresh ?? undefined;
       res.json({ ...result, user: fresh });
     } catch (err) {
       if (err instanceof z.ZodError) {

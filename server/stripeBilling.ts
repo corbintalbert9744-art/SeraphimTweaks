@@ -7,6 +7,7 @@ import type {
 import { isBillingInterval, isMembershipPlan, normalizeBillingInterval } from "@shared/membership";
 import {
   findUserById,
+  findUserByEmail,
   findUserByStripeCustomerId,
   findUserByStripeSubscriptionId,
   updateUserMembership,
@@ -283,16 +284,17 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
 }
 
 export async function confirmCheckoutSession(input: {
-  userId: string;
+  userId?: string | null;
   sessionId: string;
-}): Promise<{ membershipActive: boolean }> {
+}): Promise<{ membershipActive: boolean; userId: string }> {
   const stripe = getStripe();
   const session = await stripe.checkout.sessions.retrieve(input.sessionId, {
-    expand: ["subscription"],
+    expand: ["subscription", "customer"],
   });
 
-  const sessionUserId = session.client_reference_id || session.metadata?.userId;
-  if (!sessionUserId || sessionUserId !== input.userId) {
+  const sessionUserId = session.client_reference_id || session.metadata?.userId || null;
+
+  if (input.userId && sessionUserId && input.userId !== sessionUserId) {
     throw Object.assign(new Error("Checkout session does not belong to this user"), { status: 403 });
   }
 
@@ -304,6 +306,57 @@ export async function confirmCheckoutSession(input: {
     throw Object.assign(new Error("Checkout session is not paid yet"), { status: 402 });
   }
 
+  // Resolve / restore the local user. In-memory stores reset on server restart, so recreate from Stripe if needed.
+  let userId = sessionUserId;
+  let user = userId ? await findUserById(userId) : null;
+
+  const customerObj =
+    typeof session.customer === "object" && session.customer && !("deleted" in session.customer && session.customer.deleted)
+      ? session.customer
+      : null;
+  const customerId =
+    typeof session.customer === "string" ? session.customer : customerObj?.id || null;
+  const email =
+    session.customer_details?.email ||
+    customerObj?.email ||
+    session.customer_email ||
+    null;
+
+  if (!user && customerId) {
+    user = await findUserByStripeCustomerId(customerId);
+    if (user) userId = user.id;
+  }
+
+  if (!user && email) {
+    user = await findUserByEmail(email);
+    if (user) userId = user.id;
+  }
+
+  if (!user && email) {
+    const { createUser } = await import("./membershipStore");
+    const created = await createUser({
+      email,
+      password: `stripe-${session.id}`,
+      name: session.customer_details?.name || email.split("@")[0] || "Member",
+    });
+    userId = created.id;
+    user = await findUserById(userId);
+  }
+
+  if (!userId || !user) {
+    throw Object.assign(
+      new Error("Could not match this Checkout Session to an account. Please log in and try again."),
+      { status: 404 },
+    );
+  }
+
+  // Ensure metadata carries the resolved user for webhook handlers
+  if (!session.metadata) (session as { metadata?: Record<string, string> }).metadata = {};
+  session.metadata = { ...session.metadata, userId };
+  if (!session.client_reference_id) {
+    (session as { client_reference_id?: string | null }).client_reference_id = userId;
+  }
+
   await handleCheckoutSessionCompleted(session);
 
   const sub =
@@ -312,12 +365,26 @@ export async function confirmCheckoutSession(input: {
       : typeof session.subscription === "string"
         ? await stripe.subscriptions.retrieve(session.subscription)
         : null;
-  if (sub) await applySubscriptionToUser(sub);
+  if (sub) {
+    sub.metadata = { ...sub.metadata, userId };
+    await applySubscriptionToUser(sub);
+  } else {
+    // Still mark active from completed checkout if subscription expand failed
+    await updateUserMembership(userId, {
+      membershipStatus: "active",
+      stripeCustomerId: customerId,
+      stripeSubscriptionId:
+        typeof session.subscription === "string" ? session.subscription : session.subscription?.id || undefined,
+      plan: session.metadata?.plan || undefined,
+      billingInterval: session.metadata?.billingInterval || undefined,
+    });
+  }
 
-  const user = await findUserById(input.userId);
+  const fresh = await findUserById(userId);
   return {
+    userId,
     membershipActive: Boolean(
-      user && (user.membershipStatus === "active" || user.membershipStatus === "trialing"),
+      fresh && (fresh.membershipStatus === "active" || fresh.membershipStatus === "trialing"),
     ),
   };
 }
