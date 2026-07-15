@@ -1,48 +1,78 @@
 import { Link } from "wouter";
+import { Check } from "lucide-react";
 import { MarketingShell } from "@/components/marketing/MarketingShell";
 
 const features = [
   {
-    title: "Historical Hit Rates",
-    body: "L5, L10, L20, and season clear rates at the current line — shown as hit-rate bars on every research report.",
+    code: "01 — Research",
+    title: "Historical performance by prop",
+    body: "Every prop surfaces L5, L10, L20, and season hit rates. Color-coded thresholds let you spot high-confidence picks at a glance.",
+    bullets: [
+      "L5, L10, L20, and season hit rates on every prop",
+      "Hit-rate bars on the full research report",
+      "Sortable boards across every supported sport",
+      "Player reports with performance vs line",
+    ],
     image: "/marketing/features/hit-rates.png",
-    imageAlt: "Hit-rate visualization with L5 L10 L20 and season bars",
+    imageAlt: "Hit-rate visualization",
   },
   {
-    title: "No-Vig Edge",
-    body: "Fair no-vig probability next to EV and confidence, so you can see the edge after juice is removed.",
+    code: "02 — Edge",
+    title: "No-vig edge from real book lines",
+    body: "See true implied probability after juice is removed, next to EV and confidence on every research report.",
+    bullets: [
+      "No-vig probability on every report",
+      "Best line highlighted across compared books",
+      "EV% shown beside fair probability",
+    ],
     image: "/marketing/features/no-vig.png",
-    imageAlt: "No-Vig probability EV confidence and Research Score metrics",
+    imageAlt: "No-vig and EV metrics",
   },
   {
-    title: "Research Score",
+    code: "03 — Confidence",
+    title: "Research Score you can explain",
     body: "A transparent 0–100 score with the checklist behind it — hit rates, matchup, books, movement, and injuries.",
+    bullets: [
+      "Checklist-backed Research Score",
+      "Pass / warn / fail on every check",
+      "Separate Data Quality Score",
+    ],
     image: "/marketing/features/research-score.png",
-    imageAlt: "Research Score checklist explaining why a prop is rated highly",
+    imageAlt: "Research Score checklist",
   },
   {
-    title: "AI Analysis",
-    body: "Short AI explanation bullets that call out no-vig, hit rates, and matchup context for the prop.",
-    image: "/marketing/features/ai-analysis.png",
-    imageAlt: "AI explanation writeup on a research report",
-  },
-  {
-    title: "Line Movement",
-    body: "Open → now line timeline so you can see whether the market is confirming or fading the lean.",
+    code: "04 — Movement",
+    title: "Line movement timeline",
+    body: "Open → now tracking so you can see whether the market is confirming or fading the lean.",
+    bullets: [
+      "Open, AM, noon, and now checkpoints",
+      "Visual polyline on every report",
+    ],
     image: "/marketing/features/line-movement.png",
-    imageAlt: "Line movement timeline chart from open to now",
+    imageAlt: "Line movement chart",
   },
   {
-    title: "Player Reports",
-    body: "Full player profiles with season averages, workload, data quality, and performance vs the betting line.",
-    image: "/marketing/features/player-reports.png",
-    imageAlt: "Player profile report with averages and performance chart",
+    code: "05 — Analysis",
+    title: "AI explanation on every prop",
+    body: "Short writeups that call out no-vig, hit rates, and matchup context — not generic blurbs.",
+    bullets: [
+      "Prop-level AI explanation (Pro)",
+      "Tied to the same numbers on the report",
+    ],
+    image: "/marketing/features/ai-analysis.png",
+    imageAlt: "AI explanation",
   },
   {
-    title: "Parlay Builder",
-    body: "Build slips with Over/Under toggles and an L10 hit/miss chart for the focused leg.",
+    code: "06 — Build",
+    title: "Parlay builder alongside your research",
+    body: "Add legs while you research. Over/Under toggles and L10 hit/miss charts stay attached to every pick.",
+    bullets: [
+      "One-tap add from any board or report",
+      "Independent Over / Under per leg",
+      "L10 hit/miss chart for the focused leg",
+    ],
     image: "/marketing/features/parlay-builder.png",
-    imageAlt: "Parlay builder L10 hit miss chart for a focused leg",
+    imageAlt: "Parlay builder L10 chart",
   },
 ];
 
@@ -50,34 +80,42 @@ export default function FeaturesPage() {
   return (
     <MarketingShell>
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-yellow-500/90">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-yellow-400">
           Features
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-          Built for serious prop research
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-5xl">
+          Everything to find a winning pick.
         </h1>
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-neutral-400 sm:text-base">
-          Every tool is designed to answer one question clearly: is this prop worth your attention?
-          Screenshots below are from the live Seraphim IQ app.
+          Screenshots below are from the live Seraphim IQ app — the same boards members use after
+          checkout.
         </p>
 
-        <div className="mt-14 space-y-16">
+        <div className="mt-16 space-y-24">
           {features.map((f, i) => {
             const imageLeft = i % 2 === 1;
             return (
               <article
                 key={f.title}
-                className="grid items-center gap-8 border-t border-[#1a1a1a] pt-12 lg:grid-cols-2 lg:gap-12"
+                className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14"
               >
                 <div className={imageLeft ? "lg:order-2" : undefined}>
-                  <p className="text-sm tabular-nums text-neutral-600">
-                    {String(i + 1).padStart(2, "0")}
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                    {f.code}
                   </p>
-                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">{f.title}</h2>
-                  <p className="mt-3 max-w-md text-sm leading-relaxed text-neutral-400">{f.body}</p>
+                  <h2 className="mt-3 text-2xl font-semibold text-white">{f.title}</h2>
+                  <p className="mt-3 text-sm leading-relaxed text-neutral-400">{f.body}</p>
+                  <ul className="mt-5 space-y-2.5">
+                    {f.bullets.map((b) => (
+                      <li key={b} className="flex items-start gap-2.5 text-sm text-neutral-200">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" strokeWidth={2.5} />
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
                 <div className={imageLeft ? "lg:order-1" : undefined}>
-                  <div className="overflow-hidden rounded-2xl border border-[#222] bg-[#0a0a0a] p-2 shadow-[0_24px_60px_-28px_rgba(0,0,0,0.9)] sm:p-3">
+                  <div className="overflow-hidden rounded-2xl border border-[#222] bg-[#0c0c0c] p-3 shadow-[0_24px_50px_-30px_rgba(0,0,0,0.9)]">
                     <img
                       src={f.image}
                       alt={f.imageAlt}
@@ -91,18 +129,18 @@ export default function FeaturesPage() {
           })}
         </div>
 
-        <div className="mt-14 flex flex-wrap gap-3">
+        <div className="mt-20 flex flex-wrap gap-3">
           <Link
             href="/pricing"
-            className="btn-3d rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-6 py-3 text-sm font-semibold text-black"
+            className="rounded-full bg-yellow-400 px-6 py-3 text-sm font-semibold text-black transition hover:bg-yellow-300"
           >
-            Purchase Now
+            View plans
           </Link>
           <Link
-            href="/pricing"
-            className="rounded-xl border border-[#1a1a1a] bg-[#111] px-6 py-3 text-sm text-neutral-200 transition hover:border-yellow-500/30 hover:text-yellow-400"
+            href="/signup"
+            className="rounded-full border border-[#2a2a2a] bg-[#141414] px-6 py-3 text-sm text-white transition hover:border-neutral-500"
           >
-            View Pricing
+            Create account
           </Link>
         </div>
       </div>
