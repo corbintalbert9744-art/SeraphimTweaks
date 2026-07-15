@@ -134,7 +134,7 @@ export default function FeaturesPage() {
             href="/pricing"
             className="rounded-full bg-yellow-400 px-6 py-3 text-sm font-semibold text-black transition hover:bg-yellow-300"
           >
-            View plans
+            Become a Member
           </Link>
           <Link
             href="/signup"

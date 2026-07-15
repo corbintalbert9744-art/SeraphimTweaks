@@ -54,7 +54,7 @@ export default function MarketingHomePage() {
                 href="/pricing"
                 className="rounded-full bg-yellow-400 px-6 py-3 text-sm font-semibold text-black transition hover:bg-yellow-300"
               >
-                Choose a plan →
+                Become a Member →
               </Link>
               <Link
                 href="/login"
@@ -268,7 +268,7 @@ export default function MarketingHomePage() {
           Why Seraphim IQ
         </h2>
         <p className="mt-3 max-w-xl text-sm text-neutral-400">
-          More transparent research — membership-priced for serious prop work.
+          More transparent research — built as a premium membership, not another tip feed.
         </p>
 
         <div className="mt-10 overflow-hidden rounded-2xl border border-[#222]">
@@ -303,17 +303,17 @@ export default function MarketingHomePage() {
             Membership
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            You’re in. Now pick your plan.
+            Become a Seraphim IQ Member
           </h2>
           <p className="mt-3 max-w-xl text-sm text-neutral-400">
-            Standard for full research boards. Pro for AI analysis and premium insight tools.
+            Join for full research boards. Standard or Pro — both unlock the members-only dashboard.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
               href="/pricing"
               className="rounded-full bg-yellow-400 px-6 py-3 text-sm font-semibold text-black transition hover:bg-yellow-300"
             >
-              View plans
+              Become a Member
             </Link>
             <Link
               href="/faq"

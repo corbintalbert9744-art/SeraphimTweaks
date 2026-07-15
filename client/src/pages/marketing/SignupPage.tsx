@@ -41,7 +41,7 @@ export default function SignupPage() {
             Create your account
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-            Sign up, then choose Standard or Pro to open the research dashboard.
+            Next you’ll become a Seraphim IQ Member and unlock the research desk.
           </p>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
@@ -88,7 +88,7 @@ export default function SignupPage() {
               type="submit"
               className="btn-3d mt-2 w-full rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-4 py-3 text-sm font-semibold text-black transition hover:brightness-105"
             >
-              Continue to membership
+              Continue — Become a Member
             </button>
           </form>
 

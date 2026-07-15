@@ -11,7 +11,7 @@ const faqs = [
   },
   {
     q: "Which sports are included?",
-    a: "Membership includes NBA, NFL, MLB, ATP, WTA, and WNBA — all under one Professional plan.",
+    a: "Membership includes NBA, NFL, MLB, ATP, WTA, and WNBA — Standard and Pro both cover every sport we offer.",
   },
   {
     q: "How often is data updated?",

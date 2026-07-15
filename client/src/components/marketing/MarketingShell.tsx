@@ -66,7 +66,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                   href="/pricing"
                   className="rounded-full bg-yellow-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-yellow-300"
                 >
-                  View plans
+                  Become a Member
                 </Link>
               </>
             )}
@@ -115,7 +115,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                 Sign up
               </Link>
               <Link href="/pricing" className="block text-neutral-400 hover:text-yellow-400">
-                View plans
+                Become a Member
               </Link>
             </div>
           </div>

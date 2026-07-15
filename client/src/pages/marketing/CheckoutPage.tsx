@@ -71,12 +71,12 @@ export default function CheckoutPage() {
             Choose a membership
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-            You’re in. Now pick your plan.
+            Become a Seraphim IQ Member
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-neutral-400">
             {user
-              ? `Signed in as ${user.email}. Activate Standard or Pro to open the members dashboard.`
-              : "Create an account first, then activate membership."}
+              ? `Signed in as ${user.email}. Confirm Standard or Pro to open the members dashboard.`
+              : "Create an account first, then confirm your membership."}
           </p>
 
           {!isAuthenticated ? (
@@ -157,12 +157,12 @@ export default function CheckoutPage() {
                 type="submit"
                 className="btn-3d w-full rounded-xl bg-yellow-400 px-4 py-3 text-sm font-semibold text-black"
               >
-                Start {plan === "pro" ? "Pro" : "Standard"} —{" "}
+                Become a {plan === "pro" ? "Pro" : "Standard"} Member —{" "}
                 {interval === "annually" ? "Annual" : interval === "weekly" ? "Weekly" : "Monthly"}
               </button>
 
               <p className="text-center text-xs text-neutral-500">
-                Compare plans on the{" "}
+                Compare memberships on the{" "}
                 <Link href="/pricing" className="text-yellow-400 hover:underline">
                   pricing page
                 </Link>

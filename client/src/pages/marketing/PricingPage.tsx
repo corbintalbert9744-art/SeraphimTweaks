@@ -154,11 +154,10 @@ export default function PricingPage() {
           Choose a membership
         </p>
         <h1 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-white sm:text-5xl">
-          You’re in. Now pick your plan.
+          Become a Seraphim IQ Member
         </h1>
         <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-400 sm:text-base">
-          Seraphim IQ does not offer free accounts. Choose Standard or Pro to unlock the research
-          app.
+          Seraphim IQ is members-only. Choose Standard or Pro to unlock the research desk.
         </p>
 
         <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -216,7 +215,7 @@ export default function PricingPage() {
               href={planHref("standard")}
               className="mt-8 flex w-full items-center justify-center rounded-xl border border-[#2a2a2a] bg-[#141414] px-4 py-3 text-sm font-semibold text-white transition hover:border-neutral-500"
             >
-              Start Standard — {ctaPeriod}
+              Become a Member — {ctaPeriod}
             </Link>
           </article>
 
@@ -258,16 +257,16 @@ export default function PricingPage() {
               href={planHref("pro")}
               className="btn-3d mt-8 flex w-full items-center justify-center rounded-xl bg-yellow-400 px-4 py-3 text-sm font-semibold text-black transition hover:bg-yellow-300"
             >
-              Start Pro — {ctaPeriod}
+              Become a Pro Member — {ctaPeriod}
             </Link>
           </article>
         </div>
 
         {/* Comparison */}
         <section className="mt-20">
-          <h2 className="text-2xl font-semibold tracking-tight text-white">Plan comparison</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-white">Compare memberships</h2>
           <p className="mt-2 text-sm text-neutral-400">
-            Standard is the default paid product. Pro is the higher tier for deeper tools.
+            Both memberships unlock the full research workflow. Pro adds AI analysis and deeper tools.
           </p>
 
           <div className="mt-8 overflow-hidden rounded-2xl border border-[#222]">
@@ -311,9 +310,9 @@ export default function PricingPage() {
           <p className="mt-6 text-center text-sm text-neutral-500">
             Ready?{" "}
             <Link href={checkoutHref} className="text-yellow-400 hover:underline">
-              Start with Pro
+              Become a Pro Member
             </Link>{" "}
-            or pick Standard above.
+            or choose Standard above.
           </p>
         </section>
       </div>
