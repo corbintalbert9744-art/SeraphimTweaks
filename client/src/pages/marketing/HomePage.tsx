@@ -40,7 +40,7 @@ export default function MarketingHomePage() {
               Sports research desk
             </p>
             <h1 className="mt-3 text-2xl font-semibold leading-snug tracking-tight text-white sm:text-3xl lg:text-[2rem] lg:leading-[1.2]">
-              Prop research with receipts: history, edges, and a score you can trust.
+              Prop research with receipts. History, edges, and a score you can trust.
             </h1>
             <p className="mt-3 max-w-md text-[13px] leading-relaxed text-neutral-400 sm:text-sm">
               Seraphim IQ pulls L5–L20 hit rates, no-vig edges, Research Scores, and Pro AI writeups
