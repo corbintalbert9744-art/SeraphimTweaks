@@ -84,13 +84,10 @@ export function SportTabs() {
                   tabRefs.current[tab.id] = node;
                 }}
                 className={cn(
-                  "relative z-10 flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-300",
+                  "relative z-10 flex shrink-0 items-center rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-300",
                   active ? "text-yellow-300" : "text-neutral-400 hover:text-neutral-100",
                 )}
               >
-                <span className="text-base leading-none" aria-hidden>
-                  {tab.emoji}
-                </span>
                 <span>{tab.label}</span>
               </Link>
             );

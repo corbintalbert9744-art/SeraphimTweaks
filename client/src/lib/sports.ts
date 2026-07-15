@@ -5,17 +5,16 @@ export type SportTabId = "NBA" | "NFL" | "ATP" | "WTA" | "WNBA";
 export interface SportTab {
   id: SportTabId;
   label: string;
-  emoji: string;
   href: string;
   league: LeagueCode;
 }
 
 export const SPORT_TABS: SportTab[] = [
-  { id: "NBA", label: "NBA", emoji: "🏀", href: "/nba", league: "NBA" },
-  { id: "NFL", label: "NFL", emoji: "🏈", href: "/nfl", league: "NFL" },
-  { id: "ATP", label: "ATP", emoji: "🎾", href: "/atp", league: "ATP" },
-  { id: "WTA", label: "WTA", emoji: "🎾", href: "/wta", league: "WTA" },
-  { id: "WNBA", label: "WNBA", emoji: "🏀", href: "/wnba", league: "WNBA" },
+  { id: "NBA", label: "NBA", href: "/nba", league: "NBA" },
+  { id: "NFL", label: "NFL", href: "/nfl", league: "NFL" },
+  { id: "ATP", label: "ATP", href: "/atp", league: "ATP" },
+  { id: "WTA", label: "WTA", href: "/wta", league: "WTA" },
+  { id: "WNBA", label: "WNBA", href: "/wnba", league: "WNBA" },
 ];
 
 export function sportTabFromPath(pathname: string): SportTabId | null {
