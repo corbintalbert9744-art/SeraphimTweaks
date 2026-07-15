@@ -12,6 +12,7 @@ export default function SuccessPage() {
   );
   const [tries, setTries] = useState(0);
   const [timedOut, setTimedOut] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   useEffect(() => {
     if (membershipActive) {
@@ -19,6 +20,34 @@ export default function SuccessPage() {
       return () => window.clearTimeout(t);
     }
   }, [membershipActive, setLocation]);
+
+  // Prefer retrieving the Checkout Session from Stripe (works without local webhook forwarding).
+  useEffect(() => {
+    if (!sessionId || membershipActive || loading || !isAuthenticated) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/checkout/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ sessionId }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          if (!cancelled) setConfirmError(data.error || res.statusText);
+        }
+        if (!cancelled) await refresh();
+      } catch (err) {
+        if (!cancelled) {
+          setConfirmError(err instanceof Error ? err.message : "Could not confirm checkout");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, membershipActive, loading, isAuthenticated, refresh]);
 
   useEffect(() => {
     if (membershipActive || loading) return;
@@ -45,23 +74,27 @@ export default function SuccessPage() {
           <p className="mt-3 text-sm leading-relaxed text-neutral-400">
             {membershipActive
               ? "Stripe confirmed your subscription. Opening the research desk…"
-              : "We’re waiting for Stripe’s webhook to mark your membership Active. This usually takes a few seconds."}
+              : "Verifying your Stripe Checkout Session and activating membership…"}
           </p>
           {sessionId ? (
             <p className="mt-3 break-all text-[11px] text-neutral-600">Session {sessionId}</p>
+          ) : null}
+          {confirmError ? (
+            <p className="mt-3 text-sm text-amber-200/90">{confirmError}</p>
           ) : null}
 
           {timedOut && !membershipActive ? (
             <div className="mt-6 space-y-3">
               <p className="text-sm text-amber-200/90">
-                Still waiting on webhook confirmation. Make sure your Stripe webhook endpoint is
-                pointed at <code className="text-yellow-300">/api/stripe/webhook</code>.
+                Still waiting on confirmation. Retry below, or ensure webhooks are forwarded to{" "}
+                <code className="text-yellow-300">/api/stripe/webhook</code>.
               </p>
               <button
                 type="button"
                 onClick={() => {
                   setTimedOut(false);
                   setTries(0);
+                  setConfirmError(null);
                   void refresh();
                 }}
                 className="rounded-xl bg-yellow-400 px-4 py-2.5 text-sm font-semibold text-black"

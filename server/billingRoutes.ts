@@ -14,6 +14,7 @@ import {
 } from "./membershipStore";
 import {
   appBaseUrl,
+  confirmCheckoutSession,
   constructWebhookEvent,
   createCheckoutSession,
   handleStripeEvent,
@@ -35,6 +36,10 @@ const loginSchema = z.object({
 const checkoutSchema = z.object({
   plan: z.enum(["standard", "pro"]),
   interval: z.enum(["monthly", "yearly", "annually"]),
+});
+
+const confirmSchema = z.object({
+  sessionId: z.string().min(1),
 });
 
 function sendError(res: Response, err: unknown) {
@@ -142,11 +147,37 @@ export function registerAuthAndBillingRoutes(app: Express) {
     }
   });
 
+  app.post("/api/checkout/confirm", requireAuth, async (req: AuthedRequest, res) => {
+    try {
+      if (!isStripeConfigured()) {
+        return res.status(503).json({ error: "Stripe is not configured" });
+      }
+      const body = confirmSchema.parse(req.body);
+      const result = await confirmCheckoutSession({
+        userId: req.user!.id,
+        sessionId: body.sessionId,
+      });
+      const fresh = await getPublicUser(req.user!.id);
+      res.json({ ...result, user: fresh });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: err.errors[0]?.message || "Invalid input" });
+      }
+      return sendError(res, err);
+    }
+  });
+
   app.get("/api/billing/config", (_req, res) => {
     res.json({
       stripeConfigured: isStripeConfigured(),
       intervals: ["monthly", "yearly"],
       plans: ["standard", "pro"],
+      pricesConfigured: Boolean(
+        process.env.STRIPE_PRICE_STANDARD_MONTHLY &&
+          process.env.STRIPE_PRICE_STANDARD_YEARLY &&
+          process.env.STRIPE_PRICE_PRO_MONTHLY &&
+          process.env.STRIPE_PRICE_PRO_YEARLY,
+      ),
     });
   });
 

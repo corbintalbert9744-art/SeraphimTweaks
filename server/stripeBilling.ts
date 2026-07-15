@@ -282,6 +282,46 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
   }
 }
 
+export async function confirmCheckoutSession(input: {
+  userId: string;
+  sessionId: string;
+}): Promise<{ membershipActive: boolean }> {
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.retrieve(input.sessionId, {
+    expand: ["subscription"],
+  });
+
+  const sessionUserId = session.client_reference_id || session.metadata?.userId;
+  if (!sessionUserId || sessionUserId !== input.userId) {
+    throw Object.assign(new Error("Checkout session does not belong to this user"), { status: 403 });
+  }
+
+  if (session.mode !== "subscription") {
+    throw Object.assign(new Error("Checkout session is not a subscription"), { status: 400 });
+  }
+
+  if (session.status !== "complete" && session.payment_status !== "paid") {
+    throw Object.assign(new Error("Checkout session is not paid yet"), { status: 402 });
+  }
+
+  await handleCheckoutSessionCompleted(session);
+
+  const sub =
+    typeof session.subscription === "object" && session.subscription
+      ? session.subscription
+      : typeof session.subscription === "string"
+        ? await stripe.subscriptions.retrieve(session.subscription)
+        : null;
+  if (sub) await applySubscriptionToUser(sub);
+
+  const user = await findUserById(input.userId);
+  return {
+    membershipActive: Boolean(
+      user && (user.membershipStatus === "active" || user.membershipStatus === "trialing"),
+    ),
+  };
+}
+
 export function constructWebhookEvent(rawBody: Buffer | string, signature: string): Stripe.Event {
   const stripe = getStripe();
   const secret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
