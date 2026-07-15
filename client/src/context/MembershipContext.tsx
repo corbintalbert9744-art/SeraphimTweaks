@@ -10,7 +10,8 @@ import {
 
 const STORAGE_KEY = "seraphim-iq-membership-v1";
 
-export type BillingInterval = "monthly" | "yearly";
+export type BillingInterval = "weekly" | "monthly" | "annually";
+export type MembershipPlan = "standard" | "pro";
 
 export interface MembershipUser {
   name: string;
@@ -20,7 +21,7 @@ export interface MembershipUser {
 export interface MembershipState {
   user: MembershipUser | null;
   membershipActive: boolean;
-  plan: "professional" | null;
+  plan: MembershipPlan | null;
   billingInterval: BillingInterval;
 }
 
@@ -29,7 +30,7 @@ interface MembershipContextValue extends MembershipState {
   signUp: (input: { name: string; email: string; password: string }) => void;
   signIn: (input: { email: string; password: string }) => void;
   signOut: () => void;
-  activateMembership: (interval: BillingInterval) => void;
+  activateMembership: (plan: MembershipPlan, interval: BillingInterval) => void;
 }
 
 const defaultState: MembershipState = {
@@ -41,6 +42,20 @@ const defaultState: MembershipState = {
 
 const MembershipContext = createContext<MembershipContextValue | null>(null);
 
+function normalizeInterval(value: unknown): BillingInterval {
+  if (value === "weekly" || value === "annually" || value === "yearly") {
+    return value === "yearly" ? "annually" : value;
+  }
+  return "monthly";
+}
+
+function normalizePlan(value: unknown): MembershipPlan | null {
+  if (value === "standard" || value === "pro" || value === "professional") {
+    return value === "professional" ? "pro" : value;
+  }
+  return null;
+}
+
 function loadState(): MembershipState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -49,8 +64,8 @@ function loadState(): MembershipState {
     return {
       user: parsed.user ?? null,
       membershipActive: Boolean(parsed.membershipActive),
-      plan: parsed.plan ?? null,
-      billingInterval: parsed.billingInterval === "yearly" ? "yearly" : "monthly",
+      plan: normalizePlan(parsed.plan),
+      billingInterval: normalizeInterval(parsed.billingInterval),
     };
   } catch {
     return defaultState;
@@ -98,11 +113,11 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     setState(defaultState);
   }, []);
 
-  const activateMembership = useCallback((interval: BillingInterval) => {
+  const activateMembership = useCallback((plan: MembershipPlan, interval: BillingInterval) => {
     setState((prev) => ({
       ...prev,
       membershipActive: true,
-      plan: "professional",
+      plan,
       billingInterval: interval,
       user: prev.user ?? { name: "Member", email: "member@seraphim.iq" },
     }));

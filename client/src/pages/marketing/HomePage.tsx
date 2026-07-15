@@ -107,32 +107,46 @@ export default function MarketingHomePage() {
           Membership
         </p>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-          Become a Seraphim IQ Member
+          You’re in. Now pick your plan.
         </h2>
         <p className="mt-2 max-w-xl text-sm text-neutral-400">
-          One Professional plan. Full access to every supported sport and research tool.
+          Standard for full research boards. Pro for AI analysis and premium insight tools.
         </p>
-        <div className="card-3d mt-10 max-w-md rounded-2xl border border-yellow-500/25 bg-gradient-to-b from-yellow-500/10 to-transparent p-6 sm:p-8">
-          <p className="text-sm text-neutral-400">Professional Plan</p>
-          <p className="mt-2 text-4xl font-semibold tabular-nums text-white">
-            $19<span className="text-lg font-medium text-neutral-500">/month</span>
-          </p>
-          <ul className="mt-6 space-y-2 text-sm text-neutral-300">
-            {["NBA", "NFL", "MLB", "ATP", "WTA", "WNBA", "AI Research", "Unlimited Props"].map(
-              (item) => (
-                <li key={item} className="flex items-center gap-2">
-                  <span className="text-yellow-400">✔</span> {item}
-                </li>
-              ),
-            )}
-          </ul>
-          <Link
-            href="/signup"
-            className="btn-3d mt-8 inline-flex rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-5 py-3 text-sm font-semibold text-black"
-          >
-            Start Trial
-          </Link>
+        <div className="mt-10 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-[#222] bg-[#0c0c0c] p-6">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-lg font-semibold text-white">Standard</p>
+              <p className="text-lg font-semibold tabular-nums text-white">
+                $19.99<span className="text-sm font-medium text-neutral-500"> /mo</span>
+              </p>
+            </div>
+            <p className="mt-3 text-sm text-neutral-400">
+              Hit rates, EV, Research Score, parlays — every supported sport.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-yellow-400/60 bg-[#0c0c0c] p-6 shadow-[0_0_36px_-16px_rgba(234,179,8,0.5)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <p className="text-lg font-semibold text-white">Pro</p>
+                <span className="rounded-md bg-yellow-400 px-2 py-0.5 text-[10px] font-bold uppercase text-black">
+                  Includes AI
+                </span>
+              </div>
+              <p className="text-lg font-semibold tabular-nums text-white">
+                $24.99<span className="text-sm font-medium text-neutral-500"> /mo</span>
+              </p>
+            </div>
+            <p className="mt-3 text-sm text-neutral-400">
+              Everything in Standard, plus AI research and premium insight tools.
+            </p>
+          </div>
         </div>
+        <Link
+          href="/pricing"
+          className="btn-3d mt-8 inline-flex rounded-xl bg-yellow-400 px-5 py-3 text-sm font-semibold text-black"
+        >
+          Choose a membership
+        </Link>
       </section>
 
       <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">

@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { MarketingShell } from "@/components/marketing/MarketingShell";
 import { useMembership } from "@/context/MembershipContext";
 
@@ -9,9 +9,16 @@ const fieldClass =
 export default function SignupPage() {
   const { signUp, isAuthenticated, membershipActive } = useMembership();
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  const checkoutPath = useMemo(() => {
+    const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+    const q = params.toString();
+    return q ? `/checkout?${q}` : "/checkout";
+  }, [search]);
 
   useEffect(() => {
     if (isAuthenticated && membershipActive) setLocation("/app");
@@ -20,7 +27,7 @@ export default function SignupPage() {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     signUp({ name, email, password });
-    setLocation("/checkout");
+    setLocation(checkoutPath);
   }
 
   return (
@@ -34,7 +41,7 @@ export default function SignupPage() {
             Create your account
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-            Sign up, then activate Professional membership to open the research dashboard.
+            Sign up, then choose Standard or Pro to open the research dashboard.
           </p>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
@@ -81,7 +88,7 @@ export default function SignupPage() {
               type="submit"
               className="btn-3d mt-2 w-full rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-4 py-3 text-sm font-semibold text-black transition hover:brightness-105"
             >
-              Continue to checkout
+              Continue to membership
             </button>
           </form>
 

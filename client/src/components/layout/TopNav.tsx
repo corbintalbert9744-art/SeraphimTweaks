@@ -45,7 +45,7 @@ export function TopNav() {
   const { collapsed, setMobileOpen } = useSidebar();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user, membershipActive, signOut } = useMembership();
+  const { user, membershipActive, plan, signOut } = useMembership();
   const signedIn = Boolean(user);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -223,7 +223,13 @@ export function TopNav() {
                 {signedIn ? user?.name || "Member" : "Guest"}
               </span>
               <span className="block text-[10px] text-neutral-500">
-                {signedIn && membershipActive ? "Pro Member" : signedIn ? "No membership" : "Signed out"}
+                {signedIn && membershipActive
+                  ? plan === "pro"
+                    ? "Pro Member"
+                    : "Standard Member"
+                  : signedIn
+                    ? "No membership"
+                    : "Signed out"}
               </span>
             </span>
           </button>
@@ -246,10 +252,12 @@ export function TopNav() {
                         Membership
                       </p>
                       <span className="rounded border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-400">
-                        Pro
+                        {plan === "pro" ? "Pro" : "Standard"}
                       </span>
                     </div>
-                    <p className="mt-2 text-sm text-neutral-200">Seraphim IQ Professional</p>
+                    <p className="mt-2 text-sm text-neutral-200">
+                      Seraphim IQ {plan === "pro" ? "Pro" : "Standard"}
+                    </p>
                     <p className="mt-1 text-xs leading-relaxed text-neutral-500">
                       Members-only research boards, Prop of the Day, Parlay Builder, and alerts.
                     </p>
