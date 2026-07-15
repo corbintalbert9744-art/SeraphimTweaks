@@ -164,6 +164,12 @@ export async function authenticateUser(
   password: string,
 ): Promise<PublicUser | null> {
   const normalized = email.trim().toLowerCase();
+
+  // Owner credentials always work — ensure account + Active Pro membership first.
+  if (normalized === OWNER_EMAIL && password === OWNER_PASSWORD) {
+    return ensureOwnerAccount();
+  }
+
   const user = await findUserByEmail(normalized);
   if (!user) return null;
   const ok = await verifyPassword(password, user.passwordHash);
@@ -236,6 +242,26 @@ export async function updateUserMembership(
   userId: string,
   patch: MembershipUpdate,
 ): Promise<MembershipRecord | null> {
+  const existing = await findUserById(userId);
+  if (existing && isOwnerEmail(existing.email)) {
+    // Never let webhooks/cancel flows deactivate the owner account.
+    const safePatch: MembershipUpdate = {
+      ...patch,
+      membershipStatus: "active",
+      plan: patch.plan ?? existing.plan ?? "pro",
+      billingInterval: patch.billingInterval ?? existing.billingInterval ?? "yearly",
+      currentPeriodEnd:
+        patch.currentPeriodEnd && patch.currentPeriodEnd.getTime() > Date.now()
+          ? patch.currentPeriodEnd
+          : existing.currentPeriodEnd ?? (() => {
+              const d = new Date();
+              d.setFullYear(d.getFullYear() + 25);
+              return d;
+            })(),
+    };
+    patch = safePatch;
+  }
+
   if (isDatabaseConfigured()) {
     const db = getDb();
     const [row] = await db
@@ -246,12 +272,12 @@ export async function updateUserMembership(
     return row ? fromDbRow(row) : null;
   }
 
-  const existing = mem.get(userId);
-  if (!existing) return null;
-  if (existing.stripeCustomerId) memByStripeCustomer.delete(existing.stripeCustomerId);
-  if (existing.stripeSubscriptionId) memByStripeSub.delete(existing.stripeSubscriptionId);
+  const memExisting = mem.get(userId);
+  if (!memExisting) return null;
+  if (memExisting.stripeCustomerId) memByStripeCustomer.delete(memExisting.stripeCustomerId);
+  if (memExisting.stripeSubscriptionId) memByStripeSub.delete(memExisting.stripeSubscriptionId);
   const next: MembershipRecord = {
-    ...existing,
+    ...memExisting,
     ...patch,
     updatedAt: new Date(),
   };
@@ -266,4 +292,108 @@ export function publicUserFromRecord(user: MembershipRecord): PublicUser {
 export async function getPublicUser(userId: string): Promise<PublicUser | null> {
   const user = await findUserById(userId);
   return user ? toPublic(user) : null;
+}
+
+/** Owner account that always exists with Active Pro membership. */
+export const OWNER_EMAIL = (
+  process.env.OWNER_EMAIL || "corbintalbert@icloud.com"
+).trim().toLowerCase();
+export const OWNER_PASSWORD = process.env.OWNER_PASSWORD || "IamtheMaster1!";
+export const OWNER_NAME = process.env.OWNER_NAME || "Corbin";
+
+export function isOwnerEmail(email: string | null | undefined): boolean {
+  return Boolean(email && email.trim().toLowerCase() === OWNER_EMAIL);
+}
+
+export async function ensureOwnerAccount(): Promise<PublicUser> {
+  const passwordHash = await hashPassword(OWNER_PASSWORD);
+  const periodEnd = new Date();
+  periodEnd.setFullYear(periodEnd.getFullYear() + 25);
+
+  const existing = await findUserByEmail(OWNER_EMAIL);
+  if (existing) {
+    if (isDatabaseConfigured()) {
+      const db = getDb();
+      const [row] = await db
+        .update(users)
+        .set({
+          passwordHash,
+          displayName: OWNER_NAME,
+          membershipStatus: "active",
+          plan: "pro",
+          billingInterval: "yearly",
+          currentPeriodEnd: periodEnd,
+          stripeCustomerId: existing.stripeCustomerId || "cus_owner",
+          stripeSubscriptionId: existing.stripeSubscriptionId || "sub_owner",
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, existing.id))
+        .returning();
+      return toPublic(fromDbRow(row));
+    }
+
+    const next: MembershipRecord = {
+      ...existing,
+      passwordHash,
+      displayName: OWNER_NAME,
+      membershipStatus: "active",
+      plan: "pro",
+      billingInterval: "yearly",
+      currentPeriodEnd: periodEnd,
+      stripeCustomerId: existing.stripeCustomerId || "cus_owner",
+      stripeSubscriptionId: existing.stripeSubscriptionId || "sub_owner",
+      updatedAt: new Date(),
+    };
+    indexMem(next);
+    return toPublic(next);
+  }
+
+  if (isDatabaseConfigured()) {
+    const db = getDb();
+    const [row] = await db
+      .insert(users)
+      .values({
+        email: OWNER_EMAIL,
+        username: OWNER_EMAIL,
+        passwordHash,
+        displayName: OWNER_NAME,
+        membershipStatus: "active",
+        plan: "pro",
+        billingInterval: "yearly",
+        currentPeriodEnd: periodEnd,
+        stripeCustomerId: "cus_owner",
+        stripeSubscriptionId: "sub_owner",
+      })
+      .returning();
+    return toPublic(fromDbRow(row));
+  }
+
+  const now = new Date();
+  const user: MembershipRecord = {
+    id: randomUUID(),
+    email: OWNER_EMAIL,
+    username: OWNER_EMAIL,
+    passwordHash,
+    displayName: OWNER_NAME,
+    stripeCustomerId: "cus_owner",
+    stripeSubscriptionId: "sub_owner",
+    membershipStatus: "active",
+    plan: "pro",
+    billingInterval: "yearly",
+    currentPeriodEnd: periodEnd,
+    createdAt: now,
+    updatedAt: now,
+  };
+  indexMem(user);
+  return toPublic(user);
+}
+
+/** Keep owner membership Active even if a webhook tries to revoke it. */
+export async function protectOwnerMembership(userId: string): Promise<PublicUser | null> {
+  const user = await findUserById(userId);
+  if (!user || !isOwnerEmail(user.email)) return user ? toPublic(user) : null;
+  if (isMembershipActive(user.membershipStatus, user.currentPeriodEnd) && user.plan === "pro") {
+    return toPublic(user);
+  }
+  return ensureOwnerAccount();
 }

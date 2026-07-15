@@ -9,7 +9,10 @@ import {
 import {
   authenticateUser,
   createUser,
+  ensureOwnerAccount,
   getPublicUser,
+  isOwnerEmail,
+  protectOwnerMembership,
   updateUserMembership,
 } from "./membershipStore";
 import {
@@ -53,9 +56,15 @@ export function registerAuthAndBillingRoutes(app: Express) {
   configureSession(app);
   app.use(loadSessionUser);
 
+  // Seed owner account so it always exists with Active Pro access.
+  void ensureOwnerAccount().catch((err) => console.error("[owner] seed failed", err));
+
   app.post("/api/auth/signup", async (req: AuthedRequest, res) => {
     try {
       const body = signupSchema.parse(req.body);
+      if (isOwnerEmail(body.email)) {
+        return res.status(409).json({ error: "This email is reserved. Please log in instead." });
+      }
       const user = await createUser({
         email: body.email,
         password: body.password,
@@ -95,11 +104,14 @@ export function registerAuthAndBillingRoutes(app: Express) {
 
   app.get("/api/auth/me", async (req: AuthedRequest, res) => {
     if (!req.user) return res.status(401).json({ error: "Not authenticated" });
-    let fresh = await getPublicUser(req.user.id);
+    let fresh = await protectOwnerMembership(req.user.id);
+    if (!fresh) fresh = await getPublicUser(req.user.id);
     if (!fresh) return res.status(401).json({ error: "Not authenticated" });
 
     // Defense in depth: if renewal date has passed, revoke locally even before webhook.
+    // Owner account is never revoked this way.
     if (
+      !isOwnerEmail(fresh.email) &&
       fresh.membershipStatus === "active" &&
       fresh.currentPeriodEnd &&
       new Date(fresh.currentPeriodEnd).getTime() < Date.now()
