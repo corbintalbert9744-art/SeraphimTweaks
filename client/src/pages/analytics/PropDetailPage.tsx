@@ -278,7 +278,8 @@ export default function PropDetailPage() {
 
           <ProOnly
             title="AI explanation"
-            description="Pro members get prop-level AI writeups that call out no-vig, hit rates, and matchup context. Standard includes Research Score, hit rates, and books without the AI narrative."
+            description="Standard keeps Research Score, hit rates, and books. Upgrade to Pro for the AI writeup."
+            ctaLabel="Upgrade to Pro"
           >
             <section data-feature="ai-analysis" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
               <h2 className="text-base font-semibold text-white">AI explanation</h2>

@@ -122,9 +122,28 @@ export default function SettingsPage() {
                   Open private Discord picks →
                 </a>
               ) : (
-                <p className="mt-4 text-xs text-neutral-500">
-                  Discord premium picks unlock on Pro.
-                </p>
+                <div className="relative mt-4 overflow-hidden rounded-xl border border-yellow-500/20 bg-yellow-500/[0.04] p-4">
+                  <div className="pointer-events-none select-none blur-[5px] opacity-40" aria-hidden>
+                    <p className="text-sm font-medium text-neutral-200">Tonight&apos;s premium picks</p>
+                    <p className="mt-1 text-xs text-neutral-400">
+                      Live Discord channel with private picks and notes.
+                    </p>
+                    <span className="mt-3 inline-flex rounded-lg border border-yellow-500/30 px-3 py-1.5 text-xs text-yellow-300">
+                      Open private Discord picks →
+                    </span>
+                  </div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/55 px-3 text-center backdrop-blur-[1px]">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-yellow-400">
+                      Discord picks · Pro only
+                    </p>
+                    <Link
+                      href="/pricing"
+                      className="mt-2 inline-flex rounded-lg bg-yellow-400 px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-yellow-300"
+                    >
+                      Upgrade to Pro
+                    </Link>
+                  </div>
+                </div>
               )}
             </div>
           </div>

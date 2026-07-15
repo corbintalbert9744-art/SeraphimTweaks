@@ -1,9 +1,11 @@
+import { Lock } from "lucide-react";
 import { Link } from "wouter";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { LeagueBadge } from "@/components/shared/LeagueBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { listPlayerProfiles } from "@/data/playersMock";
 import { useIsPro } from "@/components/membership/ProOnly";
+import { cn } from "@/lib/utils";
 
 export default function PlayersHubPage() {
   const players = listPlayerProfiles().sort((a, b) => b.researchScore - a.researchScore);
@@ -50,15 +52,24 @@ export default function PlayersHubPage() {
                 {player.injury === "None" ? "Healthy" : player.injury}
               </span>
             </div>
-            {isPro ? (
-              <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-neutral-400">
+            <div className="relative mt-3 min-h-[2.5rem]">
+              <p
+                className={cn(
+                  "line-clamp-2 text-xs leading-relaxed text-neutral-400",
+                  !isPro && "select-none blur-[4px] opacity-50",
+                )}
+              >
                 {player.aiExplain.headline}
               </p>
-            ) : (
-              <p className="mt-3 text-xs text-neutral-500">
-                Research Score {player.researchScore} · AI writeups on Pro
-              </p>
-            )}
+              {!isPro && (
+                <div className="absolute inset-0 flex items-center">
+                  <span className="inline-flex items-center gap-1 rounded-md border border-yellow-500/30 bg-[#0c0c0c]/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-yellow-400">
+                    <Lock className="h-3 w-3" />
+                    AI · Upgrade to Pro
+                  </span>
+                </div>
+              )}
+            </div>
             <p className="mt-4 text-[11px] font-medium uppercase tracking-wider text-yellow-500/80">
               Open Player Profile →
             </p>

@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Check, Plus } from "lucide-react";
+import { Check, Lock, Plus } from "lucide-react";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { withLegHitData } from "@/lib/legStats";
@@ -53,7 +53,7 @@ export function PropOfTheDayCard({ prop }: { prop: PropOfDay }) {
   const { addLeg, hasLeg } = useParlayDraft();
   const isPro = useIsPro();
   const added = hasLeg(prop.id);
-  const why = isPro ? prop.why : undefined;
+  const why = prop.why;
   const initials = (prop.shortName ?? prop.player)
     .split(/\s+/)
     .map((p) => p[0])
@@ -121,26 +121,19 @@ export function PropOfTheDayCard({ prop }: { prop: PropOfDay }) {
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <ResearchScoreBadge score={prop.researchScore} size="sm" />
-          {why && (
+          {why && isPro && (
             <span className="hidden rounded border border-[#2a2a2a] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-400 sm:inline">
               {why.verdict}
             </span>
           )}
+          {why && !isPro && (
+            <span className="inline-flex items-center gap-1 rounded border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-400">
+              <Lock className="h-3 w-3" />
+              Pro
+            </span>
+          )}
         </div>
       </div>
-
-      {why && (
-        <p className="mt-3 text-xs leading-relaxed text-neutral-400">{why.headline}</p>
-      )}
-      {!isPro && (
-        <p className="mt-3 rounded-lg border border-yellow-500/20 bg-yellow-500/[0.04] px-3 py-2 text-xs text-neutral-400">
-          Premium insight writeup is Pro-only. Standard still includes EV, confidence, Research Score,
-          L10, and the checklist.{" "}
-          <Link href="/pricing" className="font-medium text-yellow-400 hover:underline">
-            Upgrade to Pro
-          </Link>
-        </p>
-      )}
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums text-neutral-300">
         <span>
@@ -158,17 +151,45 @@ export function PropOfTheDayCard({ prop }: { prop: PropOfDay }) {
       </div>
 
       {why && (
-        <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-          {why.pillars.map((pillar) => (
-            <div
-              key={pillar.id}
-              title={pillar.detail}
-              className="flex items-baseline justify-between gap-2 rounded-lg border border-[#1a1a1a] bg-black/30 px-2.5 py-1.5"
-            >
-              <span className="text-[10px] uppercase tracking-wide text-neutral-500">{pillar.title}</span>
-              <span className="truncate text-xs text-neutral-200">{pillar.summary}</span>
+        <div className="relative mt-3 overflow-hidden rounded-lg">
+          <div
+            className={cn(!isPro && "pointer-events-none select-none blur-[5px] opacity-40")}
+            aria-hidden={!isPro}
+          >
+            <p className="text-xs leading-relaxed text-neutral-400">{why.headline}</p>
+            <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {why.pillars.map((pillar) => (
+                <div
+                  key={pillar.id}
+                  title={isPro ? pillar.detail : undefined}
+                  className="flex items-baseline justify-between gap-2 rounded-lg border border-[#1a1a1a] bg-black/30 px-2.5 py-1.5"
+                >
+                  <span className="text-[10px] uppercase tracking-wide text-neutral-500">
+                    {pillar.title}
+                  </span>
+                  <span className="truncate text-xs text-neutral-200">{pillar.summary}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+          {!isPro && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 px-3 backdrop-blur-[1px]">
+              <div className="rounded-xl border border-yellow-500/30 bg-[#0c0c0c]/95 px-4 py-3 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-yellow-400">
+                  Premium insight · Pro only
+                </p>
+                <p className="mt-1 text-xs text-neutral-400">
+                  Writeup & pillars locked on Standard.
+                </p>
+                <Link
+                  href="/pricing"
+                  className="mt-2 inline-flex rounded-lg bg-yellow-400 px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-yellow-300"
+                >
+                  Upgrade to Pro
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

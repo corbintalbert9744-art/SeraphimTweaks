@@ -260,7 +260,9 @@ export function TopNav() {
                       Seraphim IQ {plan === "pro" ? "Pro" : "Standard"}
                     </p>
                     <p className="mt-1 text-xs leading-relaxed text-neutral-500">
-                      Members-only research boards, Prop of the Day, Parlay Builder, and alerts.
+                      {plan === "pro"
+                        ? "Full research plus private Discord picks and AI analysis."
+                        : "Full research boards. AI writeups and Discord picks stay locked."}
                     </p>
                     <ul className="mt-2 space-y-1 text-[11px] text-neutral-400">
                       <li>· NBA · NFL · MLB · ATP · WTA · WNBA</li>
@@ -269,11 +271,23 @@ export function TopNav() {
                         <li>· Private Discord picks + AI analysis</li>
                       ) : (
                         <>
-                          <li>· Full research boards & unlimited props</li>
-                          <li className="text-neutral-600">· No AI writeups or Discord picks</li>
+                          <li className="text-neutral-500">· AI writeups — locked</li>
+                          <li className="text-neutral-500">· Discord premium picks — locked</li>
                         </>
                       )}
                     </ul>
+                    {plan !== "pro" && (
+                      <button
+                        type="button"
+                        className="mt-3 w-full rounded-lg bg-yellow-400 px-3 py-2 text-xs font-semibold text-black transition hover:bg-yellow-300"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          setLocation("/pricing");
+                        }}
+                      >
+                        Upgrade to Pro
+                      </button>
+                    )}
                   </div>
 
                   <div className="p-1.5">

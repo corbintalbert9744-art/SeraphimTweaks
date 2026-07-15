@@ -406,7 +406,8 @@ export default function PlayerPage() {
 
           <ProOnly
             title="AI explainability"
-            description="Pro unlocks AI writeups on every player profile. Standard keeps Research Score, splits, streaks, and matchup context."
+            description="Standard keeps Research Score, splits, and matchup context. Upgrade to Pro for the AI writeup."
+            ctaLabel="Upgrade to Pro"
           >
             <section
               className={cn(
