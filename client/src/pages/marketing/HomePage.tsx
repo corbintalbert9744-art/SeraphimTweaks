@@ -34,8 +34,8 @@ export default function MarketingHomePage() {
         <div className="pointer-events-none absolute -left-16 top-8 h-56 w-56 rounded-full bg-yellow-500/10 blur-3xl" />
         <div className="pointer-events-none absolute right-0 top-24 h-64 w-64 rounded-full bg-amber-600/10 blur-3xl" />
 
-        <div className="relative mx-auto grid max-w-5xl items-center gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:py-14">
-          <div>
+        <div className="relative mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:py-12">
+          <div className="max-w-2xl">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400">
               Sports research desk
             </p>
@@ -76,7 +76,7 @@ export default function MarketingHomePage() {
             </div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-md lg:max-w-none">
+          <div className="relative mx-auto mt-10 w-full sm:mt-12">
             <div className="absolute -inset-2 rounded-2xl bg-yellow-400/10 blur-xl" />
             <div className="relative overflow-hidden rounded-xl border border-yellow-500/25 bg-[#0c0c0c] shadow-[0_0_40px_-18px_rgba(234,179,8,0.4)]">
               <img
