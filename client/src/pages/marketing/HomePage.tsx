@@ -81,7 +81,7 @@ export default function MarketingHomePage() {
             <div className="relative overflow-hidden rounded-xl border border-yellow-500/25 bg-[#0c0c0c] shadow-[0_0_40px_-18px_rgba(234,179,8,0.4)]">
               <img
                 src="/marketing/hero-product.png"
-                alt="Seraphim IQ NBA prop board"
+                alt="Seraphim IQ research report for Jayson Tatum points"
                 className="aspect-[16/11] w-full object-cover object-top"
               />
             </div>
