@@ -1,5 +1,6 @@
 import {
   buildResearchChecks,
+  buildPropOfTheDayWhy,
   confidenceScore,
   dataQualityScore,
   explainProp,
@@ -7,6 +8,7 @@ import {
   noVigPair,
   expectedValue,
   researchScoreFromChecks,
+  synthesizeLinePath,
 } from "@shared/analytics";
 import {
   extractInjuries,
@@ -25,7 +27,6 @@ function marketValues(logs: NbaGamelogRow[], market: "Points" | "Rebounds" | "As
 function deriveLine(values: number[]): number {
   if (!values.length) return 20.5;
   const avg = values.slice(0, 10).reduce((a, b) => a + b, 0) / Math.min(10, values.length);
-  // Sportsbook-style half line just under recent average
   const base = Math.round(avg * 2) / 2 - 0.5;
   return Math.max(0.5, base);
 }
@@ -117,8 +118,29 @@ export async function buildFeaturedNbaProp(gameId?: string) {
     noVig: noVigOver,
     evPercent,
     researchScore,
-    matchupNote: `${game.away.abbreviation} @ ${game.home.abbreviation} · ${game.statusDetail}. Line derived from recent scoring average until sportsbook odds adapter is connected.`,
+    matchupNote: `${game.away.abbreviation} @ ${game.home.abbreviation} · ${game.statusDetail}.`,
   });
+
+  const openLine = Math.round((line + 1) * 2) / 2;
+  const why = buildPropOfTheDayWhy({
+    researchScore,
+    checks,
+    noVig: noVigOver,
+    evPercent,
+    l5,
+    l10,
+    l20,
+    side,
+    line,
+    market,
+    matchup: `${athlete.teamAbbr} vs ${
+      athlete.teamAbbr === game.home.abbreviation ? game.away.abbreviation : game.home.abbreviation
+    } · ${game.statusDetail}`,
+    openLine,
+    currentLine: line,
+    injuryStatus: playerInjury?.status ?? "None",
+  });
+  const linePath = synthesizeLinePath(openLine, line);
 
   return {
     ok: true as const,
@@ -145,6 +167,8 @@ export async function buildFeaturedNbaProp(gameId?: string) {
       market,
       side,
       line,
+      tipTime: game.tipoffAt,
+      gameLabel: game.shortName,
       americanOdds: overOdds,
       noVigProb: noVigOver,
       evPercent: Number(evPercent.toFixed(2)),
@@ -156,6 +180,8 @@ export async function buildFeaturedNbaProp(gameId?: string) {
       l20: l20.label,
       checks,
       explanation,
+      why,
+      linePath,
       recent: values.slice(0, 10).map((v, i) => ({
         value: v,
         opponent: logs[i]?.opponent ?? "OPP",

@@ -146,3 +146,110 @@ export function explainProp(input: {
     input.matchupNote ?? "Matchup context will enrich as defensive rankings land in the warehouse.",
   ];
 }
+
+export type WhyPillar = {
+  id: "research" | "novig" | "matchup" | "form" | "movement";
+  title: string;
+  status: "strong" | "solid" | "watch";
+  summary: string;
+  detail: string;
+};
+
+/** Structured “why this is Prop of the Day” — Seraphim differentiator vs raw odds boards. */
+export function buildPropOfTheDayWhy(input: {
+  researchScore: number;
+  checks: ResearchCheck[];
+  noVig: number;
+  evPercent: number;
+  l5: HitWindow;
+  l10: HitWindow;
+  l20: HitWindow;
+  side: "Over" | "Under";
+  line: number;
+  market: string;
+  matchup: string;
+  openLine: number;
+  currentLine: number;
+  injuryStatus?: string;
+}): { headline: string; verdict: "strong" | "solid" | "watch"; pillars: WhyPillar[] } {
+  const formPct = Math.round(input.l10.rate * 100);
+  const moved = input.currentLine - input.openLine;
+  const movedFavor =
+    (input.side === "Over" && moved < 0) || (input.side === "Under" && moved > 0);
+
+  const pillars: WhyPillar[] = [
+    {
+      id: "research",
+      title: "Research Score",
+      status: input.researchScore >= 85 ? "strong" : input.researchScore >= 70 ? "solid" : "watch",
+      summary: `${input.researchScore}/100 checklist`,
+      detail: `${input.checks.filter((c) => c.status === "pass").length}/${input.checks.length} gates passed — not a win probability.`,
+    },
+    {
+      id: "novig",
+      title: "No-vig edge",
+      status: input.evPercent >= 4 ? "strong" : input.evPercent >= 1.5 ? "solid" : "watch",
+      summary: `${(input.noVig * 100).toFixed(1)}% fair · EV ${input.evPercent >= 0 ? "+" : ""}${input.evPercent.toFixed(1)}%`,
+      detail: "Juice removed across the two-way; EV is vs the offered price, not a guarantee.",
+    },
+    {
+      id: "matchup",
+      title: "Matchup",
+      status: (input.injuryStatus ?? "None").toLowerCase() === "none" ? "solid" : "watch",
+      summary: input.matchup,
+      detail:
+        (input.injuryStatus ?? "None").toLowerCase() === "none"
+          ? "No active injury flag on the featured player from the ESPN feed."
+          : `Injury context: ${input.injuryStatus}`,
+    },
+    {
+      id: "form",
+      title: "Recent form",
+      status: formPct >= 70 ? "strong" : formPct >= 50 ? "solid" : "watch",
+      summary: `L10 ${input.l10.label} (${formPct}%) · L5 ${input.l5.label}`,
+      detail: `Cleared ${input.side.toLowerCase()} ${input.line} ${input.market.toLowerCase()} in ${input.l10.label} of the last ${input.l10.samples} tracked games (L20 ${input.l20.label}).`,
+    },
+    {
+      id: "movement",
+      title: "Line movement",
+      status: movedFavor ? "strong" : Math.abs(moved) < 0.25 ? "solid" : "watch",
+      summary:
+        moved === 0
+          ? `Stable at ${input.currentLine}`
+          : `${input.openLine} → ${input.currentLine} (${moved > 0 ? "+" : ""}${moved})`,
+      detail: movedFavor
+        ? "Number moved toward value for the listed side."
+        : Math.abs(moved) < 0.25
+          ? "Little steam yet — edge is mostly form + research gates."
+          : "Line drifted against the lean — size down or wait for a better number.",
+    },
+  ];
+
+  const strongCount = pillars.filter((p) => p.status === "strong").length;
+  const verdict: "strong" | "solid" | "watch" =
+    strongCount >= 3 || (input.researchScore >= 85 && formPct >= 70)
+      ? "strong"
+      : strongCount >= 1 || input.researchScore >= 70
+        ? "solid"
+        : "watch";
+
+  const headline =
+    verdict === "strong"
+      ? "Strongest play on the board — form, research gates, and edge align."
+      : verdict === "solid"
+        ? "Solid lean — enough signals to feature, still respect variance."
+        : "Watchlist lean — featured for transparency, not max conviction.";
+
+  return { headline, verdict, pillars };
+}
+
+/** Synthetic open→now path until live odds ticks land in the warehouse. */
+export function synthesizeLinePath(openLine: number, currentLine: number): Array<{ t: string; line: number }> {
+  const mid = Math.round(((openLine + currentLine) / 2) * 2) / 2;
+  return [
+    { t: "Open", line: openLine },
+    { t: "AM", line: mid },
+    { t: "Now", line: currentLine },
+  ];
+}
+
