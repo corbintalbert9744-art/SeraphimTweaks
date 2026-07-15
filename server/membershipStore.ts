@@ -57,7 +57,7 @@ function toPublic(user: MembershipRecord): PublicUser {
     id: user.id,
     email: user.email,
     name: user.displayName || user.username || "Member",
-    membershipActive: isMembershipActive(user.membershipStatus),
+    membershipActive: isMembershipActive(user.membershipStatus, user.currentPeriodEnd),
     membershipStatus: user.membershipStatus,
     plan,
     billingInterval: interval,

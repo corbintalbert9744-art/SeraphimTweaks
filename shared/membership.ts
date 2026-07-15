@@ -29,8 +29,16 @@ export function normalizeBillingInterval(value: unknown): BillingInterval {
   return "monthly";
 }
 
-export function isMembershipActive(status: string | null | undefined): boolean {
-  return status === "active" || status === "trialing";
+export function isMembershipActive(
+  status: string | null | undefined,
+  currentPeriodEnd?: Date | string | null,
+): boolean {
+  if (status !== "active" && status !== "trialing") return false;
+  if (!currentPeriodEnd) return true;
+  const end = currentPeriodEnd instanceof Date ? currentPeriodEnd : new Date(currentPeriodEnd);
+  if (Number.isNaN(end.getTime())) return true;
+  // Grace: still active through the renewal timestamp
+  return end.getTime() >= Date.now();
 }
 
 /** Display prices (USD) — Stripe Price IDs come from env */

@@ -10,6 +10,7 @@ import {
   authenticateUser,
   createUser,
   getPublicUser,
+  updateUserMembership,
 } from "./membershipStore";
 import {
   appBaseUrl,
@@ -89,8 +90,19 @@ export function registerAuthAndBillingRoutes(app: Express) {
 
   app.get("/api/auth/me", async (req: AuthedRequest, res) => {
     if (!req.user) return res.status(401).json({ error: "Not authenticated" });
-    const fresh = await getPublicUser(req.user.id);
+    let fresh = await getPublicUser(req.user.id);
     if (!fresh) return res.status(401).json({ error: "Not authenticated" });
+
+    // Defense in depth: if renewal date has passed, revoke locally even before webhook.
+    if (
+      fresh.membershipStatus === "active" &&
+      fresh.currentPeriodEnd &&
+      new Date(fresh.currentPeriodEnd).getTime() < Date.now()
+    ) {
+      await updateUserMembership(fresh.id, { membershipStatus: "canceled" });
+      fresh = (await getPublicUser(fresh.id))!;
+    }
+
     req.user = fresh;
     res.json({ user: fresh });
   });
@@ -109,6 +121,9 @@ export function registerAuthAndBillingRoutes(app: Express) {
       }
       const interval = normalizeBillingInterval(body.interval);
       const user = req.user!;
+      if (user.membershipActive) {
+        return res.status(409).json({ error: "Membership is already active" });
+      }
       const session = await createCheckoutSession({
         userId: user.id,
         email: user.email,
