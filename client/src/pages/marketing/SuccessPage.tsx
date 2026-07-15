@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { MarketingShell } from "@/components/marketing/MarketingShell";
 import { useMembership } from "@/context/MembershipContext";
 
 export default function SuccessPage() {
-  const { membershipActive, isAuthenticated, refresh, loading } = useMembership();
+  const { membershipActive, refresh, loading } = useMembership();
   const [, setLocation] = useLocation();
   const search = useSearch();
   const sessionId = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search).get(
@@ -14,6 +14,7 @@ export default function SuccessPage() {
   const [timedOut, setTimedOut] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const confirmedRef = useRef(false);
 
   useEffect(() => {
     if (membershipActive) {
@@ -22,9 +23,9 @@ export default function SuccessPage() {
     }
   }, [membershipActive, setLocation]);
 
-  // Confirm from Stripe session_id even if the browser session cookie was lost.
   useEffect(() => {
-    if (!sessionId || membershipActive || loading || confirming) return;
+    if (!sessionId || membershipActive || loading || confirmedRef.current) return;
+    confirmedRef.current = true;
     let cancelled = false;
     setConfirming(true);
     (async () => {
@@ -37,7 +38,10 @@ export default function SuccessPage() {
         });
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as { error?: string };
-          if (!cancelled) setConfirmError(data.error || res.statusText);
+          if (!cancelled) {
+            setConfirmError(data.error || res.statusText);
+            confirmedRef.current = false;
+          }
         } else if (!cancelled) {
           setConfirmError(null);
         }
@@ -45,6 +49,7 @@ export default function SuccessPage() {
       } catch (err) {
         if (!cancelled) {
           setConfirmError(err instanceof Error ? err.message : "Could not confirm checkout");
+          confirmedRef.current = false;
         }
       } finally {
         if (!cancelled) setConfirming(false);
@@ -53,7 +58,7 @@ export default function SuccessPage() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, membershipActive, loading, confirming, refresh]);
+  }, [sessionId, membershipActive, loading, refresh]);
 
   useEffect(() => {
     if (membershipActive || loading || confirming) return;
@@ -71,10 +76,12 @@ export default function SuccessPage() {
     setTimedOut(false);
     setTries(0);
     setConfirmError(null);
+    confirmedRef.current = false;
     if (!sessionId) {
       await refresh();
       return;
     }
+    confirmedRef.current = true;
     setConfirming(true);
     try {
       const res = await fetch("/api/checkout/confirm", {
@@ -86,10 +93,12 @@ export default function SuccessPage() {
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         setConfirmError(data.error || res.statusText);
+        confirmedRef.current = false;
       }
       await refresh();
     } catch (err) {
       setConfirmError(err instanceof Error ? err.message : "Could not confirm checkout");
+      confirmedRef.current = false;
     } finally {
       setConfirming(false);
     }
@@ -137,7 +146,11 @@ export default function SuccessPage() {
           ) : (
             <div className="mt-6 flex items-center gap-2 text-sm text-neutral-400">
               <span className="h-2 w-2 animate-pulse rounded-full bg-yellow-400" />
-              {membershipActive ? "Redirecting…" : confirming ? "Confirming with Stripe…" : "Verifying payment…"}
+              {membershipActive
+                ? "Redirecting…"
+                : confirming
+                  ? "Confirming with Stripe…"
+                  : "Verifying payment…"}
             </div>
           )}
 
