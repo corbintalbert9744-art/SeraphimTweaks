@@ -33,9 +33,11 @@ export function Sidebar() {
     >
       <div className={cn("flex h-16 items-center border-b border-[#1a1a1a] px-4", collapsed ? "justify-center" : "justify-between")}>
         <Link href="/" onClick={() => setMobileOpen(false)} className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-yellow-500/30 bg-gradient-to-br from-yellow-400/20 to-amber-600/10">
-            <span className="h-2.5 w-2.5 rounded-full bg-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.8)]" />
-          </span>
+          <img
+            src="/logo.png"
+            alt="Seraphim"
+            className="h-8 w-8 shrink-0 rounded-lg object-contain"
+          />
           {!collapsed && (
             <div className="min-w-0 animate-in fade-in duration-300">
               <p className="truncate text-sm font-semibold tracking-tight text-white">Seraphim</p>
