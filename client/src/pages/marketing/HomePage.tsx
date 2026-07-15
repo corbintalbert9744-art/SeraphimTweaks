@@ -11,13 +11,41 @@ const sports = [
 ];
 
 const features = [
-  { title: "Historical Hit Rates", body: "L5, L10, and season hit rates on every prop." },
-  { title: "No-Vig Edge", body: "Fair probability stripped of book juice." },
-  { title: "Research Score", body: "A single 0–100 score grounded in explainable checks." },
-  { title: "AI Analysis", body: "Concise writeups that surface what actually matters." },
-  { title: "Line Movement", body: "Open-to-now tracking so you see where the market moved." },
-  { title: "Player Reports", body: "Profiles built for research — not highlight reels." },
-  { title: "Parlay Builder", body: "Combine legs with shared hit-rate context." },
+  {
+    title: "Historical Hit Rates",
+    body: "L5, L10, and season hit rates on every prop.",
+    image: "/marketing/features/hit-rates.png",
+  },
+  {
+    title: "No-Vig Edge",
+    body: "Fair probability stripped of book juice.",
+    image: "/marketing/features/no-vig.png",
+  },
+  {
+    title: "Research Score",
+    body: "A single 0–100 score grounded in explainable checks.",
+    image: "/marketing/features/research-score.png",
+  },
+  {
+    title: "AI Analysis",
+    body: "Concise writeups that surface what actually matters.",
+    image: "/marketing/features/ai-analysis.png",
+  },
+  {
+    title: "Line Movement",
+    body: "Open-to-now tracking so you see where the market moved.",
+    image: "/marketing/features/line-movement.png",
+  },
+  {
+    title: "Player Reports",
+    body: "Profiles built for research — not highlight reels.",
+    image: "/marketing/features/player-reports.png",
+  },
+  {
+    title: "Parlay Builder",
+    body: "Combine legs with shared hit-rate context.",
+    image: "/marketing/features/parlay-builder.png",
+  },
 ];
 
 export default function MarketingHomePage() {
@@ -39,10 +67,10 @@ export default function MarketingHomePage() {
           </p>
           <div className="mkt-reveal mkt-delay-3 mt-10 flex flex-wrap gap-3">
             <Link
-              href="/signup"
+              href="/pricing"
               className="btn-3d rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-5 py-3 text-sm font-semibold text-black"
             >
-              Start Free Trial
+              Purchase Now
             </Link>
             <Link
               href="/features"
@@ -90,9 +118,22 @@ export default function MarketingHomePage() {
           </p>
           <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {features.map((f) => (
-              <div key={f.title} className="rounded-2xl border border-[#1a1a1a] bg-[#111]/40 p-5">
-                <h3 className="text-base font-semibold text-white">{f.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-neutral-500">{f.body}</p>
+              <div
+                key={f.title}
+                className="overflow-hidden rounded-2xl border border-[#1a1a1a] bg-[#111]/40"
+              >
+                <div className="aspect-[16/10] overflow-hidden border-b border-[#1a1a1a] bg-[#0a0a0a]">
+                  <img
+                    src={f.image}
+                    alt={`${f.title} from the Seraphim IQ app`}
+                    className="h-full w-full object-cover object-top"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="p-5">
+                  <h3 className="text-base font-semibold text-white">{f.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-500">{f.body}</p>
+                </div>
               </div>
             ))}
           </div>

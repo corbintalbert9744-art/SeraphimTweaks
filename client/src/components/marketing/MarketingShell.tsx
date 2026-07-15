@@ -62,10 +62,10 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                   Log in
                 </Link>
                 <Link
-                  href="/signup"
+                  href="/pricing"
                   className="btn-3d rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-4 py-2 text-sm font-semibold text-black"
                 >
-                  Start Free Trial
+                  Purchase Now
                 </Link>
               </>
             )}

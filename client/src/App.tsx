@@ -53,7 +53,6 @@ function MembersApp() {
       <ParlayDraftProvider>
         <AppShell>
           <Switch>
-            <Route path="/" component={CommandCenterPage} />
             <Route path="/dashboard" component={DashboardPage} />
             <Route path="/nba" component={NbaPage} />
             <Route path="/nfl" component={NflPage} />
@@ -68,6 +67,7 @@ function MembersApp() {
             <Route path="/parlay-builder" component={ParlayBuilderPage} />
             <Route path="/alerts" component={AlertsPage} />
             <Route path="/settings" component={SettingsPage} />
+            <Route path="/" component={CommandCenterPage} />
             <Route component={NotFound} />
           </Switch>
         </AppShell>

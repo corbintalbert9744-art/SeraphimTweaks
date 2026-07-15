@@ -77,18 +77,13 @@ function persist(state: MembershipState) {
 }
 
 export function MembershipProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<MembershipState>(defaultState);
-  const [hydrated, setHydrated] = useState(false);
+  const [state, setState] = useState<MembershipState>(() =>
+    typeof window === "undefined" ? defaultState : loadState(),
+  );
 
   useEffect(() => {
-    setState(loadState());
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
     persist(state);
-  }, [state, hydrated]);
+  }, [state]);
 
   const signUp = useCallback((input: { name: string; email: string; password: string }) => {
     void input.password;
