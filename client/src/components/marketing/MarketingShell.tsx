@@ -20,15 +20,15 @@ export function MarketingShell({ children }: { children: ReactNode }) {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_45%_at_50%_-5%,rgba(234,179,8,0.12),transparent_55%)]" />
 
       <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-black/80 backdrop-blur-xl">
-        <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link href="/" className="flex min-w-0 items-center gap-2.5">
-            <img src="/logo.png" alt="" className="h-8 w-8 shrink-0 rounded-lg object-contain" />
-            <span className="text-sm font-semibold tracking-tight text-white">
+        <div className="relative mx-auto flex h-12 max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
+          <Link href="/" className="flex min-w-0 items-center gap-2">
+            <img src="/logo.png" alt="" className="h-6 w-6 shrink-0 rounded-md object-contain" />
+            <span className="text-[13px] font-semibold tracking-tight text-white">
               Seraphim <span className="text-yellow-400">IQ</span>
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="hidden items-center gap-0.5 md:flex">
             {nav.map((item) => {
               const active = !item.href.includes("#") && location === item.href;
               return (
@@ -36,7 +36,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "rounded-lg px-3 py-2 text-sm transition",
+                    "rounded-md px-2.5 py-1.5 text-xs transition",
                     active ? "text-yellow-400" : "text-neutral-400 hover:text-white",
                   )}
                 >
@@ -46,11 +46,11 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {isAuthenticated && membershipActive ? (
               <Link
                 href="/app"
-                className="rounded-full bg-yellow-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-yellow-300"
+                className="rounded-full bg-yellow-400 px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-yellow-300"
               >
                 Open Dashboard
               </Link>
@@ -58,13 +58,13 @@ export function MarketingShell({ children }: { children: ReactNode }) {
               <>
                 <Link
                   href="/login"
-                  className="hidden rounded-lg px-3 py-2 text-sm text-neutral-300 transition hover:text-white sm:inline"
+                  className="hidden rounded-md px-2.5 py-1.5 text-xs text-neutral-300 transition hover:text-white sm:inline"
                 >
                   Sign in
                 </Link>
                 <Link
                   href="/pricing"
-                  className="rounded-full bg-yellow-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-yellow-300"
+                  className="rounded-full bg-yellow-400 px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-yellow-300"
                 >
                   Become a Member
                 </Link>
@@ -79,19 +79,19 @@ export function MarketingShell({ children }: { children: ReactNode }) {
       </main>
 
       <footer className="relative z-10 mt-8 border-t border-white/[0.06]">
-        <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-12 sm:px-6 md:flex-row md:items-start md:justify-between">
+        <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-sm font-semibold text-white">
+            <p className="text-[13px] font-semibold text-white">
               Seraphim <span className="text-yellow-400">IQ</span>
             </p>
-            <p className="mt-3 max-w-sm text-sm text-neutral-500">
+            <p className="mt-2 max-w-sm text-xs leading-relaxed text-neutral-500">
               Professional sports research for members who want clearer props, sharper edges, and
               transparent analytics.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-8 text-sm">
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+          <div className="grid grid-cols-2 gap-6 text-xs">
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
                 Product
               </p>
               {nav.map((item) => (
@@ -104,8 +104,8 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                 </Link>
               ))}
             </div>
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
                 Members
               </p>
               <Link href="/login" className="block text-neutral-400 hover:text-yellow-400">
@@ -120,7 +120,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             </div>
           </div>
         </div>
-        <div className="border-t border-white/[0.04] py-6 text-center text-xs text-neutral-600">
+        <div className="border-t border-white/[0.04] py-4 text-center text-[11px] text-neutral-600">
           © {new Date().getFullYear()} Seraphim IQ. Research platform — not a sportsbook.
         </div>
       </footer>

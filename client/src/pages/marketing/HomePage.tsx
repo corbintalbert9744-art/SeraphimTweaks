@@ -18,8 +18,8 @@ const compareRows = [
 
 function CheckItem({ children }: { children: string }) {
   return (
-    <li className="flex items-start gap-2.5 text-sm text-neutral-200">
-      <Check className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" strokeWidth={2.5} />
+    <li className="flex items-start gap-2 text-[13px] text-neutral-200">
+      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-yellow-400" strokeWidth={2.5} />
       <span>{children}</span>
     </li>
   );
@@ -30,40 +30,36 @@ export default function MarketingHomePage() {
     <MarketingShell>
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -left-20 top-10 h-72 w-72 rounded-full bg-yellow-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute right-0 top-32 h-80 w-80 rounded-full bg-amber-600/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-16 top-8 h-56 w-56 rounded-full bg-yellow-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute right-0 top-24 h-64 w-64 rounded-full bg-amber-600/10 blur-3xl" />
 
-        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
+        <div className="relative mx-auto grid max-w-5xl items-center gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:py-14">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-yellow-400">
-              Sports prop analytics
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400">
+              Sports research desk
             </p>
-            <h1 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Hit rates.
-              <br />
-              Book edges.
-              <br />
-              Every player prop.
+            <h1 className="mt-3 text-2xl font-semibold leading-snug tracking-tight text-white sm:text-3xl lg:text-[2rem] lg:leading-[1.2]">
+              Prop research with receipts — history, edges, and a score you can trust.
             </h1>
-            <p className="mt-5 max-w-md text-sm leading-relaxed text-neutral-400 sm:text-base">
-              Seraphim IQ surfaces L5–L20 hit rates, no-vig edges, Research Scores, and AI analysis
-              so you can research props like a desk — not a tip sheet.
+            <p className="mt-3 max-w-md text-[13px] leading-relaxed text-neutral-400 sm:text-sm">
+              Seraphim IQ pulls L5–L20 hit rates, no-vig edges, Research Scores, and Pro AI writeups
+              into one desk so you research props — not chase tips.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-2.5">
               <Link
                 href="/pricing"
-                className="rounded-full bg-yellow-400 px-6 py-3 text-sm font-semibold text-black transition hover:bg-yellow-300"
+                className="rounded-full bg-yellow-400 px-4 py-2 text-xs font-semibold text-black transition hover:bg-yellow-300"
               >
                 Become a Member →
               </Link>
               <Link
                 href="/login"
-                className="rounded-full border border-[#2a2a2a] bg-[#141414] px-6 py-3 text-sm font-medium text-white transition hover:border-neutral-500"
+                className="rounded-full border border-[#2a2a2a] bg-[#141414] px-4 py-2 text-xs font-medium text-white transition hover:border-neutral-500"
               >
                 Sign in
               </Link>
             </div>
-            <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm text-neutral-400">
+            <div className="mt-6 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-neutral-400">
               <span>
                 <span className="font-semibold text-white">6</span> sports
               </span>
@@ -71,7 +67,7 @@ export default function MarketingHomePage() {
                 <span className="font-semibold text-white">Major</span> books compared
               </span>
               <span>
-                <span className="font-semibold text-yellow-300">L5–L20</span> hit rate windows
+                <span className="font-semibold text-yellow-300">L5–L20</span> hit rates
               </span>
               <span>
                 <span className="font-semibold text-white">AI</span> research (Pro)
@@ -79,16 +75,16 @@ export default function MarketingHomePage() {
             </div>
           </div>
 
-          <div className="relative">
-            <div className="absolute -inset-3 rounded-3xl bg-yellow-400/10 blur-2xl" />
-            <div className="relative overflow-hidden rounded-2xl border border-yellow-500/25 bg-[#0c0c0c] shadow-[0_0_60px_-20px_rgba(234,179,8,0.45)]">
+          <div className="relative mx-auto w-full max-w-md lg:max-w-none">
+            <div className="absolute -inset-2 rounded-2xl bg-yellow-400/10 blur-xl" />
+            <div className="relative overflow-hidden rounded-xl border border-yellow-500/25 bg-[#0c0c0c] shadow-[0_0_40px_-18px_rgba(234,179,8,0.4)]">
               <img
                 src="/marketing/hero-product.png"
                 alt="Seraphim IQ NBA prop board"
-                className="w-full object-cover object-top"
+                className="aspect-[16/11] w-full object-cover object-top"
               />
             </div>
-            <p className="mt-3 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-yellow-400/90">
+            <p className="mt-2 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-yellow-400/90">
               Actual product — not a mockup
             </p>
           </div>
@@ -97,18 +93,18 @@ export default function MarketingHomePage() {
 
       {/* Interactive workflow */}
       <section className="border-t border-[#1a1a1a] bg-black/40">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-14">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
                 Try the workflow before you join.
               </h2>
-              <p className="mt-3 max-w-xl text-sm text-neutral-400 sm:text-base">
+              <p className="mt-2 max-w-xl text-sm text-neutral-400">
                 Sort props, filter live lines, add picks, and see the research panel update like the
                 real app.
               </p>
             </div>
-            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-[#2a2a2a] bg-[#141414] px-3 py-1.5 text-xs text-yellow-300">
+            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-[#2a2a2a] bg-[#141414] px-2.5 py-1 text-[11px] text-yellow-300">
               <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
               Sample data · not live
             </span>
@@ -118,56 +114,56 @@ export default function MarketingHomePage() {
       </section>
 
       {/* Features */}
-      <section id="features-preview" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-yellow-400">
+      <section id="features-preview" className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400">
           Features
         </p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+        <h2 className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">
           Everything to find a winning pick.
         </h2>
 
         {/* 01 Research */}
-        <div className="mt-16 grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
+        <div className="mt-10 grid items-center gap-8 lg:grid-cols-2 lg:gap-10">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
               01 — Research
             </p>
-            <h3 className="mt-3 text-2xl font-semibold text-white">Historical performance by prop</h3>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-400">
+            <h3 className="mt-2 text-lg font-semibold text-white">Historical performance by prop</h3>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
               Every prop surfaces L5, L10, L20, and season hit rates. Color-coded thresholds let you
               spot high-confidence picks at a glance.
             </p>
-            <ul className="mt-5 space-y-2.5">
+            <ul className="mt-4 space-y-2">
               <CheckItem>L5, L10, L20, and season hit rates on every prop</CheckItem>
               <CheckItem>Hit-rate bars on the full research report</CheckItem>
               <CheckItem>Sortable boards across NBA, NFL, MLB, tennis, WNBA</CheckItem>
               <CheckItem>Player reports with performance vs line</CheckItem>
             </ul>
           </div>
-          <div className="overflow-hidden rounded-2xl border border-[#222] bg-[#0c0c0c] p-3 shadow-[0_24px_50px_-30px_rgba(0,0,0,0.9)]">
+          <div className="overflow-hidden rounded-xl border border-[#222] bg-[#0c0c0c] p-2.5 shadow-[0_20px_40px_-28px_rgba(0,0,0,0.9)]">
             <img
               src="/marketing/features/hit-rates.png"
               alt="Hit-rate visualization"
-              className="w-full rounded-xl object-contain"
+              className="w-full rounded-lg object-contain"
             />
           </div>
         </div>
 
         {/* 02 + 03 side by side */}
-        <div className="mt-20 grid gap-6 lg:grid-cols-2">
-          <article className="rounded-2xl border border-[#222] bg-[#0c0c0c] p-6 sm:p-7">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
+        <div className="mt-12 grid gap-4 lg:grid-cols-2">
+          <article className="rounded-xl border border-[#222] bg-[#0c0c0c] p-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
               02 — Edge
             </p>
-            <h3 className="mt-3 text-xl font-semibold text-white">No-vig edge from real book lines</h3>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-400">
+            <h3 className="mt-2 text-base font-semibold text-white">No-vig edge from real book lines</h3>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
               See true implied probability after juice is removed, next to EV and confidence.
             </p>
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-3 space-y-2">
               <CheckItem>No-vig probability on every research report</CheckItem>
               <CheckItem>Best line highlighted across compared books</CheckItem>
             </ul>
-            <div className="mt-6 overflow-hidden rounded-xl border border-[#1a1a1a] bg-black/40 p-2">
+            <div className="mt-4 overflow-hidden rounded-lg border border-[#1a1a1a] bg-black/40 p-1.5">
               <img
                 src="/marketing/features/no-vig.png"
                 alt="No-vig and EV metrics"
@@ -176,21 +172,21 @@ export default function MarketingHomePage() {
             </div>
           </article>
 
-          <article className="rounded-2xl border border-[#222] bg-[#0c0c0c] p-6 sm:p-7">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
+          <article className="rounded-xl border border-[#222] bg-[#0c0c0c] p-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
               03 — Confidence
             </p>
-            <h3 className="mt-3 text-xl font-semibold text-white">
+            <h3 className="mt-2 text-base font-semibold text-white">
               See the game log behind every number
             </h3>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-400">
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
               Research Score checklists and L10 hit/miss charts make confidence visual — not vibes.
             </p>
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-3 space-y-2">
               <CheckItem>Checklist-backed Research Score</CheckItem>
               <CheckItem>Hit / miss coloring for instant recognition</CheckItem>
             </ul>
-            <div className="mt-6 overflow-hidden rounded-xl border border-[#1a1a1a] bg-black/40 p-2">
+            <div className="mt-4 overflow-hidden rounded-lg border border-[#1a1a1a] bg-black/40 p-1.5">
               <img
                 src="/marketing/features/parlay-builder.png"
                 alt="L10 hit miss chart"
@@ -201,34 +197,34 @@ export default function MarketingHomePage() {
         </div>
 
         {/* 04 Build */}
-        <div className="mt-20 grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
+        <div className="mt-12 grid items-center gap-8 lg:grid-cols-2 lg:gap-10">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
               04 — Build
             </p>
-            <h3 className="mt-3 text-2xl font-semibold text-white">
+            <h3 className="mt-2 text-lg font-semibold text-white">
               Parlay builder alongside your research
             </h3>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-400">
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
               Add legs while you research. Over/Under toggles and live L10 context stay attached to
               every pick.
             </p>
-            <ul className="mt-5 space-y-2.5">
+            <ul className="mt-4 space-y-2">
               <CheckItem>One-tap add from any board or report</CheckItem>
               <CheckItem>Independent Over / Under per leg</CheckItem>
               <CheckItem>Live average L10 across the slip</CheckItem>
             </ul>
           </div>
-          <div className="overflow-hidden rounded-2xl border border-[#222] bg-[#0c0c0c] p-3">
+          <div className="overflow-hidden rounded-xl border border-[#222] bg-[#0c0c0c] p-2.5">
             <img
               src="/marketing/features/research-score.png"
               alt="Research Score checklist"
-              className="mb-3 w-full rounded-xl object-contain"
+              className="mb-2 w-full rounded-lg object-contain"
             />
             <img
               src="/marketing/features/ai-analysis.png"
               alt="AI explanation"
-              className="w-full rounded-xl object-contain"
+              className="w-full rounded-lg object-contain"
             />
           </div>
         </div>
@@ -236,21 +232,21 @@ export default function MarketingHomePage() {
 
       {/* Coverage */}
       <section className="border-y border-[#1a1a1a] bg-black/30">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-yellow-400">
+        <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400">
             Coverage
           </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">
             Six leagues. One research desk.
           </h2>
-          <p className="mt-3 max-w-xl text-sm text-neutral-400">
+          <p className="mt-2 max-w-xl text-sm text-neutral-400">
             Full hit-rate history and research boards across every supported sport.
           </p>
-          <div className="mt-8 flex flex-wrap gap-2">
+          <div className="mt-5 flex flex-wrap gap-2">
             {sports.map((sport) => (
               <span
                 key={sport}
-                className="rounded-full border border-[#2a2a2a] bg-[#141414] px-4 py-2 text-sm text-neutral-200"
+                className="rounded-full border border-[#2a2a2a] bg-[#141414] px-3 py-1.5 text-xs text-neutral-200"
               >
                 {sport}
               </span>
@@ -260,19 +256,19 @@ export default function MarketingHomePage() {
       </section>
 
       {/* Compare */}
-      <section id="compare" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-yellow-400">
+      <section id="compare" className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400">
           Compare
         </p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+        <h2 className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">
           Why Seraphim IQ
         </h2>
-        <p className="mt-3 max-w-xl text-sm text-neutral-400">
+        <p className="mt-2 max-w-xl text-sm text-neutral-400">
           More transparent research — built as a premium membership, not another tip feed.
         </p>
 
-        <div className="mt-10 overflow-hidden rounded-2xl border border-[#222]">
-          <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] border-b border-[#222] bg-[#0c0c0c] px-4 py-4 text-[11px] font-semibold uppercase tracking-wider sm:px-6">
+        <div className="mt-7 overflow-hidden rounded-xl border border-[#222]">
+          <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] border-b border-[#222] bg-[#0c0c0c] px-3 py-3 text-[10px] font-semibold uppercase tracking-wider sm:px-5">
             <p className="text-neutral-500">Feature</p>
             <p className="text-center text-yellow-400">Seraphim IQ</p>
             <p className="text-center text-neutral-500">Others</p>
@@ -280,14 +276,14 @@ export default function MarketingHomePage() {
           {compareRows.map((row) => (
             <div
               key={row.feature}
-              className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] items-center border-b border-[#1a1a1a] px-4 py-4 last:border-b-0 sm:px-6"
+              className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] items-center border-b border-[#1a1a1a] px-3 py-3 last:border-b-0 sm:px-5"
             >
-              <p className="pr-3 text-sm text-neutral-200">{row.feature}</p>
-              <p className="flex items-start justify-center gap-1.5 text-center text-sm text-yellow-300">
+              <p className="pr-3 text-xs text-neutral-200 sm:text-sm">{row.feature}</p>
+              <p className="flex items-start justify-center gap-1.5 text-center text-xs text-yellow-300 sm:text-sm">
                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
                 <span>{row.us}</span>
               </p>
-              <p className="flex items-start justify-center gap-1.5 text-center text-sm text-neutral-500">
+              <p className="flex items-start justify-center gap-1.5 text-center text-xs text-neutral-500 sm:text-sm">
                 <X className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} />
                 <span>{row.them}</span>
               </p>
@@ -298,26 +294,26 @@ export default function MarketingHomePage() {
 
       {/* Membership CTA */}
       <section className="border-t border-[#1a1a1a] bg-black/40">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-yellow-400">
+        <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400">
             Membership
           </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">
             Become a Seraphim IQ Member
           </h2>
-          <p className="mt-3 max-w-xl text-sm text-neutral-400">
+          <p className="mt-2 max-w-xl text-sm text-neutral-400">
             Join for full research boards. Standard or Pro — both unlock the members-only dashboard.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-5 flex flex-wrap gap-2.5">
             <Link
               href="/pricing"
-              className="rounded-full bg-yellow-400 px-6 py-3 text-sm font-semibold text-black transition hover:bg-yellow-300"
+              className="rounded-full bg-yellow-400 px-4 py-2 text-xs font-semibold text-black transition hover:bg-yellow-300"
             >
               Become a Member
             </Link>
             <Link
               href="/faq"
-              className="rounded-full border border-[#2a2a2a] bg-[#141414] px-6 py-3 text-sm text-white transition hover:border-neutral-500"
+              className="rounded-full border border-[#2a2a2a] bg-[#141414] px-4 py-2 text-xs text-white transition hover:border-neutral-500"
             >
               Read the FAQ
             </Link>
