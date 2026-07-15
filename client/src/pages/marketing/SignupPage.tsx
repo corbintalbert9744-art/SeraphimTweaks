@@ -88,7 +88,7 @@ export default function SignupPage() {
               type="submit"
               className="btn-3d mt-2 w-full rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-4 py-3 text-sm font-semibold text-black transition hover:brightness-105"
             >
-              Continue — Become a Member
+              Continue · Become a Member
             </button>
           </form>
 

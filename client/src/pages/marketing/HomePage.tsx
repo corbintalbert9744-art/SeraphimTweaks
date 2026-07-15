@@ -12,6 +12,7 @@ const compareRows = [
   { feature: "Line movement timeline", us: "Open → now on every prop", them: "Rarely shown" },
   { feature: "Sports coverage", us: "NBA · NFL · MLB · ATP · WTA · WNBA", them: "1–3 sports" },
   { feature: "Parlay builder", us: "Data-integrated L10 charts", them: "Basic or none" },
+  { feature: "Premium picks (Discord)", us: "Live private channel (Pro)", them: "Not included" },
   { feature: "AI analysis", us: "Prop-level writeups (Pro)", them: "Generic blurbs" },
   { feature: "Player reports", us: "Full research profiles", them: "Limited bios" },
 ];
@@ -39,11 +40,11 @@ export default function MarketingHomePage() {
               Sports research desk
             </p>
             <h1 className="mt-3 text-2xl font-semibold leading-snug tracking-tight text-white sm:text-3xl lg:text-[2rem] lg:leading-[1.2]">
-              Prop research with receipts — history, edges, and a score you can trust.
+              Prop research with receipts: history, edges, and a score you can trust.
             </h1>
             <p className="mt-3 max-w-md text-[13px] leading-relaxed text-neutral-400 sm:text-sm">
               Seraphim IQ pulls L5–L20 hit rates, no-vig edges, Research Scores, and Pro AI writeups
-              into one desk so you research props — not chase tips.
+              into one desk so you research props, not chase tips.
             </p>
             <div className="mt-5 flex flex-wrap gap-2.5">
               <Link
@@ -70,7 +71,7 @@ export default function MarketingHomePage() {
                 <span className="font-semibold text-yellow-300">L5–L20</span> hit rates
               </span>
               <span>
-                <span className="font-semibold text-white">AI</span> research (Pro)
+                <span className="font-semibold text-white">Pro</span> Discord picks
               </span>
             </div>
           </div>
@@ -85,7 +86,7 @@ export default function MarketingHomePage() {
               />
             </div>
             <p className="mt-2 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-yellow-400/90">
-              Actual product — not a mockup
+              Actual product, not a mockup
             </p>
           </div>
         </div>
@@ -180,7 +181,7 @@ export default function MarketingHomePage() {
               See the game log behind every number
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-              Research Score checklists and L10 hit/miss charts make confidence visual — not vibes.
+              Research Score checklists and L10 hit/miss charts make confidence visual, not vibes.
             </p>
             <ul className="mt-3 space-y-2">
               <CheckItem>Checklist-backed Research Score</CheckItem>
@@ -264,7 +265,7 @@ export default function MarketingHomePage() {
           Why Seraphim IQ
         </h2>
         <p className="mt-2 max-w-xl text-sm text-neutral-400">
-          More transparent research — built as a premium membership, not another tip feed.
+          More transparent research, built as a premium membership, not another tip feed.
         </p>
 
         <div className="mt-7 overflow-hidden rounded-xl border border-[#222]">
@@ -302,7 +303,7 @@ export default function MarketingHomePage() {
             Become a Seraphim IQ Member
           </h2>
           <p className="mt-2 max-w-xl text-sm text-neutral-400">
-            Join for full research boards. Standard or Pro — both unlock the members-only dashboard.
+            Join for full research boards. Standard or Pro, both unlock the members-only dashboard.
           </p>
           <div className="mt-5 flex flex-wrap gap-2.5">
             <Link

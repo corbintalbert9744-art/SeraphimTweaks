@@ -148,7 +148,7 @@ export default function CheckoutPage() {
                   <span className="text-base font-medium text-neutral-500"> {SHORT[interval]}</span>
                 </p>
                 <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-                  Mock checkout for this build — no real charge. Activating unlocks the members-only
+                  Mock checkout for this build, no real charge. Activating unlocks the members-only
                   research dashboard.
                 </p>
               </div>
@@ -157,7 +157,7 @@ export default function CheckoutPage() {
                 type="submit"
                 className="btn-3d w-full rounded-xl bg-yellow-400 px-4 py-3 text-sm font-semibold text-black"
               >
-                Become a {plan === "pro" ? "Pro" : "Standard"} Member —{" "}
+                Become a {plan === "pro" ? "Pro" : "Standard"} Member ·{" "}
                 {interval === "annually" ? "Annual" : interval === "weekly" ? "Weekly" : "Monthly"}
               </button>
 

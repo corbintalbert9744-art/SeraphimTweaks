@@ -264,7 +264,11 @@ export function TopNav() {
                     <ul className="mt-2 space-y-1 text-[11px] text-neutral-400">
                       <li>· NBA · NFL · MLB · ATP · WTA · WNBA</li>
                       <li>· Research Score + DQS on props</li>
-                      <li>· AI analysis & unlimited props</li>
+                      {plan === "pro" ? (
+                        <li>· Private Discord picks + AI analysis</li>
+                      ) : (
+                        <li>· Full research boards & unlimited props</li>
+                      )}
                     </ul>
                   </div>
 
