@@ -9,6 +9,7 @@ export function SportTabs() {
   const { collapsed } = useSidebar();
   const activeId = sportTabFromPath(location);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
   const [indicator, setIndicator] = useState({ left: 0, width: 0, opacity: 0 });
 
@@ -18,15 +19,16 @@ export function SportTabs() {
       return;
     }
     const el = tabRefs.current[activeId];
+    const track = trackRef.current;
     const scroller = scrollerRef.current;
-    if (!el || !scroller) return;
+    if (!el || !track || !scroller) return;
 
     const update = () => {
-      const sRect = scroller.getBoundingClientRect();
-      const tRect = el.getBoundingClientRect();
+      const tRect = track.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
       setIndicator({
-        left: tRect.left - sRect.left + scroller.scrollLeft,
-        width: tRect.width,
+        left: elRect.left - tRect.left,
+        width: elRect.width,
         opacity: 1,
       });
     };
@@ -36,6 +38,7 @@ export function SportTabs() {
 
     const ro = new ResizeObserver(update);
     ro.observe(scroller);
+    ro.observe(track);
     ro.observe(el);
     scroller.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update);
@@ -54,48 +57,49 @@ export function SportTabs() {
         collapsed ? "lg:ml-[76px]" : "lg:ml-[248px]",
       )}
     >
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="relative px-4 sm:px-6">
         <div
           ref={scrollerRef}
-          className="relative flex gap-1 overflow-x-auto py-2.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="overflow-x-auto py-2.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           role="tablist"
           aria-label="Sports"
         >
-          {/* Sliding active pill */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute top-2.5 bottom-2.5 rounded-xl border border-yellow-500/35 bg-gradient-to-b from-yellow-500/20 to-amber-600/10 shadow-[0_0_28px_-10px_rgba(234,179,8,0.55)] transition-all duration-300 ease-out"
-            style={{
-              left: indicator.left,
-              width: indicator.width,
-              opacity: indicator.opacity,
-            }}
-          />
+          <div ref={trackRef} className="relative mx-auto flex w-max items-center justify-center gap-1">
+            {/* Sliding active pill */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 rounded-xl border border-yellow-500/35 bg-gradient-to-b from-yellow-500/20 to-amber-600/10 shadow-[0_0_28px_-10px_rgba(234,179,8,0.55)] transition-all duration-300 ease-out"
+              style={{
+                left: indicator.left,
+                width: indicator.width,
+                opacity: indicator.opacity,
+              }}
+            />
 
-          {SPORT_TABS.map((tab) => {
-            const active = activeId === tab.id;
-            return (
-              <Link
-                key={tab.id}
-                href={tab.href}
-                role="tab"
-                aria-selected={active}
-                ref={(node) => {
-                  tabRefs.current[tab.id] = node;
-                }}
-                className={cn(
-                  "relative z-10 flex shrink-0 items-center rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-300",
-                  active ? "text-yellow-300" : "text-neutral-400 hover:text-neutral-100",
-                )}
-              >
-                <span>{tab.label}</span>
-              </Link>
-            );
-          })}
+            {SPORT_TABS.map((tab) => {
+              const active = activeId === tab.id;
+              return (
+                <Link
+                  key={tab.id}
+                  href={tab.href}
+                  role="tab"
+                  aria-selected={active}
+                  ref={(node) => {
+                    tabRefs.current[tab.id] = node;
+                  }}
+                  className={cn(
+                    "relative z-10 flex shrink-0 items-center rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-300",
+                    active ? "text-yellow-300" : "text-neutral-400 hover:text-neutral-100",
+                  )}
+                >
+                  <span>{tab.label}</span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Gold underline accent */}
-        <div className="pointer-events-none absolute inset-x-4 bottom-0 h-px bg-gradient-to-r from-transparent via-yellow-500/25 to-transparent sm:inset-x-6 lg:inset-x-8" />
+        <div className="pointer-events-none absolute inset-x-4 bottom-0 h-px bg-gradient-to-r from-transparent via-yellow-500/25 to-transparent sm:inset-x-6" />
       </div>
     </div>
   );
