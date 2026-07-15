@@ -5,12 +5,13 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AppShell } from "@/components/layout/AppShell";
+import DashboardPage from "@/pages/analytics/DashboardPage";
+import LeaguePage from "@/pages/analytics/LeaguePage";
+import ParlayBuilderPage from "@/pages/analytics/ParlayBuilderPage";
+import SettingsPage from "@/pages/analytics/SettingsPage";
 import NotFound from "@/pages/not-found";
-import Home from "@/pages/Home";
-import ProductPage from "@/pages/ProductPage";
-import Pricing from "@/pages/Pricing";
-import Reviews from "@/pages/Reviews";
-import Terms from "@/pages/Terms";
+import type { LeagueCode } from "@/data/mock";
 
 function ScrollToTop() {
   const [location] = useLocation();
@@ -20,16 +21,25 @@ function ScrollToTop() {
   return null;
 }
 
+function LeagueRoute({ league }: { league: LeagueCode }) {
+  return <LeaguePage league={league} />;
+}
+
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/reviews" component={Reviews} />
-      <Route path="/terms" component={Terms} />
-      <Route path="/product/:id" component={ProductPage} />
-      <Route component={NotFound} />
-    </Switch>
+    <AppShell>
+      <Switch>
+        <Route path="/" component={DashboardPage} />
+        <Route path="/nba">{() => <LeagueRoute league="NBA" />}</Route>
+        <Route path="/nfl">{() => <LeagueRoute league="NFL" />}</Route>
+        <Route path="/atp">{() => <LeagueRoute league="ATP" />}</Route>
+        <Route path="/wta">{() => <LeagueRoute league="WTA" />}</Route>
+        <Route path="/wnba">{() => <LeagueRoute league="WNBA" />}</Route>
+        <Route path="/parlay-builder" component={ParlayBuilderPage} />
+        <Route path="/settings" component={SettingsPage} />
+        <Route component={NotFound} />
+      </Switch>
+    </AppShell>
   );
 }
 

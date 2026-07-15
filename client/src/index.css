@@ -455,3 +455,14 @@
 .btn-3d:active {
   transform: translateY(0);
 }
+
+/* Analytics app: quieter atmosphere than marketing landing */
+.analytics-shell {
+  background-color: #0a0a0a;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px, 48px 48px;
+  background-attachment: fixed;
+}
+

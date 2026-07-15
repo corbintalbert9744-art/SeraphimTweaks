@@ -1,8 +1,9 @@
 {
-  "name": "rest-express",
+  "name": "seraphim-analytics",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "description": "Seraphim Analytics — sports research frontend (separate from Seraphim Tweaks)",
   "scripts": {
     "dev:client": "vite dev --port 5000",
     "dev": "NODE_ENV=development tsx server/index.ts",
