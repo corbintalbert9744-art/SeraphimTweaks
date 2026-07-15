@@ -6,39 +6,78 @@ It is **not** the Seraphim Tweaks commerce site. Do not deploy this build to the
 
 ## What’s live now
 
-- **Command Center** (`/`) — best EV, confidence, injuries, top props, games soon, Prop of the Day
-- **NBA first data source** — ESPN scoreboard + athlete gamelogs via `/api/nba/*`
-- **Analytics engine** (`shared/analytics.ts`) — L5/L10/L20, no-vig, EV, Research Score, Confidence, DQS, AI explanation
-- **Database schema** (`shared/schema.ts`) — players, teams, games, props, sportsbooks, odds, game logs, injuries, saved parlays, users
+- **Command Center** (`/app`) — best EV, confidence, injuries, top props, games soon, Prop of the Day
+- **Membership** — Standard / Pro, Stripe Checkout, Pro feature locks
+- **Node API** — auth, billing, ESPN NBA fallback adapters
+- **Data platform** (`data-platform/`) — FastAPI + SQLAlchemy warehouse + provider adapters + scheduler
 
 ## Run
 
 ```bash
-git checkout cursor/sports-analytics-dashboard-754e
 npm install
-cp .env.example .env   # add DATABASE_URL when Postgres is ready
+cp .env.example .env
+
+# Terminal A — Python warehouse / analytics API
+npm run data-platform
+
+# Terminal B — React + Express (auth, Stripe, UI)
 npm run dev
 ```
 
-### API
+Express proxies `/api/nba/*` and `/api/command-center` to the data platform when it is up, and falls back to the Node ESPN adapters if it is not.
 
-- `GET /api/health`
-- `GET /api/nba/games` — ESPN scoreboard (optional `?dates=YYYYMMDD`)
-- `GET /api/nba/featured-prop` — one player prop from real gamelogs + analytics
-- `GET /api/command-center` — Command Center payload
-
-### Odds note
-
-Without `ODDS_API_KEY`, featured props use **placeholder −110/−110** books. Games + hit rates are still real ESPN data.
-
-### Database
+### One-shot NBA ingest (no server)
 
 ```bash
-# when DATABASE_URL is set
+npm run data-platform:once
+```
+
+### Postgres (optional)
+
+```bash
+docker compose up -d postgres
+# set DATABASE_URL in .env, then:
 npm run db:push
 ```
+
+Without `DATABASE_URL`, the data platform uses SQLite automatically.
+
+## API
+
+### Node (always)
+
+- `GET /api/health`
+- Auth + Stripe routes under `/api/auth/*`, `/api/checkout/*`, `/api/stripe/*`
+
+### Data platform (via proxy or `:8000`)
+
+- `GET /api/v1/health`
+- `GET /api/v1/providers` — live vs mock vs needs configuration
+- `GET /api/v1/leagues`
+- `GET /api/nba/games` → warehouse ESPN schedule
+- `GET /api/nba/featured-prop`
+- `GET /api/command-center`
+
+## Odds note
+
+Without `ODDS_API_KEY`, props use **mock −110/−110** books flagged `oddsAreMock: true`. Games + hit rates still use real ESPN data.
+
+## Model transparency
+
+Research Score, Confidence, EV, and no-vig are **model estimates** from evidence — not guaranteed win probabilities. Do not present a single “parlay chance of winning.”
+
+## Development order (data platform)
+
+1. Database schema ✅
+2. Provider adapter framework ✅
+3. NBA live data ✅
+4. NBA analytics ✅
+5. Connect frontend (proxy) ✅
+6. Expand NFL → ATP → WTA → WNBA (next)
+
+See `data-platform/README.md`.
 
 ## Product separation
 
 - **Tweaks (production):** `SeraphimTweaks` `main` — leave alone
-- **Analytics:** this branch / eventual `SeraphimTweaks-clone` home
+- **Analytics:** this branch / sports research app

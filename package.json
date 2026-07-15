@@ -7,6 +7,9 @@
   "scripts": {
     "dev:client": "vite dev --port 5000",
     "dev": "NODE_ENV=development tsx --env-file=.env server/index.ts",
+    "data-platform": "cd data-platform && PYTHONPATH=. python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+    "data-platform:once": "cd data-platform && PYTHONPATH=. python3 scripts/run_nba_once.py",
+    "dev:all": "echo 'Run npm run data-platform in one terminal and npm run dev in another'",
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node --env-file=.env dist/index.cjs",
     "check": "tsc",

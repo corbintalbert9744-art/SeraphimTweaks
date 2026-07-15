@@ -1,0 +1,76 @@
+/**
+ * Optional proxy from Express → FastAPI data platform.
+ * When DATA_PLATFORM_URL is set (default http://127.0.0.1:8000), sports
+ * endpoints prefer the Python warehouse and fall back to the Node NBA service.
+ */
+import type { Express, Request, Response } from "express";
+
+const BASE = process.env.DATA_PLATFORM_URL || "http://127.0.0.1:8000";
+const ENABLED = process.env.DATA_PLATFORM_PROXY !== "0";
+
+async function proxyGet(path: string, res: Response, fallback: () => Promise<void>) {
+  if (!ENABLED) {
+    await fallback();
+    return;
+  }
+  try {
+    const upstream = await fetch(`${BASE}${path}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (!upstream.ok) {
+      await fallback();
+      return;
+    }
+    const data = await upstream.json();
+    res.json({ ...data, _source: "data-platform" });
+  } catch {
+    await fallback();
+  }
+}
+
+export function registerDataPlatformProxy(
+  app: Express,
+  handlers: {
+    nbaGames: (req: Request, res: Response) => Promise<void>;
+    featuredProp: (req: Request, res: Response) => Promise<void>;
+    commandCenter: (req: Request, res: Response) => Promise<void>;
+  },
+) {
+  app.get("/api/nba/games", async (req, res) => {
+    const qs = typeof req.query.dates === "string" ? `?dates=${encodeURIComponent(req.query.dates)}` : "";
+    await proxyGet(`/api/v1/nba/games${qs}`, res, () => handlers.nbaGames(req, res));
+  });
+
+  app.get("/api/nba/featured-prop", async (req, res) => {
+    const qs = typeof req.query.gameId === "string" ? `?gameId=${encodeURIComponent(req.query.gameId)}` : "";
+    await proxyGet(`/api/v1/nba/featured-prop${qs}`, res, () => handlers.featuredProp(req, res));
+  });
+
+  app.get("/api/command-center", async (req, res) => {
+    await proxyGet(`/api/v1/nba/command-center`, res, () => handlers.commandCenter(req, res));
+  });
+
+  app.get("/api/v1/providers", async (_req, res) => {
+    try {
+      const upstream = await fetch(`${BASE}/api/v1/providers`, { signal: AbortSignal.timeout(8_000) });
+      if (!upstream.ok) throw new Error(String(upstream.status));
+      res.json(await upstream.json());
+    } catch {
+      res.status(503).json({
+        error: "Data platform unavailable",
+        hint: "Start with: npm run data-platform",
+        providers: [],
+      });
+    }
+  });
+
+  app.get("/api/v1/health", async (_req, res) => {
+    try {
+      const upstream = await fetch(`${BASE}/api/v1/health`, { signal: AbortSignal.timeout(5_000) });
+      res.status(upstream.status).json(await upstream.json());
+    } catch {
+      res.status(503).json({ ok: false, error: "data-platform down" });
+    }
+  });
+}

@@ -1,7 +1,8 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { buildCommandCenterPayload, buildFeaturedNbaProp, getNbaGames } from "./services/nbaService";
 import { registerAuthAndBillingRoutes } from "./billingRoutes";
+import { registerDataPlatformProxy } from "./dataPlatformProxy";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   registerAuthAndBillingRoutes(app);
@@ -10,7 +11,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ ok: true, product: "seraphim-analytics", time: new Date().toISOString() });
   });
 
-  app.get("/api/nba/games", async (req, res) => {
+  async function nbaGames(req: Request, res: Response) {
     try {
       const dates = typeof req.query.dates === "string" ? req.query.dates : undefined;
       const data = await getNbaGames(dates);
@@ -19,9 +20,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       console.error(err);
       res.status(502).json({ error: "Failed to fetch NBA games from ESPN", detail: String(err) });
     }
-  });
+  }
 
-  app.get("/api/nba/featured-prop", async (req, res) => {
+  async function featuredProp(req: Request, res: Response) {
     try {
       const gameId = typeof req.query.gameId === "string" ? req.query.gameId : undefined;
       const data = await buildFeaturedNbaProp(gameId);
@@ -30,9 +31,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       console.error(err);
       res.status(502).json({ error: "Failed to build featured NBA prop", detail: String(err) });
     }
-  });
+  }
 
-  app.get("/api/command-center", async (_req, res) => {
+  async function commandCenter(_req: Request, res: Response) {
     try {
       const data = await buildCommandCenterPayload();
       res.json(data);
@@ -40,7 +41,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       console.error(err);
       res.status(502).json({ error: "Failed to build Command Center", detail: String(err) });
     }
-  });
+  }
+
+  // Prefer Python data platform when running; fall back to Node ESPN adapters.
+  registerDataPlatformProxy(app, { nbaGames, featuredProp, commandCenter });
 
   return httpServer;
 }

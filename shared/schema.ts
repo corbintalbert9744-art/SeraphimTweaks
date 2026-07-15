@@ -136,6 +136,8 @@ export const odds = pgTable(
     americanOdds: integer("american_odds").notNull(),
     line: real("line").notNull(),
     impliedProb: real("implied_prob"),
+    provider: text("provider").default("mock"),
+    isMock: boolean("is_mock").default(false).notNull(),
     capturedAt: timestamp("captured_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("odds_prop_book_idx").on(t.propId, t.sportsbookId)],
@@ -189,6 +191,97 @@ export const savedParlays = pgTable("saved_parlays", {
   avgHitRate: real("avg_hit_rate"),
   combinedEv: real("combined_ev"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Team defensive / pace rankings for matchup analysis (warehouse). */
+export const teamStats = pgTable(
+  "team_stats",
+  {
+    id: varchar("id").primaryKey(),
+    teamId: varchar("team_id")
+      .references(() => teams.id)
+      .notNull(),
+    league: text("league").notNull(),
+    season: text("season").notNull(),
+    statKey: text("stat_key").notNull(),
+    statValue: real("stat_value").notNull(),
+    rank: integer("rank"),
+    provider: text("provider").default("derived"),
+    isMock: boolean("is_mock").default(false).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("team_stats_unique").on(t.teamId, t.season, t.statKey)],
+);
+
+/** Cached prop analytics — recalculated by the data-platform scheduler. */
+export const propAnalytics = pgTable(
+  "prop_analytics",
+  {
+    id: varchar("id").primaryKey(),
+    propId: varchar("prop_id")
+      .references(() => props.id)
+      .notNull()
+      .unique(),
+    league: text("league").notNull(),
+    l5Hits: integer("l5_hits"),
+    l5Samples: integer("l5_samples"),
+    l5Rate: real("l5_rate"),
+    l10Hits: integer("l10_hits"),
+    l10Samples: integer("l10_samples"),
+    l10Rate: real("l10_rate"),
+    l20Hits: integer("l20_hits"),
+    l20Samples: integer("l20_samples"),
+    l20Rate: real("l20_rate"),
+    seasonHits: integer("season_hits"),
+    seasonSamples: integer("season_samples"),
+    seasonRate: real("season_rate"),
+    homeRate: real("home_rate"),
+    awayRate: real("away_rate"),
+    restDays: integer("rest_days"),
+    streak: integer("streak"),
+    noVigProb: real("no_vig_prob"),
+    evPercent: real("ev_percent"),
+    researchScore: integer("research_score"),
+    confidenceScore: integer("confidence_score"),
+    dataQualityScore: integer("data_quality_score"),
+    matchupNote: text("matchup_note"),
+    explainBullets: jsonb("explain_bullets"),
+    whyPayload: jsonb("why_payload"),
+    checks: jsonb("checks"),
+    isModelEstimate: boolean("is_model_estimate").default(true).notNull(),
+    oddsAreMock: boolean("odds_are_mock").default(false).notNull(),
+    disclaimer: text("disclaimer"),
+    computedAt: timestamp("computed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("prop_analytics_league_score_idx").on(t.league, t.researchScore)],
+);
+
+export const lineSnapshots = pgTable(
+  "line_snapshots",
+  {
+    id: varchar("id").primaryKey(),
+    propId: varchar("prop_id")
+      .references(() => props.id)
+      .notNull(),
+    line: real("line").notNull(),
+    americanOdds: integer("american_odds"),
+    source: text("source").default("derived"),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("line_snap_prop_idx").on(t.propId, t.capturedAt)],
+);
+
+export const providerRuns = pgTable("provider_runs", {
+  id: varchar("id").primaryKey(),
+  provider: text("provider").notNull(),
+  league: text("league").notNull(),
+  job: text("job").notNull(),
+  status: text("status").notNull(),
+  rowsWritten: integer("rows_written").default(0).notNull(),
+  message: text("message"),
+  isMock: boolean("is_mock").default(false).notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
 });
 
 /** Legacy insert helper kept for existing MemStorage */
