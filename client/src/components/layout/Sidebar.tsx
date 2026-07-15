@@ -11,6 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  UserRound,
+  FileSearch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
@@ -19,6 +21,8 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/nba", label: "NBA", icon: CircleDot },
   { href: "/nfl", label: "NFL", icon: Trophy },
+  { href: "/players", label: "Player Profiles", icon: UserRound },
+  { href: "/research", label: "Research Reports", icon: FileSearch },
   { href: "/atp", label: "ATP Tennis", icon: Activity },
   { href: "/wta", label: "WTA Tennis", icon: Target },
   { href: "/wnba", label: "WNBA", icon: Users },

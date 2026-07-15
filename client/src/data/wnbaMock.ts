@@ -308,7 +308,7 @@ export function wnbaToBuilderLeg(prop: WnbaProp): BuilderLeg {
 }
 
 export function wnbaToPropDetails(props: WnbaProp[]): PropDetail[] {
-  return props.map((p) => {
+  const rows = props.map((p) => {
     const checks: ResearchCheck[] = [
       { code: "L10", status: parseInt(p.l10) >= 7 ? "pass" : "warn", label: `L10: ${p.l10}` },
       { code: "MATCHUP", status: "pass", label: `Matchup lean vs ${p.opponent}` },
@@ -321,9 +321,15 @@ export function wnbaToPropDetails(props: WnbaProp[]): PropDetail[] {
         label: p.injury === "None" ? "No injury concerns" : `Injury: ${p.injury}`,
       },
     ];
+    const researchScore = Math.min(
+      99,
+      checks.reduce((s, c) => s + (c.status === "pass" ? 16 : c.status === "warn" ? 8 : 6), 0),
+    );
+    const over = p.side === "Over" ? p.americanOdds : p.americanOdds > 0 ? -Math.round(p.americanOdds * 0.9) : Math.round(Math.abs(p.americanOdds) * 0.9);
+    const under = p.side === "Under" ? p.americanOdds : p.americanOdds > 0 ? -Math.round(p.americanOdds * 0.9) : Math.round(Math.abs(p.americanOdds) * 0.9);
     return {
       id: p.id,
-      league: "WNBA",
+      league: "WNBA" as const,
       playerId: p.playerId,
       player: p.player,
       team: p.team,
@@ -334,20 +340,22 @@ export function wnbaToPropDetails(props: WnbaProp[]): PropDetail[] {
       line: p.line,
       americanOdds: p.americanOdds,
       noVigProb: p.noVigProb,
+      noVigOpposite: Math.max(0.01, 1 - p.noVigProb),
       evPercent: p.evPercent,
       confidence: p.confidence,
+      researchScore,
       dqs: Math.min(97, p.confidence + (p.injury === "None" ? 3 : -2)),
       l5: p.l5,
       l10: p.l10,
       l20: p.l20,
       season: p.season,
       tipTime: p.tipTime,
-      why: `${p.side} ${p.line} ${p.market} — research score ${p.confidence}/100`,
+      why: `${p.side} ${p.line} ${p.market} — Research Score ${researchScore}/100`,
       checks,
       books: [
-        { book: "Consensus", odds: p.americanOdds, line: p.line },
-        { book: "Sharp A", odds: p.americanOdds + 3, line: p.line },
-        { book: "Sharp B", odds: p.americanOdds - 2, line: p.line },
+        { book: "DraftKings", line: p.line, over, under },
+        { book: "FanDuel", line: p.line, over: over + 3, under: under - 2 },
+        { book: "BetMGM", line: p.line, over: over - 2, under: under + 3 },
       ],
       movement: [
         { label: "Open", line: p.line - 0.5, odds: p.americanOdds - 5 },
@@ -359,8 +367,22 @@ export function wnbaToPropDetails(props: WnbaProp[]): PropDetail[] {
         `Hit rates L5 ${p.l5} · L10 ${p.l10} · Season ${p.season}.`,
         `${p.team} vs ${p.opponent} · proj ${p.projectedMinutes} min.`,
       ],
+      opponentDefense: {
+        rank: p.confidence >= 82 ? 10 : 6,
+        of: 12,
+        label: `vs ${p.position} ${p.market.toLowerCase()}`,
+        note: `${p.opponent} defense vs ${p.position} ${p.market.toLowerCase()} in recent WNBA samples.`,
+      },
+      similarPropIds: [] as string[],
     };
   });
+  for (const row of rows) {
+    row.similarPropIds = rows
+      .filter((r) => r.id !== row.id && (r.playerId === row.playerId || r.league === row.league))
+      .map((r) => r.id)
+      .slice(0, 3);
+  }
+  return rows;
 }
 
 export function formatAmericanOdds(odds: number): string {

@@ -348,7 +348,7 @@ export function tennisToBuilderLeg(prop: TennisProp): BuilderLeg {
 }
 
 export function tennisToPropDetails(props: TennisProp[]): PropDetail[] {
-  return props.map((p) => {
+  const rows = props.map((p) => {
     const checks: ResearchCheck[] = [
       { code: "L10", status: parseInt(p.l10) >= 7 ? "pass" : "warn", label: `L10: ${p.l10}` },
       { code: "MATCHUP", status: "pass", label: `Surface: ${p.surface}` },
@@ -357,6 +357,12 @@ export function tennisToPropDetails(props: TennisProp[]): PropDetail[] {
       { code: "MIN", status: "unknown", label: "Workload n/a" },
       { code: "INJ", status: "pass", label: "No injury concerns" },
     ];
+    const researchScore = Math.min(
+      99,
+      checks.reduce((s, c) => s + (c.status === "pass" ? 16 : c.status === "warn" ? 8 : 6), 0),
+    );
+    const over = p.side === "Over" ? p.americanOdds : p.americanOdds > 0 ? -Math.round(p.americanOdds * 0.9) : Math.round(Math.abs(p.americanOdds) * 0.9);
+    const under = p.side === "Under" ? p.americanOdds : p.americanOdds > 0 ? -Math.round(p.americanOdds * 0.9) : Math.round(Math.abs(p.americanOdds) * 0.9);
     return {
       id: p.id,
       league: p.league as LeagueCode,
@@ -370,20 +376,22 @@ export function tennisToPropDetails(props: TennisProp[]): PropDetail[] {
       line: p.line,
       americanOdds: p.americanOdds,
       noVigProb: p.noVigProb,
+      noVigOpposite: Math.max(0.01, 1 - p.noVigProb),
       evPercent: p.evPercent,
       confidence: p.confidence,
+      researchScore,
       dqs: Math.min(96, p.confidence + 1),
       l5: p.l5,
       l10: p.l10,
       l20: p.l20,
       season: p.season,
       tipTime: p.tipTime,
-      why: `${p.tournament} · ${p.market} research score ${p.confidence}/100`,
+      why: `${p.tournament} · ${p.market} — Research Score ${researchScore}/100`,
       checks,
       books: [
-        { book: "Consensus", odds: p.americanOdds, line: p.line },
-        { book: "Sharp A", odds: p.americanOdds + 4, line: p.line },
-        { book: "Sharp B", odds: p.americanOdds - 3, line: p.line },
+        { book: "DraftKings", line: p.line, over, under },
+        { book: "FanDuel", line: p.line, over: over + 4, under: under - 3 },
+        { book: "BetMGM", line: p.line, over: over - 3, under: under + 4 },
       ],
       movement: [
         { label: "Open", line: p.line, odds: p.americanOdds - 8 },
@@ -395,8 +403,22 @@ export function tennisToPropDetails(props: TennisProp[]): PropDetail[] {
         `Form windows L5 ${p.l5} · L10 ${p.l10} · Season ${p.season}.`,
         `No-vig ${(p.noVigProb * 100).toFixed(1)}% at offered price.`,
       ],
+      opponentDefense: {
+        rank: 12,
+        of: 50,
+        label: `${p.surface} H2H lean`,
+        note: `${p.opponent} on ${p.surface} — form windows favor the listed side in mock data.`,
+      },
+      similarPropIds: [] as string[],
     };
   });
+  for (const row of rows) {
+    row.similarPropIds = rows
+      .filter((r) => r.id !== row.id && r.league === row.league)
+      .map((r) => r.id)
+      .slice(0, 3);
+  }
+  return rows;
 }
 
 export function formatAmericanOdds(odds: number): string {

@@ -13,6 +13,8 @@ import NbaPage from "@/pages/analytics/NbaPage";
 import NflPage from "@/pages/analytics/NflPage";
 import TennisPage from "@/pages/analytics/TennisPage";
 import WnbaPage from "@/pages/analytics/WnbaPage";
+import PlayersHubPage from "@/pages/analytics/PlayersHubPage";
+import ResearchHubPage from "@/pages/analytics/ResearchHubPage";
 import PlayerPage from "@/pages/analytics/PlayerPage";
 import PropDetailPage from "@/pages/analytics/PropDetailPage";
 import ParlayBuilderPage from "@/pages/analytics/ParlayBuilderPage";
@@ -35,6 +37,8 @@ function Router() {
           <Route path="/" component={DashboardPage} />
           <Route path="/nba" component={NbaPage} />
           <Route path="/nfl" component={NflPage} />
+          <Route path="/players" component={PlayersHubPage} />
+          <Route path="/research" component={ResearchHubPage} />
           <Route path="/atp">{() => <TennisPage tour="ATP" />}</Route>
           <Route path="/wta">{() => <TennisPage tour="WTA" />}</Route>
           <Route path="/wnba" component={WnbaPage} />

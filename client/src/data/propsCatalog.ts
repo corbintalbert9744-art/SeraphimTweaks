@@ -9,6 +9,20 @@ export interface LinePoint {
   odds: number;
 }
 
+export interface BookQuote {
+  book: string;
+  line: number;
+  over: number;
+  under: number;
+}
+
+export interface OpponentDefense {
+  rank: number;
+  of: number;
+  label: string;
+  note: string;
+}
+
 export interface PropDetail {
   id: string;
   league: LeagueCode;
@@ -18,12 +32,18 @@ export interface PropDetail {
   opponent: string;
   position: string;
   market: string;
+  /** Consensus / model recommended side */
   side: "Over" | "Under";
   line: number;
   americanOdds: number;
   noVigProb: number;
+  /** Implied no-vig on the opposite side (sums ~1 with noVigProb) */
+  noVigOpposite: number;
   evPercent: number;
+  /** Model confidence 0–100 (separate from Research Score) */
   confidence: number;
+  /** Checklist-backed Research Score 0–100 */
+  researchScore: number;
   dqs: number;
   l5: string;
   l10: string;
@@ -32,13 +52,31 @@ export interface PropDetail {
   tipTime: string;
   why: string;
   checks: ResearchCheck[];
-  books: Array<{ book: string; odds: number; line: number }>;
+  books: BookQuote[];
   movement: LinePoint[];
   analysis: string[];
+  opponentDefense: OpponentDefense;
+  similarPropIds: string[];
+}
+
+function scoreFromChecks(checks: ResearchCheck[]): number {
+  const pts = checks.reduce((sum, c) => {
+    if (c.status === "pass") return sum + 16;
+    if (c.status === "warn") return sum + 8;
+    if (c.status === "unknown") return sum + 6;
+    return sum;
+  }, 0);
+  return Math.min(99, Math.max(40, pts));
+}
+
+function oppositeOdds(odds: number): number {
+  if (odds <= -100) return Math.round(Math.abs(odds) * 0.92);
+  if (odds >= 100) return -Math.round(odds * 0.92);
+  return -110;
 }
 
 function nbaDetails(): PropDetail[] {
-  return mockNbaProps.map((p) => {
+  const rows = mockNbaProps.map((p) => {
     const baseChecks: ResearchCheck[] = [
       { code: "L10", status: p.l10.startsWith("9") || p.l10.startsWith("8") ? "pass" : "warn", label: `L10: ${p.l10}` },
       { code: "MATCHUP", status: "pass", label: `Matchup lean vs ${p.opponent}` },
@@ -51,9 +89,12 @@ function nbaDetails(): PropDetail[] {
         label: p.injury === "None" ? "No injury concerns" : `Injury: ${p.injury}`,
       },
     ];
+    const researchScore = scoreFromChecks(baseChecks);
+    const overOdds = p.side === "Over" ? p.americanOdds : oppositeOdds(p.americanOdds);
+    const underOdds = p.side === "Under" ? p.americanOdds : oppositeOdds(p.americanOdds);
     return {
       id: p.id,
-      league: "NBA",
+      league: "NBA" as const,
       playerId: p.playerId,
       player: p.player,
       team: p.team,
@@ -64,21 +105,23 @@ function nbaDetails(): PropDetail[] {
       line: p.line,
       americanOdds: p.americanOdds,
       noVigProb: p.noVigProb,
+      noVigOpposite: Math.max(0.01, 1 - p.noVigProb),
       evPercent: p.evPercent,
       confidence: p.confidence,
+      researchScore,
       dqs: Math.min(98, p.confidence - 2 + (p.injury === "None" ? 4 : 0)),
       l5: p.l5,
       l10: p.l10,
       l20: p.l20,
       season: p.season,
       tipTime: p.tipTime,
-      why: `${p.side} ${p.line} ${p.market} — research score ${p.confidence}/100`,
+      why: `${p.side} ${p.line} ${p.market} — Research Score ${researchScore}/100`,
       checks: baseChecks,
       books: [
-        { book: "Consensus", odds: p.americanOdds, line: p.line },
-        { book: "Sharp A", odds: p.americanOdds + 2, line: p.line },
-        { book: "Sharp B", odds: p.americanOdds - 3, line: p.line },
-        { book: "Soft C", odds: p.americanOdds + 5, line: p.line },
+        { book: "DraftKings", line: p.line, over: overOdds, under: underOdds },
+        { book: "FanDuel", line: p.line, over: overOdds + 2, under: underOdds - 2 },
+        { book: "BetMGM", line: p.line + (p.side === "Over" ? 0.5 : -0.5), over: overOdds - 4, under: underOdds + 4 },
+        { book: "Caesars", line: p.line, over: overOdds + 5, under: underOdds - 3 },
       ],
       movement: [
         { label: "Open", line: p.line - 1, odds: p.americanOdds - 5 },
@@ -91,12 +134,26 @@ function nbaDetails(): PropDetail[] {
         `Hit rates: L5 ${p.l5}, L10 ${p.l10}, L20 ${p.l20}, Season ${p.season}.`,
         `${p.team} vs ${p.opponent} · ${p.tipTime} · proj ${p.projectedMinutes} min.`,
       ],
+      opponentDefense: {
+        rank: p.confidence >= 85 ? 24 : 16,
+        of: 30,
+        label: `vs ${p.position} ${p.market.toLowerCase()}`,
+        note: `${p.opponent} defense sits mid-to-soft vs ${p.position} ${p.market.toLowerCase()} in recent samples.`,
+      },
+      similarPropIds: [] as string[],
     };
   });
+  for (const row of rows) {
+    row.similarPropIds = rows.filter((r) => r.id !== row.id && r.playerId === row.playerId).map((r) => r.id).slice(0, 3);
+    if (row.similarPropIds.length === 0) {
+      row.similarPropIds = rows.filter((r) => r.id !== row.id && r.league === row.league).map((r) => r.id).slice(0, 3);
+    }
+  }
+  return rows;
 }
 
 function nflDetails(): PropDetail[] {
-  return mockNflProps.map((p) => {
+  const rows = mockNflProps.map((p) => {
     const baseChecks: ResearchCheck[] = [
       { code: "L10", status: parseInt(p.l10) >= 7 ? "pass" : "warn", label: `L10: ${p.l10}` },
       { code: "MATCHUP", status: "pass", label: `Matchup lean vs ${p.opponent}` },
@@ -109,9 +166,13 @@ function nflDetails(): PropDetail[] {
         label: p.injury === "None" ? "No injury concerns" : `Injury: ${p.injury}`,
       },
     ];
+    const researchScore = scoreFromChecks(baseChecks);
+    const overOdds = p.side === "Over" ? p.americanOdds : oppositeOdds(p.americanOdds);
+    const underOdds = p.side === "Under" ? p.americanOdds : oppositeOdds(p.americanOdds);
+    const yardMove = p.market.includes("Yard") ? 4 : 0.5;
     return {
       id: p.id,
-      league: "NFL",
+      league: "NFL" as const,
       playerId: p.playerId,
       player: p.player,
       team: p.team,
@@ -122,25 +183,27 @@ function nflDetails(): PropDetail[] {
       line: p.line,
       americanOdds: p.americanOdds,
       noVigProb: p.noVigProb,
+      noVigOpposite: Math.max(0.01, 1 - p.noVigProb),
       evPercent: p.evPercent,
       confidence: p.confidence,
+      researchScore,
       dqs: Math.min(98, p.confidence - 1 + (p.injury === "None" ? 3 : -4)),
       l5: p.l5,
       l10: p.l10,
       l20: p.l20,
       season: p.season,
       tipTime: p.tipTime,
-      why: `${p.market} ${p.side} ${p.line} — research score ${p.confidence}/100`,
+      why: `${p.market} ${p.side} ${p.line} — Research Score ${researchScore}/100`,
       checks: baseChecks,
       books: [
-        { book: "Consensus", odds: p.americanOdds, line: p.line },
-        { book: "Sharp A", odds: p.americanOdds + 3, line: p.line },
-        { book: "Sharp B", odds: p.americanOdds - 2, line: p.line },
-        { book: "Soft C", odds: p.americanOdds + 6, line: p.line },
+        { book: "DraftKings", line: p.line, over: overOdds, under: underOdds },
+        { book: "FanDuel", line: p.line, over: overOdds + 3, under: underOdds - 2 },
+        { book: "BetMGM", line: p.line, over: overOdds - 2, under: underOdds + 3 },
+        { book: "Caesars", line: p.line + yardMove / 2, over: overOdds + 6, under: underOdds - 4 },
       ],
       movement: [
-        { label: "Open", line: p.line - (p.market.includes("Yard") ? 4 : 0.5), odds: p.americanOdds - 6 },
-        { label: "Wed", line: p.line - (p.market.includes("Yard") ? 2 : 0), odds: p.americanOdds - 2 },
+        { label: "Open", line: p.line - yardMove, odds: p.americanOdds - 6 },
+        { label: "Wed", line: p.line - yardMove / 2, odds: p.americanOdds - 2 },
         { label: "Sat", line: p.line, odds: p.americanOdds },
         { label: "Now", line: p.line, odds: p.americanOdds },
       ],
@@ -149,8 +212,22 @@ function nflDetails(): PropDetail[] {
         `Form windows: L5 ${p.l5} · L10 ${p.l10} · L20 ${p.l20} · Season ${p.season}.`,
         `Week matchup ${p.team} vs ${p.opponent} · ${p.tipTime}.`,
       ],
+      opponentDefense: {
+        rank: p.confidence >= 82 ? 26 : 18,
+        of: 32,
+        label: `vs ${p.position} ${p.market.toLowerCase()}`,
+        note: `${p.opponent} ranks soft-to-average vs ${p.position} ${p.market.toLowerCase()} this season.`,
+      },
+      similarPropIds: [] as string[],
     };
   });
+  for (const row of rows) {
+    row.similarPropIds = rows.filter((r) => r.id !== row.id && r.playerId === row.playerId).map((r) => r.id).slice(0, 3);
+    if (row.similarPropIds.length === 0) {
+      row.similarPropIds = rows.filter((r) => r.id !== row.id).map((r) => r.id).slice(0, 3);
+    }
+  }
+  return rows;
 }
 
 const catalog: Record<string, PropDetail> = Object.fromEntries(
@@ -165,10 +242,25 @@ export function getPropsForPlayer(playerId: string): PropDetail[] {
   return Object.values(catalog).filter((p) => p.playerId === playerId);
 }
 
+export function listPropDetails(): PropDetail[] {
+  return Object.values(catalog).sort((a, b) => b.researchScore - a.researchScore);
+}
+
 export function registerPropDetails(props: PropDetail[]) {
   for (const p of props) catalog[p.id] = p;
 }
 
 export function formatAmericanOdds(odds: number): string {
   return odds > 0 ? `+${odds}` : `${odds}`;
+}
+
+export function bestBookForSide(prop: PropDetail, side: "Over" | "Under"): BookQuote {
+  return prop.books.reduce((best, book) => {
+    const bestOdds = side === "Over" ? best.over : best.under;
+    const nextOdds = side === "Over" ? book.over : book.under;
+    // Prefer higher American odds (better price)
+    const bestVal = bestOdds < 0 ? 10000 / Math.abs(bestOdds) : bestOdds;
+    const nextVal = nextOdds < 0 ? 10000 / Math.abs(nextOdds) : nextOdds;
+    return nextVal > bestVal ? book : best;
+  });
 }
