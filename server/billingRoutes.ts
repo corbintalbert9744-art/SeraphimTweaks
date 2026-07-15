@@ -182,6 +182,30 @@ export function registerAuthAndBillingRoutes(app: Express) {
     });
   });
 
+  // Dev-only: simulate a paid member so you can open /app without completing Checkout.
+  if (process.env.NODE_ENV !== "production") {
+    app.post("/api/dev/activate-membership", requireAuth, async (req: AuthedRequest, res) => {
+      try {
+        const plan = req.body?.plan === "standard" ? "standard" : "pro";
+        const interval = req.body?.interval === "yearly" ? "yearly" : "monthly";
+        const periodEnd = new Date();
+        periodEnd.setDate(periodEnd.getDate() + (interval === "yearly" ? 365 : 30));
+        await updateUserMembership(req.user!.id, {
+          membershipStatus: "active",
+          plan,
+          billingInterval: interval,
+          currentPeriodEnd: periodEnd,
+          stripeCustomerId: req.user!.stripeCustomerId || "cus_dev_preview",
+          stripeSubscriptionId: req.user!.stripeSubscriptionId || "sub_dev_preview",
+        });
+        const fresh = await getPublicUser(req.user!.id);
+        res.json({ user: fresh });
+      } catch (err) {
+        return sendError(res, err);
+      }
+    });
+  }
+
   // Stripe webhooks — signature verified against raw body
   app.post("/api/stripe/webhook", async (req, res) => {
     try {
