@@ -1,31 +1,44 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { LeagueBadge } from "@/components/shared/LeagueBadge";
-import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
+import { ParlayLegCard } from "@/components/parlay/ParlayLegCard";
+import { L10HitMissChart } from "@/components/parlay/L10HitMissChart";
 import { mockNbaProps } from "@/data/nbaMock";
-import { mockNflProps, formatAmericanOdds } from "@/data/nflMock";
+import { mockNflProps } from "@/data/nflMock";
 import { mockTennisProps, tennisToBuilderLeg } from "@/data/tennisMock";
 import { mockWnbaProps, wnbaToBuilderLeg } from "@/data/wnbaMock";
 import { nbaToBuilderLeg, nflToBuilderLeg } from "@/lib/builderMappers";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 
 export default function ParlayBuilderPage() {
-  const { legs, addLeg, removeLeg, hasLeg, clear } = useParlayDraft();
+  const { legs, addLeg, removeLeg, setLegSide, hasLeg, clear } = useParlayDraft();
+  const [focusId, setFocusId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (legs.length === 0) {
+      setFocusId(null);
+      return;
+    }
+    if (!focusId || !legs.some((l) => l.id === focusId)) {
+      setFocusId(legs[0].id);
+    }
+  }, [legs, focusId]);
+
+  const focused = legs.find((l) => l.id === focusId) ?? legs[0];
 
   const quickAdds = [
-    ...mockNbaProps.slice(0, 2).map(nbaToBuilderLeg),
+    ...mockNbaProps.slice(0, 3).map(nbaToBuilderLeg),
     ...mockNflProps.slice(0, 2).map(nflToBuilderLeg),
-    ...mockTennisProps.slice(0, 2).map(tennisToBuilderLeg),
-    ...mockWnbaProps.slice(0, 2).map(wnbaToBuilderLeg),
+    ...mockTennisProps.slice(0, 1).map(tennisToBuilderLeg),
+    ...mockWnbaProps.slice(0, 1).map(wnbaToBuilderLeg),
   ].filter((p) => !hasLeg(p.id));
 
-  const combinedEv =
-    legs.length === 0
-      ? 0
-      : legs.reduce((sum, l) => sum + l.evPercent, 0) / legs.length;
+  const avgHitRate = useMemo(() => {
+    if (legs.length === 0) return 0;
+    return Math.round(legs.reduce((sum, l) => sum + l.l10Pct, 0) / legs.length);
+  }, [legs]);
 
   const sameEventRisk = useMemo(() => {
     const keys = legs.map((l) => l.eventKey);
@@ -37,149 +50,156 @@ export default function ParlayBuilderPage() {
       <PageHeader
         eyebrow="Tools"
         title="Parlay Builder"
-        description="Legs from NBA and NFL boards land here. Pricing is mocked until the calc API is connected."
+        description="Build slips with Over/Under toggles, L10 hit rates, and the game log behind every number."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link
-              href="/nba"
-              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
-            >
-              NBA
-            </Link>
-            <Link
-              href="/nfl"
-              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
-            >
-              NFL
-            </Link>
-            <Link
-              href="/wnba"
-              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
-            >
-              WNBA
-            </Link>
-            <Link
-              href="/atp"
-              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
-            >
-              ATP
-            </Link>
-            <Link
-              href="/wta"
-              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
-            >
-              WTA
-            </Link>
+            {[
+              ["/nba", "NBA"],
+              ["/nfl", "NFL"],
+              ["/wnba", "WNBA"],
+              ["/atp", "ATP"],
+              ["/wta", "WTA"],
+            ].map(([href, label]) => (
+              <Link
+                key={href}
+                href={href}
+                className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
+              >
+                {label}
+              </Link>
+            ))}
           </div>
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5 lg:col-span-3">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-white">Legs</h2>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-neutral-500">{legs.length} selected</span>
-              {legs.length > 0 && (
-                <button
-                  type="button"
-                  onClick={clear}
-                  className="text-xs text-neutral-500 hover:text-amber-300"
-                >
-                  Clear all
-                </button>
-              )}
+      <div className="grid gap-6 xl:grid-cols-5">
+        {/* Builder slip — matches mock card layout */}
+        <section className="card-3d rounded-2xl border border-[#1a1a1a] bg-[#0a0a0a] p-5 xl:col-span-2">
+          <div className="mb-5 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-lg font-semibold text-white">Parlay Builder</h2>
+              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-emerald-500/20 px-1.5 text-xs font-semibold tabular-nums text-emerald-300">
+                {legs.length}
+              </span>
             </div>
+            {legs.length > 0 && (
+              <button type="button" onClick={clear} className="text-sm text-neutral-500 transition hover:text-neutral-300">
+                Clear
+              </button>
+            )}
           </div>
 
-          <ul className="space-y-3">
+          <div className="space-y-3">
             {legs.map((leg) => (
-              <li
+              <ParlayLegCard
                 key={leg.id}
-                className="flex items-start justify-between gap-3 rounded-xl border border-[#1a1a1a] bg-black/25 p-4"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-neutral-100">{leg.player}</p>
-                    <LeagueBadge league={leg.league} />
-                    <ResearchScoreBadge score={leg.confidence} size="sm" />
-                  </div>
-                  <p className="mt-1 text-sm text-neutral-400">
-                    {leg.market} · {leg.side} {leg.line} · {formatAmericanOdds(leg.americanOdds)}
-                  </p>
-                  <p className="mt-2 text-xs text-neutral-500">
-                    {leg.team} vs {leg.opponent} · EV +{leg.evPercent.toFixed(1)}% · No-vig{" "}
-                    {(leg.noVigProb * 100).toFixed(1)}%
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-lg border border-[#1a1a1a] p-2 text-neutral-400 transition hover:border-red-500/30 hover:text-red-300"
-                  onClick={() => removeLeg(leg.id)}
-                  aria-label="Remove leg"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </li>
+                leg={leg}
+                selected={focused?.id === leg.id}
+                onSelect={() => setFocusId(leg.id)}
+                onSideChange={(side) => setLegSide(leg.id, side)}
+                onRemove={() => removeLeg(leg.id)}
+              />
             ))}
+
             {legs.length === 0 && (
-              <p className="rounded-xl border border-dashed border-[#222] px-4 py-10 text-center text-sm text-neutral-500">
-                No legs yet. Add props from the{" "}
+              <p className="rounded-2xl border border-dashed border-[#222] px-4 py-12 text-center text-sm text-neutral-500">
+                No legs yet. Quick-add below or open a{" "}
                 <Link href="/nba" className="text-yellow-400 hover:underline">
-                  NBA
-                </Link>{" "}
-                or{" "}
-                <Link href="/nfl" className="text-yellow-400 hover:underline">
-                  NFL
-                </Link>{" "}
-                board.
+                  research board
+                </Link>
+                .
               </p>
             )}
-          </ul>
+          </div>
+
+          {legs.length > 0 && (
+            <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.06] px-4 py-4">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-sm text-neutral-400">Avg hit rate (L10)</p>
+                  <p className="mt-1 text-xs text-neutral-500">{legs.length} legs</p>
+                </div>
+                <p className="text-3xl font-semibold tabular-nums text-emerald-300">{avgHitRate}%</p>
+              </div>
+            </div>
+          )}
 
           <div className="mt-6">
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-              Quick add
-            </h3>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {quickAdds.map((prop) => (
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">Quick add</h3>
+            <div className="grid gap-2">
+              {quickAdds.slice(0, 5).map((prop) => (
                 <button
                   key={prop.id}
                   type="button"
-                  onClick={() => addLeg(prop)}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] px-3 py-3 text-left transition hover:border-yellow-500/30"
+                  onClick={() => {
+                    addLeg(prop);
+                    setFocusId(prop.id);
+                  }}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] px-3 py-3 text-left transition hover:border-emerald-500/30"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-neutral-100">{prop.player}</p>
+                    <p className="truncate text-sm text-neutral-100">{prop.shortName}</p>
                     <p className="truncate text-xs text-neutral-500">
-                      {prop.league} · {prop.market} {prop.side} {prop.line}
+                      {prop.marketCode} · {prop.line} · L10 {prop.l10Pct}%
                     </p>
                   </div>
-                  <Plus className="h-4 w-4 shrink-0 text-yellow-400" />
+                  <Plus className="h-4 w-4 shrink-0 text-emerald-400" />
                 </button>
               ))}
             </div>
           </div>
         </section>
 
-        <aside className="card-3d-popular rounded-2xl border border-yellow-500/25 p-5 lg:col-span-2">
-          <h2 className="text-base font-semibold text-white">Mock price</h2>
-          <p className="mt-1 text-xs text-neutral-400">Independent product assumption · demo only</p>
+        {/* L10 game log + slip summary */}
+        <div className="space-y-6 xl:col-span-3">
+          <section>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-yellow-500/90">
+              03 — Confidence
+            </p>
+            <h2 className="mt-2 text-xl font-semibold text-white sm:text-2xl">
+              See the game log behind every number
+            </h2>
+            <p className="mt-2 max-w-xl text-sm text-neutral-400">
+              Hit/miss coloring for instant recognition — bars plotted against the live line for the focused leg.
+            </p>
+          </section>
 
-          <div className="mt-6 space-y-4">
-            <div className="rounded-xl border border-white/5 bg-black/30 p-4">
-              <p className="text-[11px] uppercase tracking-wider text-neutral-500">Combined EV (avg)</p>
-              <p className="mt-1 text-3xl font-semibold tabular-nums text-emerald-300">
-                +{combinedEv.toFixed(1)}%
-              </p>
+          {focused ? (
+            <L10HitMissChart leg={focused} className="card-3d animate-in fade-in duration-300" />
+          ) : (
+            <div className="card-3d rounded-2xl border border-dashed border-[#222] px-6 py-16 text-center text-sm text-neutral-500">
+              Add a leg to unlock the Last 10 hit/miss chart.
             </div>
-            <div className="rounded-xl border border-white/5 bg-black/30 p-4">
-              <p className="text-[11px] uppercase tracking-wider text-neutral-500">Legs</p>
-              <p className="mt-1 text-3xl font-semibold tabular-nums text-white">{legs.length}</p>
+          )}
+
+          <aside className="card-3d-popular rounded-2xl border border-yellow-500/25 p-5">
+            <h2 className="text-base font-semibold text-white">Slip summary</h2>
+            <p className="mt-1 text-xs text-neutral-400">Mock pricing until calc API is connected</p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-white/5 bg-black/30 p-4">
+                <p className="text-[11px] uppercase tracking-wider text-neutral-500">Avg L10</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-300">{avgHitRate}%</p>
+              </div>
+              <div className="rounded-xl border border-white/5 bg-black/30 p-4">
+                <p className="text-[11px] uppercase tracking-wider text-neutral-500">Legs</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-white">{legs.length}</p>
+              </div>
+              <div className="rounded-xl border border-white/5 bg-black/30 p-4">
+                <p className="text-[11px] uppercase tracking-wider text-neutral-500">Avg EV</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-yellow-400">
+                  +
+                  {legs.length === 0
+                    ? "0.0"
+                    : (legs.reduce((s, l) => s + l.evPercent, 0) / legs.length).toFixed(1)}
+                  %
+                </p>
+              </div>
             </div>
+
             <div
               className={cn(
-                "rounded-xl border p-4 text-sm",
+                "mt-4 rounded-xl border p-4 text-sm",
                 sameEventRisk
                   ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
                   : "border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
@@ -189,14 +209,15 @@ export default function ParlayBuilderPage() {
                 ? "Same-game legs detected — conservative correlation policy would apply."
                 : "No same-game collision in this mock slip."}
             </div>
+
             <button
               type="button"
-              className="btn-3d w-full rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 py-3 text-sm font-semibold text-black"
+              className="btn-3d mt-4 w-full rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 py-3 text-sm font-semibold text-black"
             >
               Save parlay (mock)
             </button>
-          </div>
-        </aside>
+          </aside>
+        </div>
       </div>
     </div>
   );

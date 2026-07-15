@@ -2,6 +2,7 @@ import type { LeagueCode } from "@/data/mock";
 import type { BuilderLeg } from "@/data/builderTypes";
 import type { PropDetail } from "@/data/propsCatalog";
 import type { ResearchCheck } from "@/data/mock";
+import { withLegHitData } from "@/lib/legStats";
 
 export type TennisMarket = "Match Winner" | "Total Games" | "Set Handicap" | "Games Handicap";
 
@@ -327,7 +328,7 @@ export const mockTennisPlayerCards: TennisPlayerCard[] = [
 ];
 
 export function tennisToBuilderLeg(prop: TennisProp): BuilderLeg {
-  return {
+  return withLegHitData({
     id: prop.id,
     league: prop.league,
     playerId: prop.playerId,
@@ -344,7 +345,8 @@ export function tennisToBuilderLeg(prop: TennisProp): BuilderLeg {
     confidence: prop.confidence,
     tipTime: prop.tipTime,
     eventKey: `${prop.league}-${prop.player}-${prop.opponent}-${prop.tournament}`,
-  };
+    l10: prop.l10,
+  });
 }
 
 export function tennisToPropDetails(props: TennisProp[]): PropDetail[] {

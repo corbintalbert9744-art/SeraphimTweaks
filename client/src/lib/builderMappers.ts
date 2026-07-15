@@ -1,9 +1,10 @@
 import type { BuilderLeg } from "@/data/builderTypes";
 import type { NbaProp } from "@/data/nbaMock";
 import type { NflProp } from "@/data/nflMock";
+import { withLegHitData } from "@/lib/legStats";
 
 export function nbaToBuilderLeg(prop: NbaProp): BuilderLeg {
-  return {
+  return withLegHitData({
     id: prop.id,
     league: "NBA",
     playerId: prop.playerId,
@@ -20,11 +21,12 @@ export function nbaToBuilderLeg(prop: NbaProp): BuilderLeg {
     confidence: prop.confidence,
     tipTime: prop.tipTime,
     eventKey: `${prop.team}-${prop.opponent}-${prop.tipTime}`,
-  };
+    l10: prop.l10,
+  });
 }
 
 export function nflToBuilderLeg(prop: NflProp): BuilderLeg {
-  return {
+  return withLegHitData({
     id: prop.id,
     league: "NFL",
     playerId: prop.playerId,
@@ -41,5 +43,6 @@ export function nflToBuilderLeg(prop: NflProp): BuilderLeg {
     confidence: prop.confidence,
     tipTime: prop.tipTime,
     eventKey: `${prop.team}-${prop.opponent}-W${prop.week}`,
-  };
+    l10: prop.l10,
+  });
 }

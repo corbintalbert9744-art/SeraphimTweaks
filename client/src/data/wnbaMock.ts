@@ -1,6 +1,7 @@
 import type { BuilderLeg } from "@/data/builderTypes";
 import type { PropDetail } from "@/data/propsCatalog";
 import type { ResearchCheck } from "@/data/mock";
+import { withLegHitData } from "@/lib/legStats";
 
 export type WnbaMarket = "Points" | "Rebounds" | "Assists" | "Threes" | "PRA";
 
@@ -287,7 +288,7 @@ export const mockWnbaPlayerCards: WnbaPlayerCard[] = [
 ];
 
 export function wnbaToBuilderLeg(prop: WnbaProp): BuilderLeg {
-  return {
+  return withLegHitData({
     id: prop.id,
     league: "WNBA",
     playerId: prop.playerId,
@@ -304,7 +305,8 @@ export function wnbaToBuilderLeg(prop: WnbaProp): BuilderLeg {
     confidence: prop.confidence,
     tipTime: prop.tipTime,
     eventKey: `${prop.team}-${prop.opponent}-${prop.tipTime}`,
-  };
+    l10: prop.l10,
+  });
 }
 
 export function wnbaToPropDetails(props: WnbaProp[]): PropDetail[] {

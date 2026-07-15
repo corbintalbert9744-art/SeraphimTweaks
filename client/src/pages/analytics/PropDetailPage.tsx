@@ -13,6 +13,7 @@ import {
 } from "@/data/propsCatalog";
 import "@/data/registerLeagueProps";
 import { propIdToBuilderLeg } from "@/lib/addPropToBuilder";
+import { recomputeLegSide } from "@/lib/legStats";
 import { cn } from "@/lib/utils";
 
 function MovementChart({
@@ -130,7 +131,7 @@ export default function PropDetailPage() {
   const currentPropId = prop.id;
   function handleAdd() {
     const leg = propIdToBuilderLeg(currentPropId);
-    if (leg) addLeg({ ...leg, side: selectedSide });
+    if (leg) addLeg(recomputeLegSide(leg, selectedSide));
   }
 
   const boardHref =
