@@ -7,6 +7,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
 }
 
+/** Legacy MemStorage kept for compatibility; membership uses membershipStore.ts */
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
 
@@ -24,13 +25,21 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
+    const now = new Date();
     const user: User = {
       id,
       email: insertUser.email,
       username: insertUser.username,
       passwordHash: insertUser.passwordHash,
       displayName: insertUser.displayName ?? null,
-      createdAt: new Date(),
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      membershipStatus: "inactive",
+      plan: null,
+      billingInterval: null,
+      currentPeriodEnd: null,
+      createdAt: now,
+      updatedAt: now,
     };
     this.users.set(id, user);
     return user;

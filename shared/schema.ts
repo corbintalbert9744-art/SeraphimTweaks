@@ -14,14 +14,22 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-/** Auth / account */
+/** Auth / account + Stripe membership */
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name"),
+  /** Stripe */
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  membershipStatus: text("membership_status").notNull().default("inactive"),
+  plan: text("plan"),
+  billingInterval: text("billing_interval"),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const teams = pgTable(

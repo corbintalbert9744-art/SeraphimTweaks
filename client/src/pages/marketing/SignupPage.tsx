@@ -7,27 +7,37 @@ const fieldClass =
   "mt-1.5 h-11 w-full rounded-xl border border-[#1a1a1a] bg-[#111] px-3 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-500 focus:border-yellow-500/40 focus:ring-2 focus:ring-yellow-500/15";
 
 export default function SignupPage() {
-  const { signUp, isAuthenticated, membershipActive } = useMembership();
+  const { signUp, isAuthenticated, membershipActive, loading } = useMembership();
   const [, setLocation] = useLocation();
   const search = useSearch();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const checkoutPath = useMemo(() => {
     const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+    if (params.get("interval") === "annually") params.set("interval", "yearly");
     const q = params.toString();
     return q ? `/checkout?${q}` : "/checkout";
   }, [search]);
 
   useEffect(() => {
-    if (isAuthenticated && membershipActive) setLocation("/app");
-  }, [isAuthenticated, membershipActive, setLocation]);
+    if (!loading && isAuthenticated && membershipActive) setLocation("/app");
+  }, [isAuthenticated, membershipActive, loading, setLocation]);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    signUp({ name, email, password });
-    setLocation(checkoutPath);
+    setBusy(true);
+    setError(null);
+    try {
+      await signUp({ name, email, password });
+      setLocation(checkoutPath);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create account");
+      setBusy(false);
+    }
   }
 
   return (
@@ -84,11 +94,17 @@ export default function SignupPage() {
                 className={fieldClass}
               />
             </label>
+            {error ? (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {error}
+              </p>
+            ) : null}
             <button
               type="submit"
-              className="btn-3d mt-2 w-full rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-4 py-3 text-sm font-semibold text-black transition hover:brightness-105"
+              disabled={busy}
+              className="btn-3d mt-2 w-full rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-4 py-3 text-sm font-semibold text-black transition hover:brightness-105 disabled:opacity-60"
             >
-              Continue · Become a Member
+              {busy ? "Creating account…" : "Continue · Become a Member"}
             </button>
           </form>
 

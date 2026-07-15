@@ -2,33 +2,24 @@ import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Check, X } from "lucide-react";
 import { MarketingShell } from "@/components/marketing/MarketingShell";
+import { DISPLAY_PRICES, type BillingInterval, type MembershipPlan } from "@shared/membership";
 import { cn } from "@/lib/utils";
 
-type BillingInterval = "weekly" | "monthly" | "annually";
-type PlanId = "standard" | "pro";
-
-const PRICES: Record<BillingInterval, Record<PlanId, number>> = {
-  weekly: { standard: 7.99, pro: 9.99 },
-  monthly: { standard: 19.99, pro: 24.99 },
-  annually: { standard: 199.99, pro: 249.99 },
-};
+type PlanId = MembershipPlan;
 
 const INTERVAL_LABEL: Record<BillingInterval, string> = {
-  weekly: "Weekly",
   monthly: "Monthly",
-  annually: "Annually",
+  yearly: "Yearly",
 };
 
 const INTERVAL_SHORT: Record<BillingInterval, string> = {
-  weekly: "/wk",
   monthly: "/mo",
-  annually: "/yr",
+  yearly: "/yr",
 };
 
 const INTERVAL_CTA: Record<BillingInterval, string> = {
-  weekly: "Weekly",
   monthly: "Monthly",
-  annually: "Annual",
+  yearly: "Yearly",
 };
 
 const STANDARD_FEATURES = [
@@ -137,7 +128,7 @@ export default function PricingPage() {
   const [interval, setInterval] = useState<BillingInterval>("monthly");
   const [promo, setPromo] = useState("");
 
-  const prices = PRICES[interval];
+  const prices = DISPLAY_PRICES[interval];
   const suffix = INTERVAL_SHORT[interval];
   const ctaPeriod = INTERVAL_CTA[interval];
 
@@ -176,7 +167,7 @@ export default function PricingPage() {
               className="h-10 w-full rounded-xl border border-[#222] bg-[#0f0f0f] px-3 text-sm text-neutral-200 outline-none placeholder:text-neutral-600 focus:border-yellow-500/40 sm:w-48"
             />
             <div className="inline-flex rounded-full border border-[#222] bg-[#0f0f0f] p-1">
-              {(["weekly", "monthly", "annually"] as const).map((opt) => (
+              {(["monthly", "yearly"] as const).map((opt) => (
                 <button
                   key={opt}
                   type="button"

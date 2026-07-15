@@ -7,13 +7,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import type { BillingInterval, MembershipPlan } from "@shared/membership";
+import { normalizeBillingInterval } from "@shared/membership";
 
-const STORAGE_KEY = "seraphim-iq-membership-v1";
-
-export type BillingInterval = "weekly" | "monthly" | "annually";
-export type MembershipPlan = "standard" | "pro";
+export type { BillingInterval, MembershipPlan };
 
 export interface MembershipUser {
+  id?: string;
   name: string;
   email: string;
 }
@@ -21,113 +21,151 @@ export interface MembershipUser {
 export interface MembershipState {
   user: MembershipUser | null;
   membershipActive: boolean;
+  membershipStatus: string | null;
   plan: MembershipPlan | null;
   billingInterval: BillingInterval;
+  currentPeriodEnd: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  loading: boolean;
 }
 
 interface MembershipContextValue extends MembershipState {
   isAuthenticated: boolean;
-  signUp: (input: { name: string; email: string; password: string }) => void;
-  signIn: (input: { email: string; password: string }) => void;
-  signOut: () => void;
-  activateMembership: (plan: MembershipPlan, interval: BillingInterval) => void;
+  refresh: () => Promise<void>;
+  signUp: (input: { name: string; email: string; password: string }) => Promise<void>;
+  signIn: (input: { email: string; password: string }) => Promise<void>;
+  signOut: () => Promise<void>;
+  startCheckout: (plan: MembershipPlan, interval: BillingInterval) => Promise<void>;
 }
 
 const defaultState: MembershipState = {
   user: null,
   membershipActive: false,
+  membershipStatus: null,
   plan: null,
   billingInterval: "monthly",
+  currentPeriodEnd: null,
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
+  loading: true,
 };
 
 const MembershipContext = createContext<MembershipContextValue | null>(null);
 
-function normalizeInterval(value: unknown): BillingInterval {
-  if (value === "weekly" || value === "annually" || value === "yearly") {
-    return value === "yearly" ? "annually" : value;
-  }
-  return "monthly";
+type ApiUser = {
+  id: string;
+  email: string;
+  name: string;
+  membershipActive: boolean;
+  membershipStatus: string;
+  plan: MembershipPlan | null;
+  billingInterval: BillingInterval | null;
+  currentPeriodEnd: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+};
+
+function fromApiUser(apiUser: ApiUser): Omit<MembershipState, "loading"> {
+  return {
+    user: { id: apiUser.id, name: apiUser.name, email: apiUser.email },
+    membershipActive: Boolean(apiUser.membershipActive),
+    membershipStatus: apiUser.membershipStatus,
+    plan: apiUser.plan === "standard" || apiUser.plan === "pro" ? apiUser.plan : null,
+    billingInterval: normalizeBillingInterval(apiUser.billingInterval ?? "monthly"),
+    currentPeriodEnd: apiUser.currentPeriodEnd,
+    stripeCustomerId: apiUser.stripeCustomerId,
+    stripeSubscriptionId: apiUser.stripeSubscriptionId,
+  };
 }
 
-function normalizePlan(value: unknown): MembershipPlan | null {
-  if (value === "standard" || value === "pro" || value === "professional") {
-    return value === "professional" ? "pro" : value;
-  }
-  return null;
-}
-
-function loadState(): MembershipState {
+async function readError(res: Response): Promise<string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState;
-    const parsed = JSON.parse(raw) as MembershipState;
-    return {
-      user: parsed.user ?? null,
-      membershipActive: Boolean(parsed.membershipActive),
-      plan: normalizePlan(parsed.plan),
-      billingInterval: normalizeInterval(parsed.billingInterval),
-    };
+    const data = (await res.json()) as { error?: string };
+    return data.error || res.statusText;
   } catch {
-    return defaultState;
+    return res.statusText || "Request failed";
   }
-}
-
-function persist(state: MembershipState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 export function MembershipProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<MembershipState>(() =>
-    typeof window === "undefined" ? defaultState : loadState(),
-  );
+  const [state, setState] = useState<MembershipState>(defaultState);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/me", { credentials: "include" });
+      if (res.status === 401) {
+        setState({ ...defaultState, loading: false });
+        return;
+      }
+      if (!res.ok) {
+        setState((prev) => ({ ...prev, loading: false }));
+        return;
+      }
+      const data = (await res.json()) as { user: ApiUser };
+      setState({ ...fromApiUser(data.user), loading: false });
+    } catch {
+      setState((prev) => ({ ...prev, loading: false }));
+    }
+  }, []);
 
   useEffect(() => {
-    persist(state);
-  }, [state]);
+    void refresh();
+  }, [refresh]);
 
-  const signUp = useCallback((input: { name: string; email: string; password: string }) => {
-    void input.password;
-    setState((prev) => ({
-      ...prev,
-      user: { name: input.name.trim() || "Member", email: input.email.trim() },
-    }));
+  const signUp = useCallback(async (input: { name: string; email: string; password: string }) => {
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error(await readError(res));
+    const data = (await res.json()) as { user: ApiUser };
+    setState({ ...fromApiUser(data.user), loading: false });
   }, []);
 
-  const signIn = useCallback((input: { email: string; password: string }) => {
-    void input.password;
-    setState((prev) => ({
-      ...prev,
-      user: {
-        name: prev.user?.name || "Member",
-        email: input.email.trim(),
-      },
-    }));
+  const signIn = useCallback(async (input: { email: string; password: string }) => {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error(await readError(res));
+    const data = (await res.json()) as { user: ApiUser };
+    setState({ ...fromApiUser(data.user), loading: false });
   }, []);
 
-  const signOut = useCallback(() => {
-    setState(defaultState);
+  const signOut = useCallback(async () => {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    setState({ ...defaultState, loading: false });
   }, []);
 
-  const activateMembership = useCallback((plan: MembershipPlan, interval: BillingInterval) => {
-    setState((prev) => ({
-      ...prev,
-      membershipActive: true,
-      plan,
-      billingInterval: interval,
-      user: prev.user ?? { name: "Member", email: "member@seraphim.iq" },
-    }));
+  const startCheckout = useCallback(async (plan: MembershipPlan, interval: BillingInterval) => {
+    const res = await fetch("/api/checkout/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ plan, interval }),
+    });
+    if (!res.ok) throw new Error(await readError(res));
+    const data = (await res.json()) as { url: string };
+    if (!data.url) throw new Error("Checkout session missing redirect URL");
+    window.location.assign(data.url);
   }, []);
 
   const value = useMemo<MembershipContextValue>(
     () => ({
       ...state,
       isAuthenticated: Boolean(state.user),
+      refresh,
       signUp,
       signIn,
       signOut,
-      activateMembership,
+      startCheckout,
     }),
-    [state, signUp, signIn, signOut, activateMembership],
+    [state, refresh, signUp, signIn, signOut, startCheckout],
   );
 
   return <MembershipContext.Provider value={value}>{children}</MembershipContext.Provider>;

@@ -23,7 +23,7 @@ const faqs = [
   },
   {
     q: "Can I cancel anytime?",
-    a: "Yes. Membership is weekly, monthly, or annual. You can cancel anytime and keep access through the end of your billing period.",
+    a: "Yes. Membership is monthly or yearly. You can cancel anytime and keep access through the end of your billing period.",
   },
 ];
 

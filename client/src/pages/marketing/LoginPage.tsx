@@ -7,26 +7,31 @@ const fieldClass =
   "mt-1.5 h-11 w-full rounded-xl border border-[#1a1a1a] bg-[#111] px-3 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-500 focus:border-yellow-500/40 focus:ring-2 focus:ring-yellow-500/15";
 
 export default function LoginPage() {
-  const { signIn, isAuthenticated, membershipActive } = useMembership();
+  const { signIn, isAuthenticated, membershipActive, loading } = useMembership();
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!submitted && isAuthenticated && membershipActive) {
-      setLocation("/app");
-      return;
-    }
-    if (submitted && isAuthenticated) {
+    if (loading || busy) return;
+    if (isAuthenticated) {
       setLocation(membershipActive ? "/app" : "/checkout");
     }
-  }, [submitted, isAuthenticated, membershipActive, setLocation]);
+  }, [loading, busy, isAuthenticated, membershipActive, setLocation]);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    signIn({ email, password });
-    setSubmitted(true);
+    setBusy(true);
+    setError(null);
+    try {
+      await signIn({ email, password });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not log in");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -70,11 +75,17 @@ export default function LoginPage() {
                 className={fieldClass}
               />
             </label>
+            {error ? (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {error}
+              </p>
+            ) : null}
             <button
               type="submit"
-              className="btn-3d mt-2 w-full rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-4 py-3 text-sm font-semibold text-black transition hover:brightness-105"
+              disabled={busy}
+              className="btn-3d mt-2 w-full rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-4 py-3 text-sm font-semibold text-black transition hover:brightness-105 disabled:opacity-60"
             >
-              Log in
+              {busy ? "Signing in…" : "Log in"}
             </button>
           </form>
 

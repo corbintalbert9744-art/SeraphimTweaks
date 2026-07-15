@@ -30,6 +30,7 @@ import FaqPage from "@/pages/marketing/FaqPage";
 import LoginPage from "@/pages/marketing/LoginPage";
 import SignupPage from "@/pages/marketing/SignupPage";
 import CheckoutPage from "@/pages/marketing/CheckoutPage";
+import SuccessPage from "@/pages/marketing/SuccessPage";
 import NotFound from "@/pages/not-found";
 
 function ScrollToTop() {
@@ -41,7 +42,14 @@ function ScrollToTop() {
 }
 
 function RequireMember({ children }: { children: ReactNode }) {
-  const { isAuthenticated, membershipActive } = useMembership();
+  const { isAuthenticated, membershipActive, loading } = useMembership();
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black text-sm text-neutral-400">
+        Checking membership…
+      </div>
+    );
+  }
   if (!isAuthenticated) return <Redirect to="~/login" />;
   if (!membershipActive) return <Redirect to="~/checkout" />;
   return <>{children}</>;
@@ -87,6 +95,7 @@ function AppRouter() {
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
       <Route path="/checkout" component={CheckoutPage} />
+      <Route path="/success" component={SuccessPage} />
 
       <Route path="/app" nest>
         <MembersApp />

@@ -1,29 +1,17 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { MarketingShell } from "@/components/marketing/MarketingShell";
-import {
-  useMembership,
-  type BillingInterval,
-  type MembershipPlan,
-} from "@/context/MembershipContext";
+import { useMembership, type BillingInterval, type MembershipPlan } from "@/context/MembershipContext";
+import { DISPLAY_PRICES } from "@shared/membership";
 import { cn } from "@/lib/utils";
 
-const PRICES: Record<BillingInterval, Record<MembershipPlan, number>> = {
-  weekly: { standard: 7.99, pro: 9.99 },
-  monthly: { standard: 19.99, pro: 24.99 },
-  annually: { standard: 199.99, pro: 249.99 },
-};
-
 const SHORT: Record<BillingInterval, string> = {
-  weekly: "/wk",
   monthly: "/mo",
-  annually: "/yr",
+  yearly: "/yr",
 };
 
 function parseInterval(raw: string | null): BillingInterval {
-  if (raw === "weekly" || raw === "annually" || raw === "yearly") {
-    return raw === "yearly" ? "annually" : raw;
-  }
+  if (raw === "yearly" || raw === "annually") return "yearly";
   return "monthly";
 }
 
@@ -33,35 +21,46 @@ function parsePlan(raw: string | null): MembershipPlan {
 }
 
 export default function CheckoutPage() {
-  const { isAuthenticated, membershipActive, activateMembership, user } = useMembership();
+  const {
+    isAuthenticated,
+    membershipActive,
+    startCheckout,
+    user,
+    loading,
+  } = useMembership();
   const [, setLocation] = useLocation();
   const search = useSearch();
-  const params = useMemo(
-    () => new URLSearchParams(search.startsWith("?") ? search.slice(1) : search),
-    [search],
-  );
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
 
   const [interval, setInterval] = useState<BillingInterval>(() =>
-    parseInterval(params.get("interval")),
+    parseInterval(params.get("interval") || params.get("billing")),
   );
   const [plan, setPlan] = useState<MembershipPlan>(() => parsePlan(params.get("plan")));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (membershipActive) setLocation("/app");
-  }, [membershipActive, setLocation]);
+    if (!loading && membershipActive) setLocation("/app");
+  }, [membershipActive, loading, setLocation]);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    setError(null);
     if (!isAuthenticated) {
       const q = new URLSearchParams({ plan, interval });
       setLocation(`/signup?${q.toString()}`);
       return;
     }
-    activateMembership(plan, interval);
-    setLocation("/app");
+    setBusy(true);
+    try {
+      await startCheckout(plan, interval);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start checkout");
+      setBusy(false);
+    }
   }
 
-  const price = PRICES[interval][plan];
+  const price = DISPLAY_PRICES[interval][plan];
 
   return (
     <MarketingShell>
@@ -75,11 +74,11 @@ export default function CheckoutPage() {
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-neutral-400">
             {user
-              ? `Signed in as ${user.email}. Confirm Standard or Pro to open the members dashboard.`
-              : "Create an account first, then confirm your membership."}
+              ? `Signed in as ${user.email}. Confirm Standard or Pro, then subscribe securely with Stripe.`
+              : "Create an account first, then confirm your membership with Stripe Checkout."}
           </p>
 
-          {!isAuthenticated ? (
+          {!isAuthenticated && !loading ? (
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 href={`/signup?plan=${plan}&interval=${interval}`}
@@ -97,7 +96,7 @@ export default function CheckoutPage() {
           ) : (
             <form onSubmit={onSubmit} className="mt-8 space-y-5">
               <div className="inline-flex rounded-full border border-[#222] bg-[#0f0f0f] p-1">
-                {(["weekly", "monthly", "annually"] as const).map((opt) => (
+                {(["monthly", "yearly"] as const).map((opt) => (
                   <button
                     key={opt}
                     type="button"
@@ -129,7 +128,7 @@ export default function CheckoutPage() {
                   >
                     <p className="text-sm font-semibold capitalize text-white">{opt}</p>
                     <p className="mt-1 text-lg font-semibold tabular-nums text-white">
-                      ${PRICES[interval][opt].toFixed(2)}
+                      ${DISPLAY_PRICES[interval][opt].toFixed(2)}
                       <span className="text-sm font-medium text-neutral-500">
                         {" "}
                         {SHORT[interval]}
@@ -141,24 +140,34 @@ export default function CheckoutPage() {
 
               <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-5">
                 <p className="text-sm text-neutral-400">
-                  {plan === "pro" ? "Pro" : "Standard"} · {interval}
+                  {plan === "pro" ? "Pro" : "Standard"} membership · {interval}
                 </p>
                 <p className="mt-2 text-3xl font-semibold tabular-nums text-white">
                   ${price.toFixed(2)}
                   <span className="text-base font-medium text-neutral-500"> {SHORT[interval]}</span>
                 </p>
                 <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-                  Mock checkout for this build, no real charge. Activating unlocks the members-only
-                  research dashboard.
+                  You will be redirected to Stripe Checkout. Access unlocks after webhook
+                  confirmation, not from the browser alone.
                 </p>
               </div>
 
+              {error ? (
+                <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                  {error}
+                </p>
+              ) : null}
+
               <button
                 type="submit"
-                className="btn-3d w-full rounded-xl bg-yellow-400 px-4 py-3 text-sm font-semibold text-black"
+                disabled={busy || loading}
+                className="btn-3d w-full rounded-xl bg-yellow-400 px-4 py-3 text-sm font-semibold text-black disabled:opacity-60"
               >
-                Become a {plan === "pro" ? "Pro" : "Standard"} Member ·{" "}
-                {interval === "annually" ? "Annual" : interval === "weekly" ? "Weekly" : "Monthly"}
+                {busy
+                  ? "Redirecting to Stripe…"
+                  : `Subscribe · ${plan === "pro" ? "Pro" : "Standard"} ${
+                      interval === "yearly" ? "Yearly" : "Monthly"
+                    }`}
               </button>
 
               <p className="text-center text-xs text-neutral-500">

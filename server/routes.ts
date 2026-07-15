@@ -1,8 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { buildCommandCenterPayload, buildFeaturedNbaProp, getNbaGames } from "./services/nbaService";
+import { registerAuthAndBillingRoutes } from "./billingRoutes";
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  registerAuthAndBillingRoutes(app);
+
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, product: "seraphim-analytics", time: new Date().toISOString() });
   });

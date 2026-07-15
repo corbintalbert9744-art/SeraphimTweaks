@@ -86,12 +86,13 @@ export function TopNav() {
 
   function handleSignOut() {
     setProfileOpen(false);
-    signOut();
-    toast({
-      title: "Signed out",
-      description: "You’ve left the members dashboard.",
+    void signOut().then(() => {
+      toast({
+        title: "Signed out",
+        description: "You’ve left the members dashboard.",
+      });
+      setLocation("~/");
     });
-    setLocation("~/");
   }
 
   return (
