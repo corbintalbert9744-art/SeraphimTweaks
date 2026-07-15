@@ -11,7 +11,11 @@ const faqs = [
   },
   {
     q: "Which sports are included?",
-    a: "Membership includes NBA, NFL, MLB, ATP, WTA, and WNBA — Standard and Pro both cover every sport we offer.",
+    a: "Membership includes NBA, NFL, MLB, ATP, WTA, and WNBA. Standard and Pro both cover every sport we offer.",
+  },
+  {
+    q: "What do Pro members get that Standard does not?",
+    a: "Pro includes my premium picks delivered live in a private Discord channel, plus AI research writeups and deeper insight tools. Standard already unlocks the full research boards.",
   },
   {
     q: "How often is data updated?",

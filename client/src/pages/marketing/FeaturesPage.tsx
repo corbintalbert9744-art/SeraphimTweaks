@@ -54,9 +54,10 @@ const features = [
   {
     code: "05 — Analysis",
     title: "AI explanation on every prop",
-    body: "Short writeups that call out no-vig, hit rates, and matchup context — not generic blurbs.",
+    body: "Short writeups that call out no-vig, hit rates, and matchup context, not generic blurbs. Pro also unlocks live premium picks in a private Discord.",
     bullets: [
       "Prop-level AI explanation (Pro)",
+      "Premium picks in a private Discord (Pro)",
       "Tied to the same numbers on the report",
     ],
     image: "/marketing/features/ai-analysis.png",
