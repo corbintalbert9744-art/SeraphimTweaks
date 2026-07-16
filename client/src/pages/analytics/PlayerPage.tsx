@@ -167,14 +167,23 @@ export default function PlayerPage() {
       if (nba) return nba;
 
       // Multi-sport boards: build a research profile from open props.
+      // Prefer the selected pick'em platform so WNBA/NBA stub players resolve.
+      let platformQs = "";
+      try {
+        const saved = localStorage.getItem("seraphim.pickemApp");
+        if (saved) platformQs = `?platform=${encodeURIComponent(saved)}`;
+      } catch {
+        /* ignore */
+      }
       const boardSources: Array<{ path: string; league: string; boardHref: string }> = [
+        { path: `/api/wnba/props${platformQs}`, league: "WNBA", boardHref: "/wnba" },
+        { path: `/api/nba/props${platformQs}`, league: "NBA", boardHref: "/nba" },
         { path: "/api/nfl/props", league: "NFL", boardHref: "/nfl" },
         { path: "/api/mlb/props", league: "MLB", boardHref: "/mlb" },
         { path: "/api/nhl/props", league: "NHL", boardHref: "/nhl" },
         { path: "/api/soccer/props", league: "Soccer", boardHref: "/soccer" },
         { path: "/api/tennis/props?tour=ATP", league: "ATP", boardHref: "/tennis" },
         { path: "/api/tennis/props?tour=WTA", league: "WTA", boardHref: "/tennis" },
-        { path: "/api/wnba/props", league: "WNBA", boardHref: "/wnba" },
       ];
 
       function matchesPlayer(p: Record<string, unknown>): boolean {

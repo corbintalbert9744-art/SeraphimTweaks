@@ -124,8 +124,45 @@ def _find_player_by_name(db: Session, league: str, name: str) -> Optional[Player
 def _ensure_platform_player(db: Session, league: str, name: str, platform: str) -> Player:
     existing = _find_player_by_name(db, league, name)
     if existing:
+        # Prefer a non-stub peer when both exist
+        if (existing.external_id or "").startswith("pickem:"):
+            real_id = _lookup_provider_external_id(db, league=league, name=name)
+            if real_id:
+                real = db.execute(
+                    select(Player).where(
+                        Player.league == normalize_league(league),
+                        Player.external_id == real_id,
+                    )
+                ).scalar_one_or_none()
+                if real:
+                    return real
+                # Upgrade stub in place when safe
+                try:
+                    existing.external_id = real_id
+                    db.flush()
+                except Exception:  # noqa: BLE001
+                    db.rollback()
         return existing
     code = normalize_league(league)
+    # Prefer ESPN / MLB provider ids so gamelogs (and profiles) work immediately
+    real_id = _lookup_provider_external_id(db, league=code, name=name)
+    if real_id:
+        real = db.execute(
+            select(Player).where(Player.league == code, Player.external_id == real_id)
+        ).scalar_one_or_none()
+        if real:
+            return real
+        return upsert_player(
+            db,
+            NormalizedPlayer(
+                external_id=real_id,
+                league=code,
+                full_name=name,
+                short_name=name.split()[-1] if name.split() else name,
+                position=None,
+                team_external_id=None,
+            ),
+        )
     ext = f"pickem:{platform}:{_slugify(name)}"
     return upsert_player(
         db,
@@ -138,6 +175,10 @@ def _ensure_platform_player(db: Session, league: str, name: str, platform: str) 
             team_external_id=None,
         ),
     )
+
+
+# Process-local cache so one board sync does not re-hit ESPN search per market.
+_espn_name_cache: dict[tuple[str, str], Optional[str]] = {}
 
 
 def _lookup_provider_external_id(db: Session, *, league: str, name: str) -> Optional[str]:
@@ -160,17 +201,25 @@ def _lookup_provider_external_id(db: Session, *, league: str, name: str) -> Opti
                 and p.external_id
                 and not str(p.external_id).startswith("pickem:")
             ]
-            if not peers:
-                return None
-            peers.sort(
-                key=lambda p: 1
-                if db.execute(
-                    select(PlayerGameLog.id).where(PlayerGameLog.player_id == p.id).limit(1)
-                ).first()
-                else 0,
-                reverse=True,
-            )
-            return str(peers[0].external_id)
+            if peers:
+                peers.sort(
+                    key=lambda p: 1
+                    if db.execute(
+                        select(PlayerGameLog.id).where(PlayerGameLog.player_id == p.id).limit(1)
+                    ).first()
+                    else 0,
+                    reverse=True,
+                )
+                return str(peers[0].external_id)
+            cache_key = (code, q.lower())
+            if cache_key in _espn_name_cache:
+                return _espn_name_cache[cache_key]
+            from app.providers.espn.search import search_espn_athlete
+
+            found = search_espn_athlete(q, league=code)
+            ext = found.external_id if found else None
+            _espn_name_cache[cache_key] = ext
+            return ext
     except Exception as exc:  # noqa: BLE001
         log.debug("lookup external id %s/%s: %s", code, q, exc)
     return None
@@ -361,6 +410,25 @@ def _opponent_guess(row: dict[str, Any], team_hint: Optional[str]) -> tuple[str,
     return (away or home, home if away else "TBD")
 
 
+def _team_opponent_from_matchup_note(
+    note: Optional[str], team_hint: Optional[str] = None
+) -> tuple[str, str]:
+    """Parse ``Away @ Home`` matchup notes into (team, opponent) for cards."""
+    raw = (note or "").strip()
+    if not raw or raw.upper() == "TBD":
+        return ("—", "TBD")
+    if " @ " in raw:
+        away, home = raw.split(" @ ", 1)
+        return _opponent_guess(
+            {"home_team": home.strip(), "away_team": away.strip()}, team_hint
+        )
+    if " vs " in raw.lower():
+        parts = raw.replace(" VS ", " vs ").split(" vs ", 1)
+        if len(parts) == 2:
+            return (parts[0].strip() or "—", parts[1].strip() or "TBD")
+    return ("—", raw)
+
+
 def _build_prediction_for_player(
     db: Session,
     *,
@@ -368,7 +436,7 @@ def _build_prediction_for_player(
     player: Player,
     market: str,
     platform_line: float,
-) -> tuple[Optional[Any], list[float], list[bool], list, list]:
+) -> tuple[Optional[Any], list[float], list[bool], list, list, Player]:
     player = _hydrate_player_logs(db, league=league, player=player)
     logs = (
         db.execute(
@@ -382,7 +450,7 @@ def _build_prediction_for_player(
     )
     values = _market_samples(logs, market)
     if len(values) < MIN_LOGS_FOR_MODEL:
-        return None, values, [], [], []
+        return None, values, [], [], [], player
 
     homes = [bool(r.home) for r in logs[: len(values)]]
     minutes = [r.minutes for r in logs[: len(values)]]
@@ -420,7 +488,7 @@ def _build_prediction_for_player(
         vs_opponent_values=[],
     )
     prediction = predict_prop(ctx, comparison_line=platform_line)
-    return prediction, values, homes, minutes, played_at
+    return prediction, values, homes, minutes, played_at, player
 
 
 def _upsert_platform_prop(
@@ -713,7 +781,7 @@ def sync_pickem_platform_board(
             if seed is None:
                 continue
 
-            prediction, values, homes, minutes, played_at = _build_prediction_for_player(
+            prediction, values, homes, minutes, played_at, player = _build_prediction_for_player(
                 db,
                 league=code,
                 player=player,
@@ -849,6 +917,8 @@ def sync_pickem_platform_board(
                     analytics.streak = streak(values, platform_line, side)
 
             team, opponent = _opponent_guess(g, None)
+            if team == "—" and opponent == "TBD" and analytics.matchup_note:
+                team, opponent = _team_opponent_from_matchup_note(analytics.matchup_note)
             captured = g.get("captured_at") or datetime.now(timezone.utc)
             if latest_capture is None or captured > latest_capture:
                 latest_capture = captured
@@ -856,7 +926,9 @@ def sync_pickem_platform_board(
             board_rows.append(
                 {
                     "id": prop.id,
-                    "playerId": player.external_id or player.id,
+                    # Warehouse id is stable for /player/:id profile lookups
+                    "playerId": player.id,
+                    "playerExternalId": player.external_id,
                     "playerWarehouseId": player.id,
                     "player": player.full_name,
                     "team": team,
@@ -1163,7 +1235,7 @@ def _players_from_board(props: list[dict[str, Any]], label: str) -> list[dict[st
         ),
     )
     for p in ordered:
-        pid = str(p.get("playerId") or "")
+        pid = str(p.get("playerWarehouseId") or p.get("playerId") or "")
         if not pid or pid in seen:
             continue
         seen.add(pid)
@@ -1291,13 +1363,16 @@ def _remodel_pending_board_rows(
         if attempted >= REMODEL_PENDING_LIMIT:
             break
         attempted += 1
-        prediction, *_rest = _build_prediction_for_player(
+        prediction, *_rest, hydrated = _build_prediction_for_player(
             db,
             league=code,
             player=player,
             market=prop.market,
             platform_line=float(prop.line),
         )
+        if hydrated.id != player.id:
+            prop.player_id = hydrated.id
+            player = hydrated
         if prediction is None:
             continue
         _apply_prediction_to_analytics(
@@ -1426,14 +1501,17 @@ def _list_cached_platform_board(
             if edge is not None and abs(line) > 1e-9
             else None
         )
+        team, opponent = _team_opponent_from_matchup_note(analytics.matchup_note)
         board.append(
             {
                 "id": prop.id,
-                "playerId": (player.external_id if player else None) or (player.id if player else ""),
+                "playerId": (player.id if player else "")
+                or (player.external_id if player else ""),
+                "playerExternalId": player.external_id if player else None,
                 "playerWarehouseId": player.id if player else None,
                 "player": player.full_name if player else "Player",
-                "team": "—",
-                "opponent": "TBD",
+                "team": team,
+                "opponent": opponent,
                 "position": (player.position if player else None) or "",
                 "market": prop.market,
                 "stat": prop.market,

@@ -125,7 +125,7 @@ def test_sync_builds_board_from_live_quotes_only():
             headshot_url=None,
         )
         ensure_player.return_value = player
-        pred.return_value = (None, [], [], [], [])
+        pred.return_value = (None, [], [], [], [], player)
         prop = MagicMock(id="nba:pickem:prizepicks:x:points")
         upsert_prop.return_value = prop
 

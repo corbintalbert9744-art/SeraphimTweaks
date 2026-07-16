@@ -111,5 +111,10 @@ def wnba_player_detail(player_id: str, db: Session = Depends(get_db)):
     ensure_wnba_board(db, force=False)
     profile = get_wnba_player_profile(db, player_id)
     if not profile or not (profile.get("markets") or []):
+        # Pick'em stubs / ESPN-linked players: build from open warehouse props
+        from app.ingestion.multisport_player import get_multisport_player_profile
+
+        profile = get_multisport_player_profile(db, league="WNBA", player_key=player_id)
+    if not profile or not (profile.get("markets") or []):
         raise HTTPException(status_code=404, detail="Player not found")
     return {"ok": True, "player": profile, "live": True}
