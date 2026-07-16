@@ -51,6 +51,27 @@ export function registerDataPlatformProxy(
     await proxyGet(`/api/v1/nba/command-center`, res, () => handlers.commandCenter(req, res));
   });
 
+  // NFL — data platform only (no Node ESPN fallback yet)
+  app.get("/api/nfl/games", async (req, res) => {
+    const qs = typeof req.query.dates === "string" ? `?dates=${encodeURIComponent(req.query.dates)}` : "";
+    await proxyGet(`/api/v1/nfl/games${qs}`, res, async () => {
+      res.status(503).json({
+        error: "NFL data requires the Python data platform",
+        hint: "Start with: npm run data-platform",
+      });
+    });
+  });
+
+  app.get("/api/nfl/featured-prop", async (req, res) => {
+    const qs = typeof req.query.gameId === "string" ? `?gameId=${encodeURIComponent(req.query.gameId)}` : "";
+    await proxyGet(`/api/v1/nfl/featured-prop${qs}`, res, async () => {
+      res.status(503).json({
+        error: "NFL featured prop requires the Python data platform",
+        hint: "Start with: npm run data-platform",
+      });
+    });
+  });
+
   app.get("/api/v1/providers", async (_req, res) => {
     try {
       const upstream = await fetch(`${BASE}/api/v1/providers`, { signal: AbortSignal.timeout(8_000) });

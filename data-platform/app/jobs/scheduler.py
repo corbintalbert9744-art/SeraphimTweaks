@@ -1,4 +1,4 @@
-"""APScheduler jobs for automatic warehouse updates."""
+"""APScheduler jobs for automatic warehouse updates (NBA + NFL)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,12 @@ from app.ingestion.nba_pipeline import (
     import_nba_schedule,
     recalculate_open_prop_analytics,
 )
-from app.providers.registry import get_nba_providers
+from app.ingestion.nfl_pipeline import (
+    build_and_store_featured_nfl_prop,
+    import_nfl_injuries_for_open_games,
+    import_nfl_schedule,
+    recalculate_nfl_analytics,
+)
 
 log = logging.getLogger(__name__)
 _scheduler: Optional[BackgroundScheduler] = None
@@ -31,38 +36,52 @@ def _safe(job_name: str, fn) -> None:
 
 
 def job_import_games() -> None:
-    _safe("import_games", lambda db: import_nba_schedule(db))
+    def _run(db):
+        nba = import_nba_schedule(db)
+        nfl = import_nfl_schedule(db)
+        return {"nba": nba, "nfl": nfl}
+
+    _safe("import_games", _run)
 
 
 def job_refresh_odds() -> None:
-    """Refresh odds for open props.
-
-    Live path requires ODDS_API_KEY. Without it, featured rebuild still uses MockOddsProvider
-    and marks oddsAreMock=true.
-    """
-
     def _run(db):
-        providers = get_nba_providers()
-        odds = providers.odds
-        if odds is None:
-            return {"skipped": True, "reason": "no odds provider"}
-        # Rebuild featured prop which re-quotes odds (live or mock)
-        return build_and_store_featured_prop(db)
+        return {
+            "nba": build_and_store_featured_prop(db),
+            "nfl": build_and_store_featured_nfl_prop(db),
+        }
 
     _safe("refresh_odds", _run)
 
 
 def job_update_injuries() -> None:
-    _safe("update_injuries", lambda db: import_nba_injuries_for_open_games(db))
+    def _run(db):
+        return {
+            "nba": import_nba_injuries_for_open_games(db),
+            "nfl": import_nfl_injuries_for_open_games(db),
+        }
+
+    _safe("update_injuries", _run)
 
 
 def job_import_stats() -> None:
-    """Import completed game stats via featured athlete gamelog refresh (NBA v1)."""
-    _safe("import_stats", lambda db: build_and_store_featured_prop(db))
+    def _run(db):
+        return {
+            "nba": build_and_store_featured_prop(db),
+            "nfl": build_and_store_featured_nfl_prop(db),
+        }
+
+    _safe("import_stats", _run)
 
 
 def job_recalculate_analytics() -> None:
-    _safe("recalculate_analytics", lambda db: recalculate_open_prop_analytics(db))
+    def _run(db):
+        return {
+            "nba": recalculate_open_prop_analytics(db),
+            "nfl": recalculate_nfl_analytics(db),
+        }
+
+    _safe("recalculate_analytics", _run)
 
 
 def start_scheduler() -> BackgroundScheduler:

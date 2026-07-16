@@ -15,10 +15,30 @@ def providers():
 def leagues():
     return {
         "leagues": [
-            {"code": "NBA", "status": "live", "notes": "ESPN schedule/gamelog/injuries; odds via Odds API or mock"},
-            {"code": "NFL", "status": "planned", "notes": "Adapter stub — expand after NBA warehouse is stable"},
-            {"code": "WNBA", "status": "planned", "notes": "Reuse ESPN basketball patterns"},
-            {"code": "ATP", "status": "needs_provider", "notes": "REQUIRES PROVIDER SELECTION for schedule + odds"},
-            {"code": "WTA", "status": "needs_provider", "notes": "REQUIRES PROVIDER SELECTION for schedule + odds"},
+            {
+                "code": "NBA",
+                "status": "live",
+                "notes": "ESPN schedule/gamelog/injuries; odds via Odds API or mock",
+            },
+            {
+                "code": "NFL",
+                "status": "live",
+                "notes": "ESPN schedule/gamelog/injuries/roster fallback; odds via Odds API or mock",
+            },
+            {
+                "code": "WNBA",
+                "status": "planned",
+                "notes": "Reuse ESPN basketball patterns — next after NFL",
+            },
+            {
+                "code": "ATP",
+                "status": "needs_provider",
+                "notes": "REQUIRES PROVIDER SELECTION for schedule + odds",
+            },
+            {
+                "code": "WTA",
+                "status": "needs_provider",
+                "notes": "REQUIRES PROVIDER SELECTION for schedule + odds",
+            },
         ]
     }

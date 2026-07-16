@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from app.config import get_settings
 from app.providers.base import ProviderMeta
 from app.providers.espn.nba import EspnNbaProvider
+from app.providers.espn.nfl import EspnNflProvider
 from app.providers.mock.odds import MockOddsProvider
 from app.providers.the_odds_api.odds import TheOddsApiProvider
 
@@ -20,20 +21,37 @@ class ProviderBundle:
     featured: object | None = None
 
 
+def _odds_provider():
+    settings = get_settings()
+    if settings.odds_api_key:
+        return TheOddsApiProvider(api_key=settings.odds_api_key)
+    return MockOddsProvider()
+
+
 def provider_status() -> list[dict]:
     """Public status for /api/v1/providers — what's live vs needs config."""
     settings = get_settings()
-    espn = EspnNbaProvider()
+    nba = EspnNbaProvider()
+    nfl = EspnNflProvider()
     odds_live = bool(settings.odds_api_key)
     return [
         {
-            "name": espn.meta.name,
-            "leagues": espn.meta.leagues,
-            "capabilities": espn.meta.capabilities,
-            "requires_api_key": espn.meta.requires_api_key,
+            "name": nba.meta.name,
+            "leagues": nba.meta.leagues,
+            "capabilities": nba.meta.capabilities,
+            "requires_api_key": False,
             "is_mock": False,
             "configured": True,
-            "notes": espn.meta.notes,
+            "notes": nba.meta.notes,
+        },
+        {
+            "name": nfl.meta.name,
+            "leagues": nfl.meta.leagues,
+            "capabilities": nfl.meta.capabilities,
+            "requires_api_key": False,
+            "is_mock": False,
+            "configured": True,
+            "notes": nfl.meta.notes,
         },
         {
             "name": "the-odds-api",
@@ -46,15 +64,6 @@ def provider_status() -> list[dict]:
                 "Live sportsbook odds when ODDS_API_KEY is set. "
                 "Without a key, MockOddsProvider supplies clearly labeled -110 placeholders."
             ),
-        },
-        {
-            "name": "espn-nfl",
-            "leagues": ["NFL"],
-            "capabilities": ["schedule", "gamelog", "injuries"],
-            "requires_api_key": False,
-            "is_mock": True,
-            "configured": False,
-            "notes": "PLANNED — adapter stub. Select/configure after NBA warehouse is stable.",
         },
         {
             "name": "espn-wnba",
@@ -80,18 +89,31 @@ def provider_status() -> list[dict]:
 def get_nba_providers() -> ProviderBundle:
     settings = get_settings()
     espn = EspnNbaProvider(user_agent=settings.espn_user_agent)
-    if settings.odds_api_key:
-        odds: object = TheOddsApiProvider(api_key=settings.odds_api_key)
-    else:
-        odds = MockOddsProvider()
     return ProviderBundle(
         schedule=espn,
         gamelog=espn,
         injuries=espn,
-        odds=odds,
+        odds=_odds_provider(),
+        featured=espn,
+    )
+
+
+def get_nfl_providers() -> ProviderBundle:
+    settings = get_settings()
+    espn = EspnNflProvider(user_agent=settings.espn_user_agent)
+    return ProviderBundle(
+        schedule=espn,
+        gamelog=espn,
+        injuries=espn,
+        odds=_odds_provider(),
         featured=espn,
     )
 
 
 def list_metas() -> list[ProviderMeta]:
-    return [EspnNbaProvider().meta, MockOddsProvider().meta, TheOddsApiProvider(api_key="").meta]
+    return [
+        EspnNbaProvider().meta,
+        EspnNflProvider().meta,
+        MockOddsProvider().meta,
+        TheOddsApiProvider(api_key="").meta,
+    ]
