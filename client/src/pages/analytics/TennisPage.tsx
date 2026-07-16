@@ -32,12 +32,12 @@ export default function TennisPage({ tour: initialTour }: { tour?: "ATP" | "WTA"
         title={`${tour} Research Board`}
         description={
           tour === "ATP"
-            ? "ATP (Men) — ESPN tennis schedule (no key). Prop boards fill when match stats + Odds API markets are available. Tennis Abstract is not scraped."
-            : "WTA (Women) — ESPN tennis schedule (no key). Prop boards fill when match stats + Odds API markets are available. Tennis Abstract is not scraped."
+            ? "ATP (Men) — ESPN singles slate with PrizePicks-style markets (Fantasy Score, Total Games, Total Sets). Green OVER · red UNDER."
+            : "WTA (Women) — ESPN singles slate with PrizePicks-style markets (Fantasy Score, Total Games, Total Sets). Green OVER · red UNDER."
         }
         propsPath={`/api/tennis/props?tour=${tour}`}
         queryKey={`tennis-board-${tour}`}
-        emptyHint={`${tour} schedule syncs from ESPN. Match-level prop logs and odds require Odds API keys / a licensed stats feed — we do not fabricate tennis props.`}
+        emptyHint={`${tour} board builds from the live ESPN scoreboard. Refresh when tournaments have singles matchups.`}
       />
     </div>
   );

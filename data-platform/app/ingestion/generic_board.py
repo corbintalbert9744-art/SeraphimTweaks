@@ -346,6 +346,17 @@ def list_league_props(db: Session, league: str, *, limit: int = 200) -> list[dic
     out: list[dict[str, Any]] = []
     for prop, analytics, player in rows:
         team = _team_abbr(db, player.team_id if player else None)
+        opponent = "TBD"
+        bullets = analytics.explain_bullets or []
+        if analytics.matchup_note:
+            # e.g. "Name · Market research line X vs Opponent."
+            note = analytics.matchup_note
+            if " vs " in note:
+                opponent = note.rsplit(" vs ", 1)[-1].rstrip(".")
+        elif bullets:
+            first = str(bullets[0])
+            if " vs " in first:
+                opponent = first.rsplit(" vs ", 1)[-1].rstrip(".")
         out.append(
             {
                 "id": prop.id,
@@ -353,7 +364,7 @@ def list_league_props(db: Session, league: str, *, limit: int = 200) -> list[dic
                 "playerWarehouseId": player.id if player else prop.player_id,
                 "player": player.full_name if player else "Player",
                 "team": team,
-                "opponent": "TBD",
+                "opponent": opponent,
                 "position": (player.position if player else None) or "",
                 "market": prop.market,
                 "side": prop.side,
@@ -376,6 +387,7 @@ def list_league_props(db: Session, league: str, *, limit: int = 200) -> list[dic
                 "isModelEstimate": True,
                 "oddsAreMock": analytics.odds_are_mock,
                 "explanation": analytics.explain_bullets or [],
+                "matchupNote": analytics.matchup_note,
                 "headshot": player.headshot_url if player else None,
             }
         )

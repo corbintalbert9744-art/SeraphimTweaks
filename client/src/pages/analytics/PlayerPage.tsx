@@ -16,6 +16,7 @@ import {
   type PlayerResearchProfile,
 } from "@/lib/playerResearchProfile";
 import { cn } from "@/lib/utils";
+import { leanTextClass } from "@/lib/leanTheme";
 import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -158,71 +159,95 @@ export default function PlayerPage() {
       );
       if (nba) return nba;
 
-      // NFL players: build a minimal research profile from board props
-      const nflRes = await fetch("/api/nfl/props");
-      if (!nflRes.ok) throw new Error("player");
-      const board = (await nflRes.json()) as { props: Record<string, unknown>[] };
-      const mine = board.props.filter(
-        (p) => String(p.playerId) === playerId || String(p.playerWarehouseId) === playerId,
-      );
-      if (!mine.length) throw new Error("player");
-      const top = mine[0];
-      const markets = mine.map((p) => ({
-        propId: String(p.id),
-        market: String(p.market),
-        side: (p.side === "Under" ? "Under" : "Over") as "Over" | "Under",
-        line: Number(p.line),
-        americanOdds: Number(p.americanOdds ?? -110),
-        projectedValue: Number(p.projectedValue ?? p.line),
-        edgeVsLine: Number(p.edgeVsLine ?? 0),
-        edgePercent: Number(p.line) ? (Number(p.edgeVsLine ?? 0) / Number(p.line)) * 100 : 0,
-        researchScore: Number(p.researchScore ?? p.confidence ?? 50),
-        confidence: Number(p.confidence ?? 50),
-        evPercent: Number(p.evPercent ?? 0),
-        explanation: (p.explanation as string[]) || [],
-        why: `${p.side} ${p.line} ${p.market}`,
-        hitWindows: [
-          { key: "l5", label: "Last 5", average: null, hitRate: 0, hitPct: 0, hits: String(p.l5 ?? "0/0") },
-          { key: "l10", label: "Last 10", average: null, hitRate: 0, hitPct: 0, hits: String(p.l10 ?? "0/0") },
-          { key: "l20", label: "Last 20", average: null, hitRate: 0, hitPct: 0, hits: String(p.l20 ?? "0/0") },
-          { key: "all", label: "All", average: null, hitRate: 0, hitPct: 0, hits: String(p.season ?? "0/0") },
-          { key: "matchup", label: "Matchup", average: null, hitRate: 0, hitPct: 0, hits: String(p.l10 ?? "0/0") },
-        ],
-        chartGames: [] as ChartGame[],
-      }));
-      return asLivePlayerResearch({
-        id: playerId,
-        name: String(top.player),
-        league: "NFL",
-        team: String(top.team ?? ""),
-        opponent: String(top.opponent ?? ""),
-        position: String(top.position ?? ""),
-        initials: String(top.player)
-          .split(/\s+/)
-          .slice(0, 2)
-          .map((s) => s[0] ?? "")
-          .join("")
-          .toUpperCase(),
-        injury: "None",
-        tipTime: String(top.tipTime ?? ""),
-        researchScore: Number(top.researchScore ?? top.confidence ?? 50),
-        dataQualityScore: 70,
-        aiExplain: {
-          verdict: "neutral",
-          headline: String((top.explanation as string[] | undefined)?.[0] ?? "Live NFL lean"),
-          body: "Built from live ESPN NFL warehouse props.",
-        },
-        matchup: {
-          title: `vs ${top.opponent}`,
-          defenseRank: "Live slate",
-          bullets: [`${top.market} ${top.side} ${top.line}`],
-        },
-        homeSplit: { label: "Home", samples: 0, averages: {} },
-        awaySplit: { label: "Away", samples: 0, averages: {} },
-        recentLogs: [],
-        markets,
-        boardHref: "/nfl",
-      });
+      // Multi-sport boards: build a research profile from open props.
+      const boardSources: Array<{ path: string; league: string; boardHref: string }> = [
+        { path: "/api/nfl/props", league: "NFL", boardHref: "/nfl" },
+        { path: "/api/mlb/props", league: "MLB", boardHref: "/mlb" },
+        { path: "/api/nhl/props", league: "NHL", boardHref: "/nhl" },
+        { path: "/api/soccer/props", league: "Soccer", boardHref: "/soccer" },
+        { path: "/api/tennis/props?tour=ATP", league: "ATP", boardHref: "/tennis" },
+        { path: "/api/tennis/props?tour=WTA", league: "WTA", boardHref: "/tennis" },
+        { path: "/api/wnba/props", league: "WNBA", boardHref: "/wnba" },
+      ];
+
+      function matchesPlayer(p: Record<string, unknown>): boolean {
+        const candidates = [
+          p.playerId,
+          p.playerWarehouseId,
+          p.id,
+          typeof p.playerWarehouseId === "string" && String(p.playerWarehouseId).includes(":")
+            ? String(p.playerWarehouseId).split(":").pop()
+            : null,
+        ];
+        return candidates.some((c) => c != null && String(c) === playerId);
+      }
+
+      for (const src of boardSources) {
+        const res = await fetch(src.path);
+        if (!res.ok) continue;
+        const board = (await res.json()) as { props: Record<string, unknown>[] };
+        const mine = (board.props ?? []).filter(matchesPlayer);
+        if (!mine.length) continue;
+        const top = mine[0];
+        const markets = mine.map((p) => ({
+          propId: String(p.id),
+          market: String(p.market),
+          side: (p.side === "Under" ? "Under" : "Over") as "Over" | "Under",
+          line: Number(p.line),
+          americanOdds: Number(p.americanOdds ?? -110),
+          projectedValue: Number(p.projectedValue ?? p.line),
+          edgeVsLine: Number(p.edgeVsLine ?? 0),
+          edgePercent: Number(p.line) ? (Number(p.edgeVsLine ?? 0) / Number(p.line)) * 100 : 0,
+          researchScore: Number(p.researchScore ?? p.confidence ?? 50),
+          confidence: Number(p.confidence ?? 50),
+          evPercent: Number(p.evPercent ?? 0),
+          explanation: (p.explanation as string[]) || [],
+          why: `${p.side} ${p.line} ${p.market}`,
+          hitWindows: [
+            { key: "l5", label: "Last 5", average: null, hitRate: 0, hitPct: 0, hits: String(p.l5 ?? "0/0") },
+            { key: "l10", label: "Last 10", average: null, hitRate: 0, hitPct: 0, hits: String(p.l10 ?? "0/0") },
+            { key: "l20", label: "Last 20", average: null, hitRate: 0, hitPct: 0, hits: String(p.l20 ?? "0/0") },
+            { key: "all", label: "All", average: null, hitRate: 0, hitPct: 0, hits: String(p.season ?? "0/0") },
+            { key: "matchup", label: "Matchup", average: null, hitRate: 0, hitPct: 0, hits: String(p.l10 ?? "0/0") },
+          ],
+          chartGames: [] as ChartGame[],
+        }));
+        return asLivePlayerResearch({
+          id: playerId,
+          name: String(top.player),
+          league: src.league,
+          team: String(top.team ?? ""),
+          opponent: String(top.opponent ?? ""),
+          position: String(top.position ?? ""),
+          initials: String(top.player)
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((s) => s[0] ?? "")
+            .join("")
+            .toUpperCase(),
+          injury: "None",
+          tipTime: String(top.tipTime ?? ""),
+          researchScore: Number(top.researchScore ?? top.confidence ?? 50),
+          dataQualityScore: Number(top.dqs ?? 70),
+          aiExplain: {
+            verdict: "neutral",
+            headline: String((top.explanation as string[] | undefined)?.[0] ?? `Live ${src.league} lean`),
+            body: `Built from live ${src.league} warehouse props.`,
+          },
+          matchup: {
+            title: `vs ${top.opponent}`,
+            defenseRank: "Live slate",
+            bullets: [`${top.market} ${top.side} ${top.line}`],
+          },
+          homeSplit: { label: "Home", samples: 0, averages: {} },
+          awaySplit: { label: "Away", samples: 0, averages: {} },
+          recentLogs: [],
+          markets,
+          boardHref: src.boardHref,
+        });
+      }
+
+      throw new Error("player");
     },
     staleTime: 120_000,
     retry: 1,
@@ -592,18 +617,23 @@ export default function PlayerPage() {
       )}
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Metric label="Our Projection" value={market.projectedValue.toFixed(1)} hint="Seraphim model" />
+        <Metric
+          label="Our Projection"
+          value={market.projectedValue.toFixed(1)}
+          hint="Seraphim model · green Over · red Under"
+          lean={market.side}
+        />
         <Metric
           label="Projection Edge"
           value={`${market.edgeVsLine > 0 ? "+" : ""}${market.edgeVsLine.toFixed(1)}`}
           hint="vs consensus line"
-          accent="emerald"
+          lean={market.side}
         />
         <Metric
           label="Proj Edge %"
           value={`${market.edgePercent > 0 ? "+" : ""}${market.edgePercent.toFixed(1)}%`}
           hint="edge / line"
-          accent="emerald"
+          lean={market.side}
         />
         <Metric label="Confidence" value={`${market.confidence}%`} hint="model certainty" />
         <Metric label="Research Score" value={`${market.researchScore}`} hint="checklist-backed" />
@@ -611,7 +641,7 @@ export default function PlayerPage() {
           label="Model EV"
           value={`+${market.evPercent.toFixed(1)}%`}
           hint="vs comparison odds"
-          accent="emerald"
+          lean={market.side}
         />
       </div>
 
@@ -666,12 +696,12 @@ function Metric({
   label,
   value,
   hint,
-  accent,
+  lean,
 }: {
   label: string;
   value: string;
   hint?: string;
-  accent?: "emerald";
+  lean?: "Over" | "Under" | string | null;
 }) {
   return (
     <div className="card-3d rounded-2xl border border-[#1a1a1a] p-3.5">
@@ -682,7 +712,7 @@ function Metric({
       <p
         className={cn(
           "mt-2 text-xl font-semibold tabular-nums",
-          accent === "emerald" ? "text-emerald-300" : "text-white",
+          lean ? leanTextClass(lean) : "text-white",
         )}
       >
         {value}

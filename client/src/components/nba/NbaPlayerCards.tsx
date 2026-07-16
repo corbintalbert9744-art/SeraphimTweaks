@@ -5,6 +5,7 @@ import { LeanBadge } from "@/components/shared/LeanBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import type { NbaPlayerCard, NbaProp } from "@/data/nbaMock";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
+import { leanTextClass } from "@/lib/leanTheme";
 import { cn } from "@/lib/utils";
 
 export function NbaPlayerCards({
@@ -72,9 +73,9 @@ export function NbaPlayerCards({
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-[#1a1a1a] bg-black/30 p-3">
-                <Avg label="PTS" value={proj.pts} />
-                <Avg label="REB" value={proj.reb} />
-                <Avg label="AST" value={proj.ast} />
+                <Avg label="PTS" value={proj.pts} side={topProp?.side} />
+                <Avg label="REB" value={proj.reb} side={topProp?.side} />
+                <Avg label="AST" value={proj.ast} side={topProp?.side} />
               </div>
 
               <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-neutral-400">{insight}</p>
@@ -111,11 +112,21 @@ export function NbaPlayerCards({
   );
 }
 
-function Avg({ label, value }: { label: string; value: number }) {
+function Avg({
+  label,
+  value,
+  side,
+}: {
+  label: string;
+  value: number;
+  side?: string;
+}) {
   return (
     <div className="text-center">
       <p className="text-[10px] uppercase tracking-wider text-neutral-500">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold tabular-nums text-neutral-100">{value.toFixed(1)}</p>
+      <p className={cn("mt-0.5 text-sm font-semibold tabular-nums", leanTextClass(side ?? "Over"))}>
+        {value.toFixed(1)}
+      </p>
     </div>
   );
 }

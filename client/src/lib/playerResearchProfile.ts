@@ -336,10 +336,11 @@ export type SportBoardCard = {
   position: string;
   initials: string;
   researchScore: number;
-  projections: Array<{ label: string; value: number }>;
+  projections: Array<{ label: string; value: number; side?: string }>;
   insight: string;
   topPropId: string;
   lean: string;
+  leanSide: "Over" | "Under";
   league: string;
 };
 
@@ -397,7 +398,7 @@ export function buildSportPlayerCards(
     const top = sorted[0];
     const meta = opts?.cards?.find((c) => c.id === playerId);
     const avg = (meta?.seasonAvg ?? meta?.projections ?? {}) as Record<string, number | undefined>;
-    const projections: Array<{ label: string; value: number }> = [];
+    const projections: Array<{ label: string; value: number; side?: string }> = [];
     if (Object.keys(avg).length) {
       const map: Array<[string, string]> = [
         ["pts", "PTS"],
@@ -413,18 +414,22 @@ export function buildSportPlayerCards(
       ];
       for (const [key, label] of map) {
         const v = avg[key];
-        if (typeof v === "number") projections.push({ label, value: v });
+        if (typeof v === "number") projections.push({ label, value: v, side: top.side });
       }
     }
     if (!projections.length) {
       for (const p of sorted.slice(0, 3)) {
         projections.push({
           label: p.market.slice(0, 6).toUpperCase(),
-          value: p.line,
+          value: typeof (p as { projectedValue?: number }).projectedValue === "number"
+            ? Number((p as { projectedValue?: number }).projectedValue)
+            : p.line,
+          side: p.side,
         });
       }
     }
 
+    const leanSide = (top.side === "Under" ? "Under" : "Over") as "Over" | "Under";
     cards.push({
       id: playerId,
       name: meta?.name ?? top.player,
@@ -437,6 +442,7 @@ export function buildSportPlayerCards(
       insight: meta?.matchupNote ?? `${top.opponent} matchup · +${top.evPercent.toFixed(1)}% EV lean`,
       topPropId: meta?.topPropId ?? top.id,
       lean: `${top.market} ${top.side} ${top.line}`,
+      leanSide,
       league: opts?.league ?? "NBA",
     });
   });

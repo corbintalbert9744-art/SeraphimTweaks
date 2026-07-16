@@ -9,7 +9,7 @@ import {
 
 export interface NbaBoardFilters {
   query: string;
-  market: NbaMarket | "All";
+  market: NbaMarket | "All" | string;
   team: string;
   side: "All" | "Over" | "Under";
   minConfidence: number;
@@ -21,11 +21,24 @@ export function NbaFiltersBar({
   filters,
   onChange,
   resultCount,
+  marketOptions,
+  teamOptions,
+  leagueLabel = "NBA",
+  minConfidenceFloor = 40,
+  minConfidenceCeiling = 95,
 }: {
   filters: NbaBoardFilters;
   onChange: (next: NbaBoardFilters) => void;
   resultCount: number;
+  marketOptions?: string[];
+  teamOptions?: string[];
+  leagueLabel?: string;
+  minConfidenceFloor?: number;
+  minConfidenceCeiling?: number;
 }) {
+  const markets = marketOptions?.length ? marketOptions : [...nbaMarketOptions];
+  const teams = teamOptions?.length ? teamOptions : [...nbaTeamOptions];
+
   return (
     <section className="card-3d rounded-2xl border border-[#1a1a1a] p-4 sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -48,13 +61,13 @@ export function NbaFiltersBar({
           <FilterSelect
             label="Market"
             value={filters.market}
-            options={nbaMarketOptions}
-            onChange={(market) => onChange({ ...filters, market: market as NbaMarket | "All" })}
+            options={markets}
+            onChange={(market) => onChange({ ...filters, market })}
           />
           <FilterSelect
             label="Team"
             value={filters.team}
-            options={[...nbaTeamOptions]}
+            options={teams}
             onChange={(team) => onChange({ ...filters, team })}
           />
           <FilterSelect
@@ -70,8 +83,8 @@ export function NbaFiltersBar({
             <div className="flex h-11 items-center gap-2 rounded-xl border border-[#1a1a1a] bg-[#111] px-3">
               <input
                 type="range"
-                min={60}
-                max={95}
+                min={minConfidenceFloor}
+                max={minConfidenceCeiling}
                 value={filters.minConfidence}
                 onChange={(e) => onChange({ ...filters, minConfidence: Number(e.target.value) })}
                 className="w-24 accent-yellow-400"
@@ -112,7 +125,8 @@ export function NbaFiltersBar({
 
       <div className="mt-4 flex items-center justify-between border-t border-[#151515] pt-3">
         <p className="text-xs text-neutral-500">
-          Showing <span className="text-neutral-300">{resultCount}</span> NBA props · live model board
+          Showing <span className="text-neutral-300">{resultCount}</span> {leagueLabel} props · live
+          model board
         </p>
         <button
           type="button"
@@ -123,7 +137,7 @@ export function NbaFiltersBar({
               market: "All",
               team: "All",
               side: "All",
-              minConfidence: 60,
+              minConfidence: minConfidenceFloor,
               sortKey: "edge",
               sortDir: "desc",
             })

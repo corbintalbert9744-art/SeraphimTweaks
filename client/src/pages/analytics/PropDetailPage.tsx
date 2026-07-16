@@ -405,7 +405,12 @@ export default function PropDetailPage() {
               Seraphim projection
             </p>
             <p className="mt-4 text-sm text-neutral-500">{prop.market}</p>
-            <p className="mt-1 text-6xl font-semibold tabular-nums tracking-tight text-white sm:text-7xl">
+            <p
+              className={cn(
+                "mt-1 text-6xl font-semibold tabular-nums tracking-tight sm:text-7xl",
+                recommendation === "Over" ? "text-emerald-400" : "text-red-400",
+              )}
+            >
               {projected.toFixed(1)}
             </p>
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-500">{prop.why}</p>

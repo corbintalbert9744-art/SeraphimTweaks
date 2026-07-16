@@ -4,6 +4,7 @@ import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { propIdToBuilderLeg } from "@/lib/addPropToBuilder";
 import type { SportBoardCard } from "@/lib/playerResearchProfile";
+import { leanTextClass } from "@/lib/leanTheme";
 import { cn } from "@/lib/utils";
 
 export function SportPlayerCards({
@@ -76,7 +77,12 @@ export function SportPlayerCards({
                   {player.projections.map((p) => (
                     <div key={p.label} className="text-center">
                       <p className="text-[10px] uppercase tracking-wider text-neutral-500">{p.label}</p>
-                      <p className="mt-0.5 text-sm font-semibold tabular-nums text-neutral-100">
+                      <p
+                        className={cn(
+                          "mt-0.5 text-sm font-semibold tabular-nums",
+                          leanTextClass(p.side ?? player.leanSide),
+                        )}
+                      >
                         {p.value.toFixed(1)}
                       </p>
                     </div>
@@ -89,7 +95,9 @@ export function SportPlayerCards({
               </p>
 
               <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#151515] pt-4">
-                <p className="min-w-0 truncate text-sm font-semibold text-neutral-100">{player.lean}</p>
+                <p className={cn("min-w-0 truncate text-sm font-semibold", leanTextClass(player.leanSide))}>
+                  {player.lean}
+                </p>
                 <button
                   type="button"
                   disabled={added || !leg}

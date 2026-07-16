@@ -263,12 +263,16 @@ export function registerDataPlatformProxy(
 
   proxyLeagueGet("/api/mlb/games", "/api/v1/mlb/games");
   proxyLeagueGet("/api/mlb/props", "/api/v1/mlb/props", 180_000);
+  proxyLeagueGet("/api/mlb/players", "/api/v1/mlb/players", 180_000);
   proxyLeagueGet("/api/nhl/games", "/api/v1/nhl/games");
   proxyLeagueGet("/api/nhl/props", "/api/v1/nhl/props", 180_000);
+  proxyLeagueGet("/api/nhl/players", "/api/v1/nhl/players", 180_000);
   proxyLeagueGet("/api/soccer/games", "/api/v1/soccer/games");
-  proxyLeagueGet("/api/soccer/props", "/api/v1/soccer/props");
+  proxyLeagueGet("/api/soccer/props", "/api/v1/soccer/props", 180_000);
+  proxyLeagueGet("/api/soccer/players", "/api/v1/soccer/players", 180_000);
   proxyLeagueGet("/api/tennis/games", "/api/v1/tennis/games");
-  proxyLeagueGet("/api/tennis/props", "/api/v1/tennis/props");
+  proxyLeagueGet("/api/tennis/props", "/api/v1/tennis/props", 180_000);
+  proxyLeagueGet("/api/tennis/players", "/api/v1/tennis/players", 180_000);
   // prop detail proxies
   app.get("/api/mlb/props/:id", async (req, res) => {
     try {

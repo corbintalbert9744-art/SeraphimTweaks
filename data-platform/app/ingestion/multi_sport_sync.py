@@ -129,7 +129,8 @@ def sync_nhl_warehouse(db: Session, *, date: Optional[str] = None, max_teams: in
 
 
 def sync_soccer_warehouse(db: Session, *, date: Optional[str] = None) -> dict[str, Any]:
-    """ESPN soccer schedules (no key) + optional Football-Data.org when keyed."""
+    """ESPN soccer schedules + PrizePicks-style pick'em slate (comparison lines)."""
+    from app.ingestion.pickem_slate import ensure_soccer_pickem_board
     from app.providers.espn.soccer import EspnSoccerProvider
 
     stages: dict[str, Any] = {}
@@ -158,17 +159,19 @@ def sync_soccer_warehouse(db: Session, *, date: Optional[str] = None) -> dict[st
             "note": "Optional enrichment — ESPN schedule already imported without a key.",
         }
 
-    stages["board"] = {
-        "props": 0,
-        "note": "Match schedules imported from ESPN. Player prop logs require an events provider — not fabricated.",
-    }
+    try:
+        stages["board"] = ensure_soccer_pickem_board(db)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("Soccer pickem board failed")
+        stages["board"] = {"props": 0, "ok": False, "error": str(exc)}
     stages["ok"] = True
     stages["provider"] = "espn-soccer"
     return stages
 
 
 def sync_tennis_warehouse(db: Session, *, tour: str = "ATP", date: Optional[str] = None) -> dict[str, Any]:
-    """ESPN ATP/WTA schedules (no key). No fabricated match props."""
+    """ESPN ATP/WTA schedules + PrizePicks-style pick'em slate (comparison lines)."""
+    from app.ingestion.pickem_slate import ensure_tennis_pickem_board
     from app.providers.espn.tennis import EspnTennisProvider
 
     code = "WTA" if tour.upper() == "WTA" else "ATP"
@@ -190,15 +193,11 @@ def sync_tennis_warehouse(db: Session, *, tour: str = "ATP", date: Optional[str]
         job.rows_written = players_n
         stages["players"] = {"imported": players_n}
 
-    # Explicit: no fabricated prop boards without match-stat logs
-    stages["board"] = {
-        "props": 0,
-        "note": (
-            "ESPN schedule + slate players imported. Match prop gamelogs are not fabricated. "
-            "ODDS_API_KEY enables tournament odds when sport keys are verified; "
-            "Tennis Abstract is not scraped."
-        ),
-    }
+    try:
+        stages["board"] = ensure_tennis_pickem_board(db, tour=code)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("%s pickem board failed", code)
+        stages["board"] = {"props": 0, "ok": False, "error": str(exc)}
     stages["ok"] = True
     return stages
 

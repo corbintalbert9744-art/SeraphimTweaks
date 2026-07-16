@@ -12,6 +12,36 @@ function hrefForPlayer(player: PlayerSearchResult): string {
   return `/player/${player.id}`;
 }
 
+async function fetchPlayers(path: string, league: string): Promise<PlayerSearchResult[]> {
+  const res = await fetch(path);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return ((data.players ?? []) as Array<Record<string, unknown>>).map(
+    (p): PlayerSearchResult => ({
+      id: String(p.id),
+      name: String(p.name ?? ""),
+      league: (p.league as PlayerSearchResult["league"]) || (league as PlayerSearchResult["league"]),
+      team: String(p.team ?? ""),
+      position: String(p.position ?? ""),
+    }),
+  );
+}
+
+/** Deduplicate players that appear on multiple boards under the same id. */
+function mergePlayers(lists: PlayerSearchResult[][]): PlayerSearchResult[] {
+  const seen = new Set<string>();
+  const out: PlayerSearchResult[] = [];
+  for (const list of lists) {
+    for (const p of list) {
+      const key = `${p.league}:${p.id}`;
+      if (seen.has(key) || !p.name) continue;
+      seen.add(key);
+      out.push(p);
+    }
+  }
+  return out;
+}
+
 export function TopNav() {
   const { collapsed, setMobileOpen } = useSidebar();
   const [, setLocation] = useLocation();
@@ -26,48 +56,25 @@ export function TopNav() {
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const nbaPlayers = useQuery({
-    queryKey: ["nba-players-search"],
+  const searchPlayers = useQuery({
+    queryKey: ["global-players-search"],
     queryFn: async () => {
-      const res = await fetch("/api/nba/players");
-      if (!res.ok) return [] as PlayerSearchResult[];
-      const data = await res.json();
-      return ((data.players ?? []) as Array<Record<string, unknown>>).map(
-        (p): PlayerSearchResult => ({
-          id: String(p.id),
-          name: String(p.name ?? ""),
-          league: "NBA",
-          team: String(p.team ?? ""),
-          position: String(p.position ?? ""),
-        }),
-      );
+      const batches = await Promise.all([
+        fetchPlayers("/api/nba/players", "NBA"),
+        fetchPlayers("/api/nfl/players", "NFL"),
+        fetchPlayers("/api/wnba/players", "WNBA"),
+        fetchPlayers("/api/mlb/players", "MLB"),
+        fetchPlayers("/api/nhl/players", "NHL"),
+        fetchPlayers("/api/soccer/players", "Soccer"),
+        fetchPlayers("/api/tennis/players?tour=ATP", "ATP"),
+        fetchPlayers("/api/tennis/players?tour=WTA", "WTA"),
+      ]);
+      return mergePlayers(batches);
     },
     staleTime: 120_000,
   });
 
-  const nflPlayers = useQuery({
-    queryKey: ["nfl-players-search"],
-    queryFn: async () => {
-      const res = await fetch("/api/nfl/players");
-      if (!res.ok) return [] as PlayerSearchResult[];
-      const data = await res.json();
-      return ((data.players ?? []) as Array<Record<string, unknown>>).map(
-        (p): PlayerSearchResult => ({
-          id: String(p.id),
-          name: String(p.name ?? ""),
-          league: "NFL",
-          team: String(p.team ?? ""),
-          position: String(p.position ?? ""),
-        }),
-      );
-    },
-    staleTime: 120_000,
-  });
-
-  const searchIndex = useMemo(
-    () => [...(nbaPlayers.data ?? []), ...(nflPlayers.data ?? [])],
-    [nbaPlayers.data, nflPlayers.data],
-  );
+  const searchIndex = searchPlayers.data ?? [];
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -17,7 +17,7 @@ const defaultFilters: NbaBoardFilters = {
   market: "All",
   team: "All",
   side: "All",
-  minConfidence: 50,
+  minConfidence: 40,
   sortKey: "edge",
   sortDir: "desc",
 };
@@ -102,6 +102,22 @@ export function SportResearchBoard({
   }, [board.data?.props]);
 
   const livePlayers = board.data?.players ?? [];
+
+  const marketOptions = useMemo(() => {
+    const fromApi = (board.data as { markets?: string[] } | undefined)?.markets;
+    if (fromApi?.length) return fromApi;
+    const set = new Set<string>(["All"]);
+    for (const p of liveProps) set.add(p.market);
+    return Array.from(set);
+  }, [board.data, liveProps]);
+
+  const teamOptions = useMemo(() => {
+    const fromApi = (board.data as { teams?: string[] } | undefined)?.teams;
+    if (fromApi?.length) return fromApi;
+    const set = new Set<string>(["All"]);
+    for (const p of liveProps) if (p.team) set.add(p.team);
+    return Array.from(set);
+  }, [board.data, liveProps]);
 
   const filtered = useMemo(() => {
     const q = filters.query.trim().toLowerCase();
@@ -242,6 +258,10 @@ export function SportResearchBoard({
                   filters={filters}
                   onChange={setFilters}
                   resultCount={filtered.length}
+                  marketOptions={marketOptions}
+                  teamOptions={teamOptions}
+                  leagueLabel={league}
+                  minConfidenceFloor={40}
                 />
               </div>
               {livePlayers.length > 0 && (

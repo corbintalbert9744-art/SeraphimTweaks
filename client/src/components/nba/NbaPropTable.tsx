@@ -6,7 +6,7 @@ import { ConfidenceBadge } from "@/components/shared/ConfidenceBadge";
 import { LeanBadge } from "@/components/shared/LeanBadge";
 import { formatAmericanOdds, type NbaProp } from "@/data/nbaMock";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
-import { hitRateTextClass } from "@/lib/leanTheme";
+import { hitRateTextClass, leanTextClass } from "@/lib/leanTheme";
 import { cn } from "@/lib/utils";
 
 export function NbaPropTable({
@@ -79,7 +79,7 @@ export function NbaPropTable({
                       {row.market}
                     </Link>
                   </td>
-                  <td className="px-4 py-4 tabular-nums text-white">
+                  <td className={cn("px-4 py-4 tabular-nums font-semibold", leanTextClass(row.side))}>
                     {(row.projectedValue ?? row.line).toFixed(1)}
                   </td>
                   <td className="px-4 py-4">

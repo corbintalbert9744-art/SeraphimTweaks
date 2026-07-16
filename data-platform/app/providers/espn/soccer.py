@@ -66,6 +66,8 @@ class EspnSoccerProvider:
                 away = competitors.get("away") or {}
                 ht = home.get("team") or {}
                 at = away.get("team") or {}
+                # path like "soccer/eng.1/scoreboard" → league slug "eng.1"
+                league_slug = path.split("/")[1] if "/" in path else "eng.1"
                 games.append(
                     NormalizedGame(
                         external_id=str(e.get("id") or ""),
@@ -83,7 +85,11 @@ class EspnSoccerProvider:
                         venue=(comps.get("venue") or {}).get("fullName"),
                         home_logo=(ht.get("logos") or [{}])[0].get("href") if ht.get("logos") else None,
                         away_logo=(at.get("logos") or [{}])[0].get("href") if at.get("logos") else None,
-                        raw={"source": "espn-soccer", "path": path},
+                        raw={
+                            "source": "espn-soccer",
+                            "path": path,
+                            "leagueSlug": league_slug,
+                        },
                     )
                 )
         return [g for g in games if g.external_id]
