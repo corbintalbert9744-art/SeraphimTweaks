@@ -108,6 +108,8 @@ export function SportResearchBoard({
         requiresConfiguration?: boolean;
         error?: string;
         disclaimer?: string;
+        rateLimited?: boolean;
+        cached?: boolean;
       }>;
     },
     staleTime: 120_000,
@@ -121,6 +123,7 @@ export function SportResearchBoard({
   }, [board.data?.props]);
 
   const livePlayers = board.data?.players ?? [];
+  const rateLimited = Boolean(board.data?.rateLimited);
 
   const marketOptions = useMemo(() => {
     const fromApi = (board.data as { markets?: string[] } | undefined)?.markets;
@@ -225,8 +228,21 @@ export function SportResearchBoard({
       </div>
 
       {note && (
-        <p className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-200/90">
-          {note}
+        <p
+          className={
+            rateLimited
+              ? "mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-100"
+              : "mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-200/90"
+          }
+        >
+          {rateLimited ? (
+            <>
+              <span className="font-semibold text-amber-200">PropLine daily limit reached. </span>
+              {note}
+            </>
+          ) : (
+            note
+          )}
         </p>
       )}
 

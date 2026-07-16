@@ -33,7 +33,8 @@ from app.ingestion.platform_board import (
     slugs_for_app,
 )
 from app.ingestion.warehouse import insert_odds, upsert_gamelog, upsert_player
-from app.providers.base import NormalizedOddsQuote, NormalizedPlayer, run_provider_job
+from app.providers.base import NormalizedOddsQuote, NormalizedPlayer, ProviderRateLimitError, run_provider_job
+from app.providers.propline import rate_limit as propline_rate_limit
 from app.providers.propline.adapter import PropLineAdapter
 from app.providers.propline.markets import normalize_league
 
@@ -128,85 +129,120 @@ def _ensure_platform_player(db: Session, league: str, name: str, platform: str) 
     )
 
 
-def _resolve_stub_external_id(db: Session, *, league: str, player: Player) -> None:
-    """Attach a real provider id to pick'em stub players so gamelogs can hydrate."""
+def _lookup_provider_external_id(db: Session, *, league: str, name: str) -> Optional[str]:
+    """Resolve a display name to a real provider id (does not mutate Player rows)."""
     code = normalize_league(league)
-    ext = str(player.external_id or "")
-    if ext and not ext.startswith("pickem:"):
-        return
-    name = (player.full_name or "").strip()
-    if not name:
-        return
+    q = (name or "").strip()
+    if not q:
+        return None
     try:
         if code == "MLB":
             from app.providers.mlb.statsapi import MlbStatsApiProvider
 
-            found = MlbStatsApiProvider().search_player(name)
-            if not found:
-                return
-            # Prefer an existing warehouse row with this MLB id (merge stub → real)
-            existing = db.execute(
-                select(Player).where(
-                    Player.league == code,
-                    Player.external_id == found.external_id,
-                )
-            ).scalar_one_or_none()
-            if existing and existing.id != player.id:
-                # Point callers at the real player by copying identity onto stub usage sites
-                # is handled by re-linking props; for hydrate we just use the real row's id
-                # via returning early after we switch references in remodel.
-                player.external_id = found.external_id
-                if found.position and not player.position:
-                    player.position = found.position
-                db.flush()
-                return
-            player.external_id = found.external_id
-            if found.position and not player.position:
-                player.position = found.position
-            db.flush()
-        elif code in {"NBA", "WNBA"}:
-            # Best-effort: match another warehouse player with same name + real id
+            found = MlbStatsApiProvider().search_player(q)
+            return found.external_id if found else None
+        if code in {"NBA", "WNBA"}:
             peers = [
                 p
                 for p in db.execute(select(Player).where(Player.league == code)).scalars().all()
-                if (p.full_name or "").lower().strip() == name.lower()
-                and p.id != player.id
+                if (p.full_name or "").lower().strip() == q.lower()
                 and p.external_id
                 and not str(p.external_id).startswith("pickem:")
             ]
-            if peers:
-                peers.sort(
-                    key=lambda p: 1
-                    if db.execute(
-                        select(PlayerGameLog.id).where(PlayerGameLog.player_id == p.id).limit(1)
-                    ).first()
-                    else 0,
-                    reverse=True,
-                )
-                player.external_id = peers[0].external_id
-                if peers[0].position and not player.position:
-                    player.position = peers[0].position
-                db.flush()
+            if not peers:
+                return None
+            peers.sort(
+                key=lambda p: 1
+                if db.execute(
+                    select(PlayerGameLog.id).where(PlayerGameLog.player_id == p.id).limit(1)
+                ).first()
+                else 0,
+                reverse=True,
+            )
+            return str(peers[0].external_id)
     except Exception as exc:  # noqa: BLE001
-        log.debug("resolve stub %s/%s: %s", code, name, exc)
+        log.debug("lookup external id %s/%s: %s", code, q, exc)
+    return None
 
 
-def _hydrate_player_logs(db: Session, *, league: str, player: Player) -> None:
-    """Fetch gamelogs when missing so the model can project vs live pick'em lines."""
+def _resolve_stub_external_id(db: Session, *, league: str, player: Player) -> Optional[str]:
+    """Attach a real provider id to pick'em stub players when safe; return id to hydrate with."""
     code = normalize_league(league)
+    ext = str(player.external_id or "")
+    if ext and not ext.startswith("pickem:"):
+        return ext
+    found_id = _lookup_provider_external_id(db, league=code, name=player.full_name or "")
+    if not found_id:
+        return None
+    existing = db.execute(
+        select(Player).where(Player.league == code, Player.external_id == found_id)
+    ).scalar_one_or_none()
+    if existing and existing.id != player.id:
+        # Another warehouse row already owns this provider id — re-link props to it
+        # and hydrate that row instead of violating the unique constraint.
+        for prop in (
+            db.execute(select(Prop).where(Prop.player_id == player.id)).scalars().all()
+        ):
+            prop.player_id = existing.id
+        db.flush()
+        return str(existing.external_id)
+    try:
+        player.external_id = found_id
+        db.flush()
+    except Exception as exc:  # noqa: BLE001
+        log.debug("resolve stub assign %s/%s: %s", code, player.full_name, exc)
+        db.rollback()
+        return found_id
+    return found_id
+
+
+def _hydrate_player_logs(db: Session, *, league: str, player: Player) -> Player:
+    """Fetch gamelogs when missing so the model can project vs live pick'em lines.
+
+    Returns the player row to use for modeling (may switch to a real warehouse
+    player when a stub collides on external_id).
+    """
+    code = normalize_league(league)
+    # If stub resolves to an existing real player, model that one instead
+    ext = str(player.external_id or "")
+    if ext.startswith("pickem:") or not ext:
+        found_id = _lookup_provider_external_id(db, league=code, name=player.full_name or "")
+        if found_id:
+            existing = db.execute(
+                select(Player).where(Player.league == code, Player.external_id == found_id)
+            ).scalar_one_or_none()
+            if existing and existing.id != player.id:
+                for prop in (
+                    db.execute(select(Prop).where(Prop.player_id == player.id)).scalars().all()
+                ):
+                    prop.player_id = existing.id
+                db.flush()
+                player = existing
+            else:
+                try:
+                    player.external_id = found_id
+                    db.flush()
+                except Exception:  # noqa: BLE001
+                    db.rollback()
+
     if db.execute(
         select(PlayerGameLog.id).where(PlayerGameLog.player_id == player.id).limit(1)
     ).first():
-        return
-    _resolve_stub_external_id(db, league=code, player=player)
+        return player
+
     ext = player.external_id
-    if not ext or str(ext).startswith("pickem:"):
-        return
+    hydrate_ext = str(ext) if ext and not str(ext).startswith("pickem:") else None
+    if not hydrate_ext:
+        hydrate_ext = _lookup_provider_external_id(
+            db, league=code, name=player.full_name or ""
+        )
+    if not hydrate_ext:
+        return player
     try:
         if code == "MLB":
             from app.providers.mlb.statsapi import MlbStatsApiProvider
 
-            for gl in MlbStatsApiProvider().fetch_gamelog("MLB", str(ext)):
+            for gl in MlbStatsApiProvider().fetch_gamelog("MLB", str(hydrate_ext)):
                 upsert_gamelog(db, gl, player.id)
             db.flush()
         elif code in {"NBA", "WNBA"}:
@@ -214,11 +250,12 @@ def _hydrate_player_logs(db: Session, *, league: str, player: Player) -> None:
 
             providers = get_wnba_providers() if code == "WNBA" else get_nba_providers()
             if providers.gamelog:
-                for gl in providers.gamelog.fetch_gamelog(code, str(ext)):
+                for gl in providers.gamelog.fetch_gamelog(code, str(hydrate_ext)):
                     upsert_gamelog(db, gl, player.id)
                 db.flush()
     except Exception as exc:  # noqa: BLE001
         log.debug("hydrate logs %s/%s: %s", code, player.full_name, exc)
+    return player
 
 
 def _market_samples(logs: list[PlayerGameLog], market: str) -> list[float]:
@@ -268,6 +305,7 @@ def _group_platform_quotes(
                 "over": None,
                 "under": None,
                 "projection_ids": [],
+                "commence_time": (q.raw or {}).get("commence_time"),
             },
         )
         if q.side == "Over":
@@ -283,6 +321,9 @@ def _group_platform_quotes(
         if not bucket.get("home_team") and q.home_team:
             bucket["home_team"] = q.home_team
             bucket["away_team"] = q.away_team
+        tip = (q.raw or {}).get("commence_time")
+        if tip and not bucket.get("commence_time"):
+            bucket["commence_time"] = tip
     return list(buckets.values())
 
 
@@ -317,7 +358,7 @@ def _build_prediction_for_player(
     market: str,
     platform_line: float,
 ) -> tuple[Optional[Any], list[float], list[bool], list, list]:
-    _hydrate_player_logs(db, league=league, player=player)
+    player = _hydrate_player_logs(db, league=league, player=player)
     logs = (
         db.execute(
             select(PlayerGameLog)
@@ -483,51 +524,98 @@ def sync_pickem_platform_board(
         if cached is not None:
             return cached
 
-    adapter = PropLineAdapter(api_key=settings.propline_api_key or "", max_events=16)
+    def _stale_or_rate_limit_empty(exc: BaseException | str, *, rate_limited: bool = False) -> dict[str, Any]:
+        msg = str(exc)
+        limited = rate_limited or (
+            "429" in msg
+            or "daily limit" in msg.lower()
+            or "daily_limit" in msg.lower()
+            or "rate limit" in msg.lower()
+            or propline_rate_limit.is_blocked()
+        )
+        stale = _list_cached_platform_board(
+            db,
+            league=code,
+            platform=app,
+            slugs=slugs,
+            allow_stale=True,
+            max_age=timedelta(days=2),
+        )
+        until = propline_rate_limit.blocked_until()
+        reset_hint = (
+            f" PropLine daily free-tier limit hit — new lines (including tomorrow's PrizePicks slate) "
+            f"resume after {until.strftime('%b %d %H:%M UTC') if until else 'the next UTC day'}."
+            if limited
+            else ""
+        )
+        if stale is not None:
+            stale["note"] = (
+                f"Showing last live {label} lines from warehouse.{reset_hint} "
+                "Projections are Seraphim estimates vs those lines."
+            )
+            stale["cached"] = True
+            stale["refreshError"] = msg
+            stale["rateLimited"] = limited
+            return stale
+        return {
+            "ok": False,
+            "league": code,
+            "platform": app,
+            "platformLabel": label,
+            "props": [],
+            "players": [],
+            "count": 0,
+            "updatedAt": None,
+            "propsUpdatedAt": None,
+            "dataSource": f"pickem:{app}",
+            "error": msg,
+            "rateLimited": limited,
+            "note": (
+                f"No cached {label} lines for {code}.{reset_hint} "
+                "We only show players currently listed on the app — never invented lines."
+            ).strip(),
+        }
+
+    # Circuit open: skip PropLine entirely (scheduler was burning the daily quota)
+    if propline_rate_limit.is_blocked():
+        return _stale_or_rate_limit_empty(
+            propline_rate_limit.last_message() or "propline daily limit reached",
+            rate_limited=True,
+        )
+
+    adapter = PropLineAdapter(api_key=settings.propline_api_key or "", max_events=24)
     with run_provider_job(db, provider="propline-pickem", league=code, job=f"sync_{app}") as job:
         try:
+            # Upcoming slate window (today + tomorrow) so Jul 17 PrizePicks tips
+            # appear when browsing on Jul 16.
             quotes = adapter.fetch_pickem_prop_odds(
-                code, platforms=set(slugs), max_events=16
+                code,
+                platforms=set(slugs),
+                max_events=24,
+                horizon_hours=48,
             )
+        except ProviderRateLimitError as exc:
+            log.warning("pickem sync %s/%s rate limited: %s", app, code, exc)
+            job.error = str(exc)
+            return _stale_or_rate_limit_empty(exc, rate_limited=True)
         except Exception as exc:  # noqa: BLE001
             log.exception("pickem sync %s/%s failed", app, code)
             job.error = str(exc)
-            stale = _list_cached_platform_board(
-                db,
-                league=code,
-                platform=app,
-                slugs=slugs,
-                allow_stale=True,
-                max_age=timedelta(days=2),
-            )
-            if stale is not None:
-                stale["note"] = (
-                    f"Showing last live {label} lines from warehouse "
-                    f"(PropLine refresh failed: {exc}). Projections remodeled vs those lines."
-                )
-                stale["cached"] = True
-                stale["refreshError"] = str(exc)
-                return stale
-            return {
-                "ok": False,
-                "league": code,
-                "platform": app,
-                "platformLabel": label,
-                "props": [],
-                "players": [],
-                "count": 0,
-                "updatedAt": None,
-                "propsUpdatedAt": None,
-                "dataSource": f"pickem:{app}",
-                "error": str(exc),
-                "note": f"Failed to fetch live {label} lines: {exc}",
-            }
+            return _stale_or_rate_limit_empty(exc)
 
         if not quotes:
             support = adapter.league_support(code)
             reason = support.get("reason") or (
                 f"PropLine returned no current {label} player props for {code}."
             )
+            if (
+                "429" in reason
+                or "daily limit" in reason.lower()
+                or "daily_limit" in reason.lower()
+                or "rate" in reason.lower()
+                or propline_rate_limit.is_blocked()
+            ):
+                return _stale_or_rate_limit_empty(reason, rate_limited=True)
             stale = _list_cached_platform_board(
                 db,
                 league=code,
@@ -536,16 +624,6 @@ def sync_pickem_platform_board(
                 allow_stale=True,
                 max_age=timedelta(days=2),
             )
-            # Prefer warehouse lines when PropLine is rate-limited or briefly empty
-            if stale is not None and (
-                "429" in reason or "rate" in reason.lower() or "sports lookup failed" in reason.lower()
-            ):
-                stale["note"] = (
-                    f"Showing last live {label} lines from warehouse ({reason}). "
-                    "Projections remodeled vs those lines."
-                )
-                stale["cached"] = True
-                return stale
             job.rows_written = 0
             db.commit()
             if stale is not None:
@@ -778,7 +856,12 @@ def sync_pickem_platform_board(
                     "isModelEstimate": prediction is not None,
                     "modelPending": prediction is None,
                     "explanation": explain,
-                    "tipTime": game_row.tipoff_at.isoformat() if game_row else None,
+                    "tipTime": (
+                        game_row.tipoff_at.isoformat()
+                        if game_row
+                        else (g.get("commence_time") or None)
+                    ),
+                    "commenceTime": g.get("commence_time"),
                     "injury": "None",
                     "projectedMinutes": (
                         mean([m for m in minutes if m is not None][:5])

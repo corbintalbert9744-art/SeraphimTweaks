@@ -11,7 +11,7 @@ Never fabricates lines — unsupported sports/markets return empty + status.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import httpx
@@ -22,6 +22,7 @@ from app.providers.base import (
     ProviderMeta,
     ProviderRateLimitError,
 )
+from app.providers.propline import rate_limit as propline_rate_limit
 from app.providers.propline.markets import (
     LEAGUE_EXTRA_SPORTS,
     PICKEM_SLUGS,
@@ -36,6 +37,11 @@ from app.providers.propline.markets import (
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://api.prop-line.com/v1"
+
+# Prefer the upcoming slate PrizePicks users see (today + tomorrow), not a random
+# slice of PropLine's event list.
+UPCOMING_HORIZON_HOURS = 48
+UPCOMING_LOOKBACK_HOURS = 4  # keep tips that just started
 
 
 class PropLineAdapter:
@@ -93,6 +99,12 @@ class PropLineAdapter:
     def _get(self, path: str, params: Optional[dict[str, Any]] = None) -> Any:
         if not self.api_key:
             raise RuntimeError("PROPLINE_API_KEY not configured")
+        if propline_rate_limit.is_blocked():
+            until = propline_rate_limit.blocked_until()
+            raise ProviderRateLimitError(
+                "propline",
+                f"daily limit reached — retry after {until.isoformat() if until else 'reset'}",
+            )
         url = f"{BASE_URL}{path}"
         with httpx.Client(timeout=self.timeout) as client:
             res = client.get(url, params=params or {}, headers=self._headers())
@@ -101,7 +113,20 @@ class PropLineAdapter:
             if res.status_code == 404:
                 return None
             if res.status_code == 429:
-                raise ProviderRateLimitError("propline", "HTTP 429")
+                detail = ""
+                try:
+                    body = res.json()
+                    detail = str(
+                        (body.get("detail") or {}).get("error")
+                        or (body.get("detail") or {}).get("message")
+                        or body.get("detail")
+                        or ""
+                    )
+                except Exception:  # noqa: BLE001
+                    detail = res.text[:200]
+                if "daily_limit" in detail.lower() or "1000" in detail:
+                    propline_rate_limit.trip(detail or "daily_limit_exceeded")
+                raise ProviderRateLimitError("propline", detail or "HTTP 429")
             res.raise_for_status()
             return res.json()
 
@@ -194,44 +219,89 @@ class PropLineAdapter:
         platforms: Optional[set[str]] = None,
         date: Optional[str] = None,
         max_events: Optional[int] = None,
+        horizon_hours: int = UPCOMING_HORIZON_HOURS,
     ) -> list[NormalizedOddsQuote]:
         """Fetch live player props, optionally restricted to pick'em bookmaker keys.
 
         ``platforms`` e.g. ``{"prizepicks"}`` — only those bookmakers are kept.
         Sportsbook odds are never returned when platforms is a pick'em set.
         Never fabricates lines.
+
+        Uses PropLine's bulk ``/odds`` endpoint (1 request per sport) and keeps
+        events whose commence_time falls in the upcoming slate window so boards
+        match what PrizePicks shows for today/tomorrow.
         """
-        _ = date
         if not self.api_key:
             return []
+        if propline_rate_limit.is_blocked():
+            until = propline_rate_limit.blocked_until()
+            raise ProviderRateLimitError(
+                "propline",
+                f"daily limit reached — retry after {until.isoformat() if until else 'reset'}",
+            )
+
         code = normalize_league(league)
         support = self.league_support(code)
         if not support.get("supported"):
-            log.info("PropLine skip %s: %s", code, support.get("reason"))
+            reason = support.get("reason") or "unsupported"
+            log.info("PropLine skip %s: %s", code, reason)
+            if "429" in reason or "daily limit" in reason.lower() or "rate" in reason.lower():
+                raise ProviderRateLimitError("propline", reason)
             return []
 
         sport = support["sportKey"]
         markets = support["markets"]
-        sport_keys = [sport]
+        # Soccer on US pick'em apps is usually MLS — don't burn quota on 5 EU leagues.
         if code == "Soccer":
-            sport_keys.extend(SOCCER_EXTRA_SPORTS)
+            ordered = ["soccer_mls", sport, *SOCCER_EXTRA_SPORTS]
         else:
-            sport_keys.extend(LEAGUE_EXTRA_SPORTS.get(code, ()))
+            ordered = [sport, *LEAGUE_EXTRA_SPORTS.get(code, ())]
+        sport_keys: list[str] = []
+        seen_keys: set[str] = set()
+        for key in ordered:
+            if key and key not in seen_keys:
+                seen_keys.add(key)
+                sport_keys.append(key)
 
         allowed = {p.lower() for p in platforms} if platforms else None
         limit = max_events if max_events is not None else self.max_events
+        target_day = _parse_target_day(date)
         out: list[NormalizedOddsQuote] = []
+        rate_limited = False
+        last_rl: Optional[Exception] = None
+
         for sk in sport_keys:
+            if propline_rate_limit.is_blocked():
+                rate_limited = True
+                break
             try:
                 if not self.sport_is_active(sk):
                     continue
-                out.extend(
-                    self._fetch_sport_props(
-                        code, sk, markets, bookmakers=allowed, max_events=limit
-                    )
+                batch = self._fetch_sport_props(
+                    code,
+                    sk,
+                    markets,
+                    bookmakers=allowed,
+                    max_events=limit,
+                    horizon_hours=horizon_hours,
+                    target_day=target_day,
                 )
+                out.extend(batch)
+                # Once we have pick'em quotes for Soccer MLS, stop expanding EU leagues.
+                if code == "Soccer" and batch and sk == "soccer_mls":
+                    break
+            except ProviderRateLimitError as exc:
+                rate_limited = True
+                last_rl = exc
+                log.warning("PropLine %s/%s rate limited: %s", code, sk, exc)
+                break
             except Exception as exc:  # noqa: BLE001
                 log.warning("PropLine %s/%s failed: %s", code, sk, exc)
+
+        if not out and rate_limited and last_rl is not None:
+            raise last_rl
+        if not out and rate_limited:
+            raise ProviderRateLimitError("propline", "daily limit reached")
         return out
 
     def _fetch_sport_props(
@@ -242,35 +312,74 @@ class PropLineAdapter:
         *,
         bookmakers: Optional[set[str]] = None,
         max_events: Optional[int] = None,
+        horizon_hours: int = UPCOMING_HORIZON_HOURS,
+        target_day: Optional[datetime] = None,
     ) -> list[NormalizedOddsQuote]:
-        events = self._get(f"/sports/{sport_key}/events")
-        if not events or not isinstance(events, list):
-            return []
-        out: list[NormalizedOddsQuote] = []
+        """Fetch props via bulk /odds (1 call), fall back to per-event only if needed."""
         markets_param = ",".join(markets)
         limit = max_events if max_events is not None else self.max_events
-        for event in events[:limit]:
+
+        # Preferred path: one bulk odds call covers the whole sport slate.
+        try:
+            bulk = self._get(
+                f"/sports/{sport_key}/odds",
+                {"markets": markets_param},
+            )
+        except ProviderRateLimitError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            log.debug("PropLine bulk odds %s failed (%s); falling back to events", sport_key, exc)
+            bulk = None
+
+        events: list[dict[str, Any]] = []
+        if isinstance(bulk, list) and bulk:
+            events = [e for e in bulk if isinstance(e, dict)]
+        else:
+            # Fallback: list events then odds per event (expensive — avoid when possible)
+            listed = self._get(f"/sports/{sport_key}/events")
+            if not listed or not isinstance(listed, list):
+                return []
+            for event in _select_upcoming_events(
+                listed, limit=limit, horizon_hours=horizon_hours, target_day=target_day
+            ):
+                eid = event.get("id")
+                if eid is None:
+                    continue
+                try:
+                    payload = self._get(
+                        f"/sports/{sport_key}/events/{eid}/odds",
+                        {"markets": markets_param},
+                    )
+                except ProviderRateLimitError:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("PropLine event %s odds: %s", eid, exc)
+                    continue
+                if not payload or not isinstance(payload, dict):
+                    continue
+                payload.setdefault("home_team", event.get("home_team"))
+                payload.setdefault("away_team", event.get("away_team"))
+                payload.setdefault("commence_time", event.get("commence_time"))
+                payload.setdefault("sport_key", sport_key)
+                payload.setdefault("id", eid)
+                events.append(payload)
+
+        selected = _select_upcoming_events(
+            events, limit=limit, horizon_hours=horizon_hours, target_day=target_day
+        )
+        out: list[NormalizedOddsQuote] = []
+        for event in selected:
             eid = event.get("id")
             if eid is None:
                 continue
-            try:
-                payload = self._get(
-                    f"/sports/{sport_key}/events/{eid}/odds",
-                    {"markets": markets_param},
-                )
-            except Exception as exc:  # noqa: BLE001
-                log.debug("PropLine event %s odds: %s", eid, exc)
-                continue
-            if not payload:
-                continue
-            # Prefer event-level team names when odds payload omits them
-            if isinstance(payload, dict):
-                payload.setdefault("home_team", event.get("home_team"))
-                payload.setdefault("away_team", event.get("away_team"))
-                payload.setdefault("sport_key", sport_key)
+            event.setdefault("sport_key", sport_key)
             out.extend(
                 self._parse_event_odds(
-                    league, str(eid), payload, bookmakers=bookmakers, sport_key=sport_key
+                    league,
+                    str(eid),
+                    event,
+                    bookmakers=bookmakers,
+                    sport_key=sport_key,
                 )
             )
         return out
@@ -289,6 +398,7 @@ class PropLineAdapter:
         home = payload.get("home_team")
         away = payload.get("away_team")
         sk = sport_key or payload.get("sport_key")
+        commence = _parse_ts(payload.get("commence_time") or payload.get("commenceTime"))
         for book in payload.get("bookmakers") or []:
             slug = str(book.get("key") or "").lower()
             if bookmakers is not None and slug not in bookmakers:
@@ -357,6 +467,7 @@ class PropLineAdapter:
                                 "dfs_odds_type": dfs_type,
                                 "payout_multiplier": outcome.get("payout_multiplier"),
                                 "market_key": mkey,
+                                "commence_time": commence.isoformat() if commence else None,
                             },
                         )
                     )
@@ -410,3 +521,67 @@ def _parse_ts(raw: Any) -> Optional[datetime]:
         return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _parse_target_day(date: Optional[str]) -> Optional[datetime]:
+    """Optional YYYY-MM-DD (or YYYYMMDD) — prefer events on that UTC calendar day."""
+    if not date:
+        return None
+    raw = date.strip()
+    try:
+        if "-" in raw:
+            d = datetime.strptime(raw[:10], "%Y-%m-%d")
+        else:
+            d = datetime.strptime(raw[:8], "%Y%m%d")
+        return d.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _event_commence(event: dict[str, Any]) -> Optional[datetime]:
+    return _parse_ts(event.get("commence_time") or event.get("commenceTime"))
+
+
+def _select_upcoming_events(
+    events: list[dict[str, Any]],
+    *,
+    limit: int,
+    horizon_hours: int = UPCOMING_HORIZON_HOURS,
+    target_day: Optional[datetime] = None,
+) -> list[dict[str, Any]]:
+    """Keep the PrizePicks-visible upcoming slate (next ~48h), sorted by tip time.
+
+    When ``target_day`` is set, prefer events on that UTC calendar day first, then
+    fill remaining slots from the upcoming window.
+    """
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(hours=UPCOMING_LOOKBACK_HOURS)
+    end = now + timedelta(hours=max(horizon_hours, 12))
+
+    dated: list[tuple[datetime, dict[str, Any]]] = []
+    undated: list[dict[str, Any]] = []
+    for event in events:
+        tip = _event_commence(event)
+        if tip is None:
+            undated.append(event)
+            continue
+        if tip < start or tip > end:
+            continue
+        dated.append((tip, event))
+
+    dated.sort(key=lambda row: row[0])
+
+    if target_day is not None:
+        day_start = target_day.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+        on_day = [(t, e) for t, e in dated if day_start <= t < day_end]
+        off_day = [(t, e) for t, e in dated if not (day_start <= t < day_end)]
+        ordered = on_day + off_day
+    else:
+        ordered = dated
+
+    selected = [e for _, e in ordered[:limit]]
+    if len(selected) < limit:
+        # Include undated only if we have spare slots (PropLine sometimes omits tip)
+        selected.extend(undated[: max(0, limit - len(selected))])
+    return selected

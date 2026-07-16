@@ -80,6 +80,7 @@ def _scope_to_platform(
         "stale": scoped.get("stale"),
         "modeledCount": scoped.get("modeledCount"),
         "refreshError": scoped.get("refreshError"),
+        "rateLimited": scoped.get("rateLimited"),
     }
 
 router = APIRouter(tags=["leagues"])

@@ -57,17 +57,32 @@ def job_refresh_odds() -> None:
     def _run(db):
         from app.ingestion.line_aggregation_sync import sync_aggregated_lines
         from app.ingestion.pickem_platform_sync import sync_pickem_platform_board
+        from app.providers.propline import rate_limit as propline_rate_limit
 
         pickem: dict = {}
-        for platform in ("prizepicks", "underdog", "sleeper"):
-            for league in ("NBA", "MLB", "NHL", "WNBA", "Soccer"):
-                key = f"{platform}:{league}"
-                try:
-                    pickem[key] = sync_pickem_platform_board(
-                        db, league=league, platform=platform, force=True
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    pickem[key] = {"ok": False, "error": str(exc)}
+        # Never force-refresh pick'em on every tick — free PropLine tier is 1k/day.
+        # Cache TTL inside sync_pickem_platform_board prevents hammering.
+        if propline_rate_limit.is_blocked():
+            pickem["skipped"] = {
+                "reason": "propline_daily_limit",
+                **propline_rate_limit.status(),
+            }
+        else:
+            # PrizePicks first (primary app). Other platforms only if quota remains.
+            for platform in ("prizepicks", "underdog", "sleeper"):
+                if propline_rate_limit.is_blocked():
+                    pickem["stopped"] = propline_rate_limit.status()
+                    break
+                for league in ("MLB", "WNBA", "NBA", "NHL", "Soccer"):
+                    if propline_rate_limit.is_blocked():
+                        break
+                    key = f"{platform}:{league}"
+                    try:
+                        pickem[key] = sync_pickem_platform_board(
+                            db, league=league, platform=platform, force=False
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        pickem[key] = {"ok": False, "error": str(exc)}
 
         return {
             "nba": build_and_store_featured_prop(db),
