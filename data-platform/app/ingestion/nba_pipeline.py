@@ -682,9 +682,52 @@ def build_command_center(db: Session) -> dict[str, Any]:
         max(today_props, key=lambda p: float(p.get("confidence") or 0)) if today_props else prop
     )
 
+    # OddsIQ-style no-vig board: strongest juice-free lean edges on today's slate.
+    best_no_vig = _rank_novig_picks(today_props, limit=8)
+    generated_at = datetime.now(timezone.utc).isoformat()
+    notifications: list[dict[str, Any]] = []
+    for p in best_no_vig[:6]:
+        edge_pct = float(p.get("noVigEdgePct") or 0)
+        if edge_pct < 5:
+            continue
+        notifications.append(
+            {
+                "id": f"novig:{p.get('id')}",
+                "kind": "novig",
+                "tone": "research",
+                "title": f"No-vig pick · {p.get('player')}",
+                "detail": (
+                    f"{p.get('side')} {p.get('line')} {p.get('market')} · "
+                    f"+{edge_pct:.1f}% no-vig edge"
+                    + (f" · {p.get('league')}" if p.get("league") else "")
+                ),
+                "propId": p.get("id"),
+                "league": p.get("league") or "NBA",
+                "noVigEdgePct": edge_pct,
+                "createdAt": generated_at,
+            }
+        )
+    for inj in (featured.get("injuries") or [])[:4]:
+        notifications.append(
+            {
+                "id": f"injury:{inj.get('player') or inj.get('player_name') or len(notifications)}",
+                "kind": "injury",
+                "tone": "injury",
+                "title": f"Injury · {inj.get('player') or inj.get('player_name') or 'Player'}",
+                "detail": (
+                    f"{inj.get('team') or ''} {inj.get('status') or ''} "
+                    f"{inj.get('detail') or ''}"
+                ).strip()
+                or "Injury update",
+                "propId": None,
+                "league": "NBA",
+                "createdAt": generated_at,
+            }
+        )
+
     return {
         "ok": True,
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedAt": generated_at,
         "disclaimer": get_settings().model_disclaimer,
         "board": {
             "date": board_date,
@@ -701,9 +744,11 @@ def build_command_center(db: Session) -> dict[str, Any]:
         },
         "propOfTheDay": prop,
         "topProps": top_props,
+        "bestNoVigPicks": best_no_vig,
         "bestEvToday": best_ev,
         "gamesStartingSoon": games_soon,
         "injuryAlerts": featured.get("injuries") or [],
+        "notifications": notifications,
         "savedParlays": [],
         "highestConfidence": highest,
         "featured": featured,
@@ -711,5 +756,48 @@ def build_command_center(db: Session) -> dict[str, Any]:
             "schedule": "espn-nba",
             "odds": "mock" if (prop or {}).get("oddsAreMock", True) else "line-aggregator",
             "slate": "warehouse-today",
+            "novigRefreshSeconds": 300,
         },
     }
+
+
+def _novig_lean_prob(prop: dict[str, Any]) -> float:
+    """Lean-side no-vig probability (0–1). Board rows usually already store lean noVigProb."""
+    side = str(prop.get("side") or "Over")
+    raw = prop.get("noVigProb")
+    if raw is None:
+        if side == "Under":
+            raw = prop.get("underProbability")
+        else:
+            raw = prop.get("overProbability")
+    try:
+        return max(0.0, min(1.0, float(raw or 0)))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _rank_novig_picks(props: list[dict[str, Any]], *, limit: int = 8) -> list[dict[str, Any]]:
+    """Rank today's props by no-vig edge vs a fair coin (0.5)."""
+    ranked: list[dict[str, Any]] = []
+    for p in props:
+        lean = _novig_lean_prob(p)
+        edge = lean - 0.5
+        if edge < 0.04:  # require at least ~4% juice-free edge
+            continue
+        row = {
+            **p,
+            "noVigProb": round(lean, 4),
+            "noVigEdge": round(edge, 4),
+            "noVigEdgePct": round(edge * 100, 2),
+            "noVigPct": int(round(lean * 100)),
+        }
+        ranked.append(row)
+    ranked.sort(
+        key=lambda r: (
+            float(r.get("noVigEdge") or 0),
+            float(r.get("evPercent") or 0),
+            float(r.get("researchScore") or 0),
+        ),
+        reverse=True,
+    )
+    return ranked[:limit]

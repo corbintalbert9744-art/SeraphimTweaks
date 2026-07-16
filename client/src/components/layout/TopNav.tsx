@@ -5,7 +5,13 @@ import { Bell, LogOut, Menu, Search, Settings, User } from "lucide-react";
 import type { PlayerSearchResult } from "@/data/mock";
 import { useToast } from "@/hooks/use-toast";
 import { useMembership } from "@/context/MembershipContext";
-import { playerProfilePath } from "@/lib/playerLinks";
+import { playerProfilePath, propResearchPath } from "@/lib/playerLinks";
+import {
+  isAlertUnread,
+  loadSeenIds,
+  markAlertSeen,
+  type AppNotification,
+} from "@/lib/novigAlerts";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 
@@ -53,6 +59,7 @@ export function TopNav() {
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [seenTick, setSeenTick] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -74,6 +81,21 @@ export function TopNav() {
     },
     staleTime: 120_000,
   });
+
+  const alertsQuery = useQuery({
+    queryKey: ["command-center"],
+    queryFn: async () => {
+      const res = await fetch("/api/command-center");
+      if (!res.ok) throw new Error("cc");
+      return res.json() as Promise<{ notifications?: AppNotification[] }>;
+    },
+    refetchInterval: 300_000,
+    staleTime: 60_000,
+  });
+
+  const notifItems = (alertsQuery.data?.notifications ?? []).slice(0, 8);
+  const seen = useMemo(() => loadSeenIds(), [seenTick, notifItems]);
+  const unreadCount = notifItems.filter((n) => isAlertUnread(n.id, seen)).length;
 
   const searchIndex = searchPlayers.data ?? [];
 
@@ -207,19 +229,67 @@ export function TopNav() {
             aria-label="Notifications"
           >
             <Bell className="h-4 w-4" />
-            <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-yellow-400" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-yellow-400 px-1 text-[10px] font-bold text-black">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
           </button>
           {notifOpen && (
             <div className="absolute right-0 top-[calc(100%+8px)] w-80 overflow-hidden rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] shadow-2xl animate-in fade-in slide-in-from-top-1 duration-200">
               <div className="border-b border-[#1a1a1a] px-4 py-3">
                 <p className="text-sm font-medium text-white">Notifications</p>
-                <p className="text-xs text-neutral-500">Mock feed — wire to jobs later</p>
+                <p className="text-xs text-neutral-500">
+                  No-vig picks · updates every 5 min
+                </p>
               </div>
-              <ul className="divide-y divide-[#1a1a1a]">
-                <li className="px-4 py-3 text-sm text-neutral-300">Research scores refreshed for NBA slate.</li>
-                <li className="px-4 py-3 text-sm text-neutral-300">Injury uncertainty flagged on KC props.</li>
-                <li className="px-4 py-3 text-sm text-neutral-300">ATP odds adapter heartbeat OK.</li>
+              <ul className="max-h-80 divide-y divide-[#1a1a1a] overflow-y-auto">
+                {(notifItems.length
+                  ? notifItems
+                  : [{ id: "empty", title: "No alerts yet", detail: "Strong no-vig edges will appear here.", propId: null }]
+                ).map((n) => {
+                  const unread = n.id !== "empty" && isAlertUnread(n.id, seen);
+                  return (
+                    <li key={n.id} className="px-4 py-3">
+                      {n.propId ? (
+                        <button
+                          type="button"
+                          className="w-full text-left"
+                          onClick={() => {
+                            markAlertSeen(n.id);
+                            setSeenTick((t) => t + 1);
+                            setNotifOpen(false);
+                            setLocation(propResearchPath(n.propId!));
+                          }}
+                        >
+                          <p className="flex items-center gap-2 text-sm text-neutral-100">
+                            {unread ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-400" /> : null}
+                            {n.title}
+                          </p>
+                          <p className="mt-0.5 text-xs text-neutral-500">{n.detail}</p>
+                        </button>
+                      ) : (
+                        <>
+                          <p className="text-sm text-neutral-300">{n.title}</p>
+                          <p className="mt-0.5 text-xs text-neutral-500">{n.detail}</p>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
+              <div className="border-t border-[#1a1a1a] px-4 py-2">
+                <button
+                  type="button"
+                  className="text-xs font-medium text-yellow-400 hover:underline"
+                  onClick={() => {
+                    setNotifOpen(false);
+                    setLocation("/alerts");
+                  }}
+                >
+                  Open all alerts
+                </button>
+              </div>
             </div>
           )}
         </div>

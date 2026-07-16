@@ -1,14 +1,23 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { PropOfTheDayCard } from "@/components/command/PropOfTheDayCard";
+import { NoVigPicksPanel } from "@/components/command/NoVigPicksPanel";
 import { LeagueBadge } from "@/components/shared/LeagueBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { cn } from "@/lib/utils";
 import { propResearchPath } from "@/lib/playerLinks";
 import type { LeagueCode } from "@/data/mock";
+import { useToast } from "@/hooks/use-toast";
+import {
+  maybeDesktopNotify,
+  takeNewNotifications,
+  type AppNotification,
+  type NoVigPick,
+} from "@/lib/novigAlerts";
 
 type CommandCenterResponse = {
   generatedAt: string;
@@ -18,9 +27,12 @@ type CommandCenterResponse = {
   highestConfidence?: any | null;
   propOfTheDay?: any | null;
   topProps?: any[];
+  bestNoVigPicks?: NoVigPick[];
+  notifications?: AppNotification[];
   injuryAlerts?: Array<{ team: string; player: string; status: string; detail?: string }>;
   savedParlays?: Array<{ id: string; title: string; legs: number }>;
   featured?: { ok: boolean; source?: any };
+  providers?: { novigRefreshSeconds?: number };
 };
 
 async function fetchCommandCenter(): Promise<CommandCenterResponse> {
@@ -30,18 +42,34 @@ async function fetchCommandCenter(): Promise<CommandCenterResponse> {
 }
 
 export default function CommandCenterPage() {
+  const { toast } = useToast();
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["command-center"],
     queryFn: fetchCommandCenter,
-    refetchInterval: 60_000,
+    // OddsIQ-style no-vig board cadence
+    refetchInterval: 300_000,
+    staleTime: 60_000,
   });
+
+  useEffect(() => {
+    const notes = data?.notifications ?? [];
+    if (!notes.length) return;
+    const fresh = takeNewNotifications(notes.filter((n) => n.kind === "novig"));
+    for (const n of fresh.slice(0, 2)) {
+      toast({
+        title: n.title,
+        description: n.detail,
+      });
+      void maybeDesktopNotify(n);
+    }
+  }, [data?.generatedAt, data?.notifications, toast]);
 
   return (
     <div className="space-y-5">
       <PageHeader
         eyebrow="Command Center"
         title="Edge today"
-        description="Best EV, confidence, injuries, and the featured prop — without the noise."
+        description="No-vig great picks (5‑min refresh), Prop of the Day, hit rates, and injuries."
         actions={
           <button
             type="button"
@@ -106,6 +134,8 @@ export default function CommandCenterPage() {
               description="Waiting on today’s live slate props. Open a board after sync, then refresh."
             />
           )}
+
+          <NoVigPicksPanel picks={data.bestNoVigPicks ?? []} refreshedAt={data.generatedAt} />
 
           <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5 transition hover:border-yellow-500/20">
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -183,6 +213,20 @@ export default function CommandCenterPage() {
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
+              label="Best no-vig"
+              value={
+                data.bestNoVigPicks?.[0]
+                  ? `${Math.round(Number(data.bestNoVigPicks[0].noVigPct ?? (Number(data.bestNoVigPicks[0].noVigProb ?? 0) * 100)))}%`
+                  : "—"
+              }
+              sub={
+                data.bestNoVigPicks?.[0]
+                  ? `${data.bestNoVigPicks[0].player} · +${Number(data.bestNoVigPicks[0].noVigEdgePct ?? 0).toFixed(1)}% edge`
+                  : "Waiting on slate"
+              }
+              accent="emerald"
+            />
+            <MetricCard
               label="Best EV today"
               value={data.bestEvToday ? `+${Number(data.bestEvToday.evPercent ?? 0).toFixed(1)}%` : "—"}
               sub={data.bestEvToday ? `${data.bestEvToday.player} · ${data.bestEvToday.market}` : "Waiting on slate"}
@@ -199,14 +243,9 @@ export default function CommandCenterPage() {
               accent="gold"
             />
             <MetricCard
-              label="Injury alerts"
-              value={`${(data.injuryAlerts ?? []).length}`}
-              sub="From ESPN game summaries"
-            />
-            <MetricCard
-              label="Saved parlays"
-              value={`${(data.savedParlays ?? []).length}`}
-              sub="Sign-in + DB coming next"
+              label="Notifications"
+              value={`${(data.notifications ?? []).length}`}
+              sub="No-vig + injury signals"
             />
           </div>
 

@@ -228,8 +228,52 @@ export async function buildCommandCenterPayload() {
       ]
     : [];
 
+  const generatedAt = new Date().toISOString();
+  const bestNoVigPicks = topProps
+    .map((p) => {
+      const lean = Number(p.noVigProb ?? 0.5);
+      const edge = lean - 0.5;
+      return {
+        ...p,
+        noVigProb: lean,
+        noVigPct: Math.round(lean * 100),
+        noVigEdge: edge,
+        noVigEdgePct: Number((edge * 100).toFixed(2)),
+      };
+    })
+    .filter((p) => p.noVigEdge >= 0.04)
+    .sort((a, b) => b.noVigEdge - a.noVigEdge)
+    .slice(0, 8);
+
+  const notifications = [
+    ...bestNoVigPicks
+      .filter((p) => p.noVigEdgePct >= 5)
+      .slice(0, 6)
+      .map((p) => ({
+        id: `novig:${p.id}`,
+        kind: "novig" as const,
+        tone: "research" as const,
+        title: `No-vig pick · ${p.player}`,
+        detail: `${p.side} ${p.line} ${p.market} · +${p.noVigEdgePct.toFixed(1)}% no-vig edge`,
+        propId: p.id,
+        league: p.league ?? "NBA",
+        noVigEdgePct: p.noVigEdgePct,
+        createdAt: generatedAt,
+      })),
+    ...(featured.ok ? featured.injuries : []).slice(0, 4).map((inj, i) => ({
+      id: `injury:${inj.player ?? i}`,
+      kind: "injury" as const,
+      tone: "injury" as const,
+      title: `Injury · ${inj.player ?? "Player"}`,
+      detail: `${inj.team ?? ""} ${inj.status ?? ""} ${inj.detail ?? ""}`.trim() || "Injury update",
+      propId: null as string | null,
+      league: "NBA",
+      createdAt: generatedAt,
+    })),
+  ];
+
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     leagueFocus: "NBA",
     board,
     gamesStartingSoon,
@@ -237,8 +281,11 @@ export async function buildCommandCenterPayload() {
     highestConfidence: topProps.slice().sort((a, b) => b.confidence - a.confidence)[0] ?? null,
     propOfTheDay: prop,
     topProps: topProps.slice(0, 10),
+    bestNoVigPicks,
+    notifications,
     injuryAlerts: featured.ok ? featured.injuries : [],
     savedParlays: [] as Array<{ id: string; title: string; legs: number }>,
     featured,
+    providers: { novigRefreshSeconds: 300 },
   };
 }
