@@ -14,7 +14,7 @@ import { useSidebar } from "./sidebar-context";
 
 const navItems = [
   { href: "/", label: "Command Center", icon: LayoutDashboard },
-  { href: "/research", label: "Research", icon: FileSearch },
+  { href: "/research", label: "Research Hub", icon: FileSearch },
   { href: "/parlay-builder", label: "Parlay Builder", icon: Layers },
   { href: "/alerts", label: "Alerts", icon: BellRing },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -41,7 +41,7 @@ export function Sidebar() {
           {!collapsed && (
             <div className="min-w-0 animate-in fade-in duration-300">
               <p className="truncate text-sm font-semibold tracking-tight text-white">Seraphim</p>
-              <p className="truncate text-[10px] uppercase tracking-[0.18em] text-yellow-500/80">Analytics</p>
+              <p className="truncate text-[10px] uppercase tracking-[0.18em] text-yellow-500/80">IQ Research</p>
             </div>
           )}
         </Link>

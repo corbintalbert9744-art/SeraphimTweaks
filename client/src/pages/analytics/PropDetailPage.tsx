@@ -23,158 +23,13 @@ import { cn } from "@/lib/utils";
 import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { LineComparison } from "@/components/shared/LineComparison";
-
-type HitWindow = "L5" | "L10" | "L20" | "Season";
-
-function parseHitRate(value: string): { hits: number; samples: number; pct: number } {
-  const [hits, samples] = value.split("/").map(Number);
-  const h = Number.isFinite(hits) ? hits : 0;
-  const s = Number.isFinite(samples) ? samples : 0;
-  return { hits: h, samples: s, pct: s ? Math.round((h / s) * 100) : 0 };
-}
-
-function MovementChart({
-  points,
-}: {
-  points: Array<{ label: string; line: number; odds: number }>;
-}) {
-  if (!points.length) return <p className="text-sm text-neutral-500">No line ticks yet.</p>;
-  const values = points.map((p) => p.line);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const width = 320;
-  const height = 120;
-  const coords = values.map((v, i) => {
-    const x = (i / Math.max(values.length - 1, 1)) * width;
-    const y = height - 20 - ((v - min) / range) * (height - 40);
-    return { x, y };
-  });
-  const line = coords.map((c) => `${c.x},${c.y}`).join(" ");
-
-  return (
-    <div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-40 w-full">
-        <polyline
-          fill="none"
-          stroke="rgb(250, 204, 21)"
-          strokeWidth="2.5"
-          points={line}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {coords.map((c, i) => (
-          <circle
-            key={points[i].label}
-            cx={c.x}
-            cy={c.y}
-            r="4"
-            fill="#0a0a0a"
-            stroke="rgb(250, 204, 21)"
-            strokeWidth="2"
-          />
-        ))}
-      </svg>
-      <div className="mt-2 flex justify-between text-[11px] text-neutral-500">
-        {points.map((p) => (
-          <span key={p.label}>
-            {p.label} · {p.line}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HitHistoryChart({
-  history,
-  line,
-  window,
-  windowLabel,
-}: {
-  history: NonNullable<PropDetail["hitHistory"]>;
-  line: number;
-  window: HitWindow;
-  windowLabel: string;
-}) {
-  const limit = window === "L5" ? 5 : window === "L10" ? 10 : window === "L20" ? 20 : history.length;
-  const slice = history.slice(0, Math.max(limit, 0));
-  if (!slice.length) {
-    return <p className="text-sm text-neutral-500">Hit-rate history fills as warehouse gamelogs land.</p>;
-  }
-  const vals = slice.map((h) => h.value ?? 0);
-  const max = Math.max(...vals, line, 1) * 1.2;
-  const hits = slice.filter((g) => g.hit).length;
-
-  return (
-    <div>
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
-            Hit rate · {windowLabel}
-          </p>
-          <p className="mt-2 text-5xl font-semibold tabular-nums tracking-tight text-white sm:text-6xl">
-            {hits}
-            <span className="text-neutral-600">/{slice.length}</span>
-          </p>
-          <p className="mt-2 text-sm text-neutral-500">
-            Cleared line {line} in {hits} of last {slice.length} games
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-4 text-xs text-neutral-500">
-          <span className="inline-flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm bg-emerald-500" /> Hit
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm bg-red-500/80" /> Miss
-          </span>
-        </div>
-      </div>
-
-      <div className="relative h-56 sm:h-64">
-        <div
-          className="pointer-events-none absolute inset-x-0 z-10 flex items-center"
-          style={{ bottom: `${(line / max) * 100}%` }}
-        >
-          <div className="h-px flex-1 border-t border-dashed border-neutral-500/60" />
-          <span className="ml-3 shrink-0 rounded-md bg-[#0d0d0d] px-2 py-0.5 text-[11px] font-medium text-neutral-400">
-            Line {line}
-          </span>
-        </div>
-
-        <div className="absolute inset-0 flex items-end justify-between gap-2 px-1">
-          {slice.map((g, i) => {
-            const v = g.value ?? 0;
-            const h = Math.max(10, (v / max) * 100);
-            return (
-              <div key={`${g.label}-${i}`} className="flex h-full flex-1 flex-col items-center justify-end">
-                <span
-                  className={cn(
-                    "mb-2 text-[11px] font-semibold tabular-nums sm:text-xs",
-                    g.hit ? "text-emerald-300" : "text-red-300/85",
-                  )}
-                >
-                  {g.value != null ? g.value : "—"}
-                </span>
-                <div
-                  className={cn(
-                    "w-full max-w-[36px] rounded-t-lg transition-all duration-500",
-                    g.hit
-                      ? "bg-gradient-to-t from-emerald-800 to-emerald-400"
-                      : "bg-gradient-to-t from-red-950/90 to-red-500/75",
-                  )}
-                  style={{ height: `${h}%` }}
-                  title={g.label}
-                />
-                <span className="mt-3 text-[10px] tabular-nums text-neutral-600">{g.label}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
+import {
+  HitRateBars,
+  HitRateChips,
+  LineMovementChart,
+  parseHitRate,
+  type HitWindow,
+} from "@/components/research";
 
 export default function PropDetailPage() {
   const [, params] = useRoute("/prop/:id");
@@ -530,32 +385,20 @@ export default function PropDetailPage() {
       <div className="grid gap-8 xl:grid-cols-[1.4fr_0.85fr]">
         <div className="space-y-8">
           <section className={cn(panel, "p-6 sm:p-8")} data-feature="hit-history">
-            <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold text-white">Game log vs line</h2>
                 <p className="mt-1 text-sm text-neutral-500">
                   Green cleared {prop.line} · red missed · lean {recommendation}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2" data-feature="hit-rates">
-                {(["L5", "L10", "L20", "Season"] as const).map((w) => (
-                  <button
-                    key={w}
-                    type="button"
-                    onClick={() => setHitWindow(w)}
-                    className={cn(
-                      "rounded-full px-4 py-2 text-xs font-semibold tracking-wide transition",
-                      hitWindow === w
-                        ? "bg-white text-black"
-                        : "bg-white/[0.04] text-neutral-400 hover:bg-white/[0.08] hover:text-neutral-200",
-                    )}
-                  >
-                    {w}
-                  </button>
-                ))}
-              </div>
+              <HitRateChips
+                rates={{ l5: prop.l5, l10: prop.l10, l20: prop.l20, season: prop.season }}
+                active={hitWindow}
+                onSelect={setHitWindow}
+              />
             </div>
-            <HitHistoryChart
+            <HitRateBars
               history={prop.hitHistory ?? []}
               line={prop.line}
               window={hitWindow}
@@ -661,7 +504,7 @@ export default function PropDetailPage() {
                 : "Snapshots wire as providers land"}
             </p>
             <div className="mt-6">
-              <MovementChart points={prop.movement} />
+              <LineMovementChart points={prop.movement} />
             </div>
           </section>
 
