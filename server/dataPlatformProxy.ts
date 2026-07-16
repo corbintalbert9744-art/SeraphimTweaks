@@ -137,6 +137,49 @@ export function registerDataPlatformProxy(
     });
   });
 
+  // WNBA — ESPN live + PrizePicks comparison placeholders
+  app.get("/api/wnba/games", async (req, res) => {
+    const qs = typeof req.query.dates === "string" ? `?dates=${encodeURIComponent(req.query.dates)}` : "";
+    await proxyGet(`/api/v1/wnba/games${qs}`, res, async () => {
+      res.status(503).json({ error: "WNBA requires the data platform", games: [] });
+    });
+  });
+
+  app.get("/api/wnba/props", async (req, res) => {
+    const refresh = req.query.refresh === "1" || req.query.refresh === "true" ? "?refresh=true" : "";
+    await proxyGet(
+      `/api/v1/wnba/props${refresh}`,
+      res,
+      async () => {
+        res.status(503).json({
+          error: "WNBA board requires the Python data platform",
+          hint: "Start with: npm run data-platform",
+          props: [],
+          players: [],
+        });
+      },
+      180_000,
+    );
+  });
+
+  app.get("/api/wnba/props/:id", async (req, res) => {
+    await proxyGet(`/api/v1/wnba/props/${encodeURIComponent(req.params.id)}`, res, async () => {
+      res.status(503).json({ error: "WNBA prop detail requires the data platform" });
+    });
+  });
+
+  app.get("/api/wnba/players", async (_req, res) => {
+    await proxyGet(`/api/v1/wnba/players`, res, async () => {
+      res.status(503).json({ error: "WNBA players require the data platform", players: [] });
+    });
+  });
+
+  app.get("/api/wnba/players/:id", async (req, res) => {
+    await proxyGet(`/api/v1/wnba/players/${encodeURIComponent(req.params.id)}`, res, async () => {
+      res.status(503).json({ error: "WNBA player profile requires the data platform" });
+    });
+  });
+
   app.get("/api/v1/providers", async (_req, res) => {
     try {
       const upstream = await fetch(`${BASE}/api/v1/providers`, { signal: AbortSignal.timeout(8_000) });

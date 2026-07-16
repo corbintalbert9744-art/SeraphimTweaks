@@ -14,7 +14,7 @@ export const CANONICAL_LINE_PROVIDERS: LineProviderSpec[] = [
     slug: "prizepicks",
     name: "PrizePicks",
     kind: "pickem",
-    notes: "Requires PrizePicks partner adapter.",
+    notes: "Primary pick'em comparison for WNBA/NBA. Live adapter pending — placeholder vs our projection.",
   },
   {
     slug: "underdog",

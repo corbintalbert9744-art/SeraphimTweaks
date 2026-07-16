@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.providers.base import ProviderMeta, capability_matrix
 from app.providers.espn.nba import EspnNbaProvider
 from app.providers.espn.nfl import EspnNflProvider
+from app.providers.espn.wnba import EspnWnbaProvider
 from app.providers.mock.odds import MockOddsProvider
 from app.providers.the_odds_api.odds import TheOddsApiProvider
 
@@ -38,6 +39,7 @@ def provider_status() -> list[dict]:
     settings = get_settings()
     nba = EspnNbaProvider()
     nfl = EspnNflProvider()
+    wnba = EspnWnbaProvider()
     odds_live = bool(settings.odds_api_key)
     rows = [
         {
@@ -60,6 +62,17 @@ def provider_status() -> list[dict]:
             "configured": True,
             "legitimate": True,
             "notes": nfl.meta.notes,
+        },
+        {
+            "name": wnba.meta.name,
+            "leagues": wnba.meta.leagues,
+            "capabilities": wnba.meta.capabilities,
+            "requires_api_key": False,
+            "is_mock": False,
+            "configured": True,
+            "legitimate": True,
+            "notes": wnba.meta.notes,
+            "homepage": wnba.meta.homepage,
         },
         {
             "name": "the-odds-api",
@@ -97,16 +110,6 @@ def provider_status() -> list[dict]:
                 "Fanatics Sportsbook",
                 "ESPN BET",
             ],
-        },
-        {
-            "name": "espn-wnba",
-            "leagues": ["WNBA"],
-            "capabilities": ["schedule", "gamelog", "injuries"],
-            "requires_api_key": False,
-            "is_mock": True,
-            "configured": False,
-            "legitimate": False,
-            "notes": "PLANNED — reuse ESPN basketball patterns from NBA adapter.",
         },
         {
             "name": "mlb-provider",
@@ -183,10 +186,27 @@ def get_nfl_providers() -> ProviderBundle:
     )
 
 
+def get_wnba_providers() -> ProviderBundle:
+    """Live ESPN WNBA — same basketball patterns as NBA; PrizePicks for pick'em comparison."""
+    settings = get_settings()
+    espn = EspnWnbaProvider(user_agent=settings.espn_user_agent)
+    return ProviderBundle(
+        schedule=espn,
+        gamelog=espn,
+        injuries=espn,
+        odds=_odds_provider(),
+        featured=espn,
+        roster=espn,
+        primary=espn.meta.name,
+        metas=[espn.meta, _odds_provider().meta],
+    )
+
+
 def list_metas() -> list[ProviderMeta]:
     return [
         EspnNbaProvider().meta,
         EspnNflProvider().meta,
+        EspnWnbaProvider().meta,
         MockOddsProvider().meta,
         TheOddsApiProvider(api_key="").meta,
     ]

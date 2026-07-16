@@ -132,6 +132,12 @@ export default function PlayerPage() {
         const raw = (data.player ?? data) as PlayerResearchProfile;
         return asLivePlayerResearch({ ...raw, boardHref: raw.boardHref || "/nba" });
       }
+      const wnbaRes = await fetch(`/api/wnba/players/${encodeURIComponent(playerId)}`);
+      if (wnbaRes.ok) {
+        const data = await wnbaRes.json();
+        const raw = (data.player ?? data) as PlayerResearchProfile;
+        return asLivePlayerResearch({ ...raw, league: "WNBA", boardHref: raw.boardHref || "/wnba" });
+      }
       // NFL players: build a minimal research profile from board props
       const nflRes = await fetch("/api/nfl/props");
       if (!nflRes.ok) throw new Error("player");

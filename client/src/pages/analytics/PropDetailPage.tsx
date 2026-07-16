@@ -185,7 +185,6 @@ export default function PropDetailPage() {
     queryKey: ["live-prop", propId],
     enabled: Boolean(propId),
     queryFn: async () => {
-      // Prefer NBA detail endpoint; fall back to board cache registration
       const nbaRes = await fetch(`/api/nba/props/${encodeURIComponent(propId)}`);
       if (nbaRes.ok) {
         const data = await nbaRes.json();
@@ -193,7 +192,16 @@ export default function PropDetailPage() {
         cacheNbaPropDetail(detail);
         return detail;
       }
-      // NFL props: synthesize report from board cache / list
+      const wnbaRes = await fetch(`/api/wnba/props/${encodeURIComponent(propId)}`);
+      if (wnbaRes.ok) {
+        const data = await wnbaRes.json();
+        const detail = asPropDetailFromApi({
+          ...((data.prop ?? data) as Record<string, unknown>),
+          league: "WNBA",
+        });
+        cacheNbaPropDetail(detail);
+        return detail;
+      }
       const nflBoard = await fetch("/api/nfl/props");
       if (nflBoard.ok) {
         const data = (await nflBoard.json()) as { props: Record<string, unknown>[] };

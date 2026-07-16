@@ -50,8 +50,9 @@ def leagues():
             },
             {
                 "code": "WNBA",
-                "status": "planned",
-                "notes": "Reuse ESPN basketball patterns — next after NBA sync hardened",
+                "status": "live",
+                "provider": "espn-wnba",
+                "notes": "ESPN schedule/roster/gamelog/injuries; Line Comparison includes PrizePicks placeholders until pick'em adapter is connected",
             },
             {
                 "code": "MLB",

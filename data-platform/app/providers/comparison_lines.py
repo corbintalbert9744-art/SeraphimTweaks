@@ -41,7 +41,7 @@ CANONICAL_LINE_PROVIDERS: tuple[LineProviderSpec, ...] = (
         "pickem",
         placeholder_offset=-1.5,
         connected=False,
-        notes="Requires PrizePicks partner / scrape adapter.",
+        notes="Primary pick'em comparison for WNBA/NBA. Live PrizePicks adapter not connected — placeholder vs our projection.",
     ),
     LineProviderSpec(
         "underdog",
