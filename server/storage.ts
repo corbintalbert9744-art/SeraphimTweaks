@@ -32,6 +32,7 @@ export class MemStorage implements IStorage {
       username: insertUser.username,
       passwordHash: insertUser.passwordHash,
       displayName: insertUser.displayName ?? null,
+      role: "member",
       stripeCustomerId: null,
       stripeSubscriptionId: null,
       membershipStatus: "inactive",

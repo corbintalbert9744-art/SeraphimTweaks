@@ -145,7 +145,7 @@ export default function Terms() {
             <Link href="/pricing"><a className={`text-sm text-neutral-400 hover:text-white ${clickableStyles}`}>Products</a></Link>
             <Link href="/reviews"><a className={`text-sm text-neutral-400 hover:text-white ${clickableStyles}`}>Reviews</a></Link>
             <span className="text-sm text-white">Terms</span>
-            <button onClick={() => window.open('https://discord.gg/yP4uBqNyrP', '_blank')} className={`text-sm text-neutral-400 hover:text-white flex items-center gap-1.5 ${clickableStyles}`}>
+            <button onClick={() => window.open('https://discord.gg/zFZxh9RKdC', '_blank')} className={`text-sm text-neutral-400 hover:text-white flex items-center gap-1.5 ${clickableStyles}`}>
               <DiscordIcon />Discord
             </button>
           </div>

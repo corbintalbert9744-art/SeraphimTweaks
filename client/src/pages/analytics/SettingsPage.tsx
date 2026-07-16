@@ -5,6 +5,7 @@ import type { LeagueCode } from "@/data/mock";
 import { cn } from "@/lib/utils";
 import { useMembership } from "@/context/MembershipContext";
 import { useIsPro } from "@/components/membership/ProOnly";
+import { DISCORD_INVITE_URL } from "@/lib/discord";
 
 const leagueOptions: LeagueCode[] = ["NBA", "NFL", "MLB", "WNBA", "ATP", "WTA"];
 
@@ -36,8 +37,9 @@ export default function SettingsPage() {
     );
   }
 
-  const discordUrl = (import.meta as { env?: { VITE_DISCORD_INVITE_URL?: string } }).env
-    ?.VITE_DISCORD_INVITE_URL;
+  const discordUrl =
+    (import.meta as { env?: { VITE_DISCORD_INVITE_URL?: string } }).env?.VITE_DISCORD_INVITE_URL ||
+    DISCORD_INVITE_URL;
 
   return (
     <div>
@@ -114,7 +116,7 @@ export default function SettingsPage() {
 
               {isPro ? (
                 <a
-                  href={discordUrl || "https://discord.com/"}
+                  href={discordUrl || "https://discord.gg/zFZxh9RKdC"}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-4 inline-flex rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-xs font-semibold text-yellow-300 hover:bg-yellow-500/15"

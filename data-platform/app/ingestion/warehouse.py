@@ -139,11 +139,29 @@ def upsert_injury(db: Session, inj: NormalizedInjury) -> Injury:
     return row
 
 
-def ensure_sportsbook(db: Session, slug: str, name: str) -> Sportsbook:
+def ensure_sportsbook(
+    db: Session,
+    slug: str,
+    name: str,
+    *,
+    kind: str = "sportsbook",
+    provider: str = "manual",
+) -> Sportsbook:
+    pickem = {"prizepicks", "underdog", "sleeper", "parlayplay"}
+    resolved_kind = "pickem" if slug in pickem else kind
     row = db.execute(select(Sportsbook).where(Sportsbook.slug == slug)).scalar_one_or_none()
     if row:
+        if hasattr(row, "kind") and not row.kind:
+            row.kind = resolved_kind
         return row
-    row = Sportsbook(id=f"book:{slug}", name=name, slug=slug, active=True)
+    row = Sportsbook(
+        id=f"book:{slug}",
+        name=name,
+        slug=slug,
+        kind=resolved_kind,
+        provider=provider,
+        active=True,
+    )
     db.add(row)
     return row
 
@@ -181,13 +199,20 @@ def upsert_prop(
 
 
 def insert_odds(db: Session, quote: NormalizedOddsQuote, prop_id: str) -> Odds:
-    book = ensure_sportsbook(db, quote.sportsbook_slug, quote.sportsbook_name)
+    book = ensure_sportsbook(
+        db,
+        quote.sportsbook_slug,
+        quote.sportsbook_name,
+        kind="pickem" if quote.sportsbook_slug in {"prizepicks", "underdog", "sleeper", "parlayplay"} else "sportsbook",
+        provider="mock" if quote.is_mock else "the-odds-api",
+    )
     db.flush()
     oid = str(uuid.uuid4())
     row = Odds(
         id=oid,
         prop_id=prop_id,
         sportsbook_id=book.id,
+        side=quote.side,
         american_odds=quote.american_odds,
         line=quote.line,
         implied_prob=None,
