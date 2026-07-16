@@ -9,6 +9,7 @@ import {
   FileSearch,
   BellRing,
   TrendingUp,
+  Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
@@ -17,6 +18,7 @@ const navItems = [
   { href: "/", label: "Command Center", icon: LayoutDashboard },
   { href: "/research", label: "Research Hub", icon: FileSearch },
   { href: "/plus-ev", label: "+EV Engine", icon: TrendingUp },
+  { href: "/arbitrage", label: "Arbitrage", icon: Scale },
   { href: "/parlay-builder", label: "Parlay Builder", icon: Layers },
   { href: "/alerts", label: "Alerts", icon: BellRing },
   { href: "/settings", label: "Settings", icon: Settings },

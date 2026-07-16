@@ -215,6 +215,47 @@ export function registerDataPlatformProxy(
     }
   });
 
+  // Arbitrage Finder — cross-book Over/Under surebets
+  app.get("/api/arbitrage", async (req, res) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(req.query)) {
+      if (typeof v === "string") qs.set(k, v);
+    }
+    const suffix = qs.toString() ? `?${qs}` : "";
+    await proxyGet(
+      `/api/v1/arbitrage${suffix}`,
+      res,
+      async () => {
+        res.status(503).json({
+          error: "Arbitrage finder requires the data platform",
+          opportunities: [],
+          count: 0,
+        });
+      },
+      180_000,
+    );
+  });
+
+  app.get("/api/arbitrage/meta", async (_req, res) => {
+    await proxyGet(`/api/v1/arbitrage/meta`, res, async () => {
+      res.json({ refreshSeconds: 300, defaultTotalStake: 100 });
+    });
+  });
+
+  app.get("/api/arbitrage/prop/:id", async (req, res) => {
+    const qs = new URLSearchParams();
+    if (typeof req.query.league === "string") qs.set("league", req.query.league);
+    if (typeof req.query.totalStake === "string") qs.set("totalStake", req.query.totalStake);
+    const suffix = qs.toString() ? `?${qs}` : "";
+    await proxyGet(
+      `/api/v1/arbitrage/prop/${encodeURIComponent(req.params.id)}${suffix}`,
+      res,
+      async () => {
+        res.status(503).json({ error: "Arbitrage prop scan requires the data platform" });
+      },
+    );
+  });
+
   // Positive Expected Value (+EV) board
   app.get("/api/plus-ev", async (req, res) => {
     const qs = new URLSearchParams();
