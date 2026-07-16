@@ -36,7 +36,7 @@ export function NbaPlayerCards({
             props.find((p) => p.playerId === player.id && p.market === "Points") ??
             props.find((p) => p.playerId === player.id);
           const added = topProp ? hasLeg(topProp.id) : false;
-          const proj = player.projections ?? player.seasonAvg;
+          const proj = player.projections ?? player.seasonAvg ?? { pts: 0, reb: 0, ast: 0 };
           const rs = player.researchScore ?? player.confidence;
           const topLeanLabel =
             player.topLean ||
@@ -118,14 +118,15 @@ function Avg({
   side,
 }: {
   label: string;
-  value: number;
+  value?: number | null;
   side?: string;
 }) {
+  const n = typeof value === "number" && Number.isFinite(value) ? value : null;
   return (
     <div className="text-center">
       <p className="text-[10px] uppercase tracking-wider text-neutral-500">{label}</p>
       <p className={cn("mt-0.5 text-sm font-semibold tabular-nums", leanTextClass(side ?? "Over"))}>
-        {value.toFixed(1)}
+        {n == null ? "—" : n.toFixed(1)}
       </p>
     </div>
   );
