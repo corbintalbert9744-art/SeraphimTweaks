@@ -245,7 +245,11 @@ def insert_odds(
     prop_id: str,
     *,
     provider_name: Optional[str] = None,
+    write_snapshot: bool = True,
 ) -> Odds:
+    """Persist a live odds quote and (by default) a timestamped line_snapshots row."""
+    from app.db.models import LineSnapshot
+
     provider = provider_name or quote.source_provider or ("mock" if quote.is_mock else "line-aggregator")
     book = ensure_sportsbook(
         db,
@@ -256,6 +260,7 @@ def insert_odds(
     )
     db.flush()
     oid = str(uuid.uuid4())
+    captured = quote.captured_at or datetime.now(timezone.utc)
     row = Odds(
         id=oid,
         prop_id=prop_id,
@@ -266,7 +271,19 @@ def insert_odds(
         implied_prob=None,
         provider=provider if not quote.is_mock else "mock",
         is_mock=quote.is_mock,
-        captured_at=quote.captured_at or datetime.now(timezone.utc),
+        captured_at=captured,
     )
     db.add(row)
+    if write_snapshot and not quote.is_mock:
+        db.add(
+            LineSnapshot(
+                id=str(uuid.uuid4()),
+                prop_id=prop_id,
+                sportsbook_id=book.id,
+                line=float(quote.line),
+                american_odds=int(quote.american_odds),
+                source=provider,
+                captured_at=captured,
+            )
+        )
     return row

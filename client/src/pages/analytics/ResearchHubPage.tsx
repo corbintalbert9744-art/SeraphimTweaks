@@ -1,148 +1,230 @@
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { LeagueBadge } from "@/components/shared/LeagueBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { formatAmericanOdds, type PropDetail, registerPropDetails } from "@/data/propsCatalog";
-import { asNbaPropFromApi, cacheNbaBoardProps, propDetailFromNbaProp } from "@/lib/nbaLiveCache";
-import { cacheNflBoardProps } from "@/lib/addPropToBuilder";
+import { asPropDetailFromApi } from "@/lib/nbaLiveCache";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { propResearchPath } from "@/lib/playerLinks";
 import { HitRateMatrixCell } from "@/components/research";
-import type { NflProp } from "@/data/nflMock";
+import { usePickemApp } from "@/context/PickemAppContext";
+import { PickemAppGate, PickemAppSwitcher } from "@/components/shared/PickemAppGate";
+import type { LeagueCode } from "@/data/mock";
 
-function asNflProp(row: Record<string, unknown>): NflProp {
-  return {
-    id: String(row.id),
-    playerId: String(row.playerId ?? ""),
-    player: String(row.player ?? ""),
-    team: String(row.team ?? ""),
-    opponent: String(row.opponent ?? ""),
-    position: String(row.position ?? "SKILL"),
-    market: row.market as NflProp["market"],
-    side: row.side === "Under" ? "Under" : "Over",
-    line: Number(row.line ?? 0),
-    americanOdds: Number(row.americanOdds ?? -110),
-    noVigProb: Number(row.noVigProb ?? 0.5),
-    evPercent: Number(row.evPercent ?? 0),
-    confidence: Number(row.confidence ?? 50),
-    l5: String(row.l5 ?? "0/0"),
-    l10: String(row.l10 ?? "0/0"),
-    l20: String(row.l20 ?? "0/0"),
-    season: String(row.season ?? "0/0"),
-    tipTime: String(row.tipTime ?? ""),
-    week: Number(row.week ?? 0),
-    projectedSnapPct: Number(row.projectedSnapPct ?? 80),
-    injury: "None",
-  };
+function isLivePickemRow(row: Record<string, unknown>): boolean {
+  const id = String(row.id ?? "");
+  if (id.includes(":pickem:")) return true;
+  if (row.oddsAreMock === false) return true;
+  if (row.oddsAreMock === true) return false;
+  return false;
 }
 
-function nflToDetail(p: NflProp): PropDetail {
-  return {
-    id: p.id,
-    league: "NFL",
-    playerId: p.playerId,
-    player: p.player,
-    team: p.team,
-    opponent: p.opponent,
-    position: p.position,
-    market: p.market,
-    side: p.side,
-    line: p.line,
-    americanOdds: p.americanOdds,
-    noVigProb: p.noVigProb,
-    noVigOpposite: Math.max(0.01, 1 - p.noVigProb),
-    evPercent: p.evPercent,
-    confidence: p.confidence,
-    researchScore: p.confidence,
-    dqs: Math.min(97, p.confidence + 3),
-    l5: p.l5,
-    l10: p.l10,
-    l20: p.l20,
-    season: p.season,
-    tipTime: p.tipTime,
-    why: `${p.side} ${p.line} ${p.market} — live model lean`,
-    checks: [],
-    books: [{ book: "Consensus", line: p.line, over: p.americanOdds, under: -110 }],
-    movement: [{ label: "Now", line: p.line, odds: p.americanOdds }],
-    analysis: [],
-    opponentDefense: {
-      rank: 16,
-      of: 32,
-      label: `vs ${p.position}`,
-      note: "Live NFL warehouse",
-    },
-    similarPropIds: [],
+function leagueFromId(id: string, fallback?: string): LeagueCode {
+  const prefix = id.split(":")[0]?.toLowerCase();
+  const map: Record<string, LeagueCode> = {
+    nba: "NBA",
+    wnba: "WNBA",
+    nfl: "NFL",
+    mlb: "MLB",
+    nhl: "NHL",
+    soccer: "Soccer",
+    atp: "ATP",
+    wta: "WTA",
   };
+  if (prefix && map[prefix]) return map[prefix];
+  const f = String(fallback || "NBA").toUpperCase();
+  if (f === "ATP" || f === "WTA" || f === "SOCCER") return f as LeagueCode;
+  if (["NBA", "NFL", "MLB", "NHL", "WNBA"].includes(f)) return f as LeagueCode;
+  return "NBA";
 }
+
+function researchScore(row: Record<string, unknown>): number {
+  return Math.max(
+    Number(row.researchScore ?? 0),
+    Number(row.confidence ?? 0),
+    Number(row.evPercent ?? 0),
+    Number(row.edgePercent ?? 0),
+    Number(row.noVigProb != null ? (Number(row.noVigProb) - 0.5) * 100 : 0),
+  );
+}
+
+function toHubDetail(row: Record<string, unknown>, leagueHint?: string): PropDetail {
+  const league = leagueFromId(String(row.id ?? ""), leagueHint || String(row.league ?? ""));
+  return asPropDetailFromApi({
+    ...row,
+    league,
+    researchScore: researchScore(row) || Number(row.confidence ?? 50),
+    why: row.why ?? `${row.side ?? "Over"} ${row.line} ${row.market} — live pick'em`,
+    books: Array.isArray(row.books) ? row.books : Array.isArray(row.lines) ? row.lines : [],
+  });
+}
+
+async function fetchBoardProps(path: string): Promise<Record<string, unknown>[]> {
+  const res = await fetch(path);
+  if (!res.ok) return [];
+  const ct = res.headers.get("content-type") || "";
+  if (!ct.includes("application/json")) return [];
+  const data = (await res.json()) as { props?: Record<string, unknown>[] };
+  return Array.isArray(data.props) ? data.props : [];
+}
+
+const LEAGUES: Array<LeagueCode | "All"> = [
+  "All",
+  "NBA",
+  "WNBA",
+  "NFL",
+  "MLB",
+  "NHL",
+  "Soccer",
+  "ATP",
+  "WTA",
+];
 
 export default function ResearchHubPage() {
-  const nba = useQuery({
-    queryKey: ["nba-board"],
+  const { appId, app, ready } = usePickemApp();
+  const platform = appId || "prizepicks";
+  const [leagueFilter, setLeagueFilter] = useState<(typeof LEAGUES)[number]>("All");
+
+  const commandCenter = useQuery({
+    queryKey: ["command-center"],
     queryFn: async () => {
-      const res = await fetch("/api/nba/props");
-      if (!res.ok) throw new Error("board");
-      return res.json() as Promise<{ props: Record<string, unknown>[] }>;
+      const res = await fetch("/api/command-center");
+      if (!res.ok) throw new Error("cc");
+      return res.json() as Promise<{
+        generatedAt?: string;
+        topProps?: Record<string, unknown>[];
+        bestNoVigPicks?: Record<string, unknown>[];
+        propOfTheDay?: Record<string, unknown> | null;
+      }>;
     },
-    staleTime: 120_000,
+    staleTime: 60_000,
+    refetchInterval: 300_000,
   });
 
-  const nfl = useQuery({
-    queryKey: ["nfl-board"],
+  const liveBoards = useQuery({
+    queryKey: ["research-hub-live", platform],
+    enabled: ready,
     queryFn: async () => {
-      const res = await fetch("/api/nfl/props");
-      if (!res.ok) throw new Error("board");
-      return res.json() as Promise<{ props: Record<string, unknown>[] }>;
+      const qs = `platform=${encodeURIComponent(platform)}`;
+      const batches = await Promise.all([
+        fetchBoardProps(`/api/wnba/props?${qs}`),
+        fetchBoardProps(`/api/mlb/props?${qs}`),
+        fetchBoardProps(`/api/nhl/props?${qs}`),
+        fetchBoardProps(`/api/soccer/props?${qs}`),
+        fetchBoardProps(`/api/tennis/props?tour=ATP&${qs}`),
+        fetchBoardProps(`/api/tennis/props?tour=WTA&${qs}`),
+        fetchBoardProps(`/api/nba/props?${qs}`),
+        fetchBoardProps(`/api/nfl/props?${qs}`),
+      ]);
+      return batches.flat();
     },
-    staleTime: 120_000,
+    staleTime: 90_000,
+    refetchInterval: 300_000,
   });
 
-  const liveNba: PropDetail[] = (() => {
-    const rows = (nba.data?.props ?? []).map(asNbaPropFromApi);
-    if (rows.length) cacheNbaBoardProps(rows);
-    const details = rows.map((p) => propDetailFromNbaProp(p));
-    registerPropDetails(details);
-    return details;
-  })();
+  const props = useMemo(() => {
+    const byId = new Map<string, PropDetail>();
 
-  const liveNfl: PropDetail[] = (() => {
-    const rows = (nfl.data?.props ?? []).map(asNflProp);
-    if (rows.length) cacheNflBoardProps(rows);
-    const details = rows.map(nflToDetail);
-    registerPropDetails(details);
-    return details;
-  })();
+    const ingest = (rows: Record<string, unknown>[], leagueHint?: string) => {
+      for (const row of rows) {
+        if (!isLivePickemRow(row)) continue;
+        if (!row.id || row.player == null || row.line == null) continue;
+        const detail = toHubDetail(row, leagueHint);
+        if (!detail.player || !Number.isFinite(detail.line)) continue;
+        const prev = byId.get(detail.id);
+        if (!prev || detail.researchScore > prev.researchScore) {
+          byId.set(detail.id, detail);
+        }
+      }
+    };
 
-  const props = [...liveNba, ...liveNfl].sort((a, b) => b.researchScore - a.researchScore);
-  const loading = (nba.isLoading || nfl.isLoading) && props.length === 0;
+    ingest(commandCenter.data?.bestNoVigPicks ?? []);
+    ingest(commandCenter.data?.topProps ?? []);
+    if (commandCenter.data?.propOfTheDay) {
+      ingest([commandCenter.data.propOfTheDay]);
+    }
+    ingest(liveBoards.data ?? []);
+
+    const list = Array.from(byId.values()).sort((a, b) => b.researchScore - a.researchScore);
+    registerPropDetails(list);
+    return list;
+  }, [commandCenter.data, liveBoards.data]);
+
+  const filtered = useMemo(() => {
+    if (leagueFilter === "All") return props;
+    return props.filter((p) => p.league === leagueFilter);
+  }, [props, leagueFilter]);
+
+  const loading =
+    ready &&
+    (commandCenter.isLoading || liveBoards.isLoading) &&
+    props.length === 0;
+
+  if (!ready) {
+    return (
+      <div>
+        <PageHeader
+          eyebrow="Research desk"
+          title="Research Hub"
+          description="Live optional picks from your connected pick'em app — no mock warehouse lines."
+        />
+        <PickemAppGate />
+      </div>
+    );
+  }
 
   return (
     <div>
       <PageHeader
         eyebrow="Research desk"
         title="Research Hub"
-        description="Cross-league Seraphim reports ranked by research score — open any row for hit rates, projections, and line comparison."
+        description={`Live ${app?.name || "pick'em"} props across leagues — open any row for hit rates, projections, and Live Odds Comparison.`}
         actions={
-          <Link
-            href="/players"
-            className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
-          >
-            Player Profiles
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <PickemAppSwitcher />
+            <Link
+              href="/players"
+              className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
+            >
+              Player Profiles
+            </Link>
+          </div>
         }
       />
 
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        {LEAGUES.map((lg) => (
+          <button
+            key={lg}
+            type="button"
+            onClick={() => setLeagueFilter(lg)}
+            className={
+              leagueFilter === lg
+                ? "rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-2.5 py-1 text-[11px] font-semibold text-yellow-300"
+                : "rounded-lg border border-transparent bg-white/[0.03] px-2.5 py-1 text-[11px] text-neutral-400 hover:border-white/10 hover:text-neutral-200"
+            }
+          >
+            {lg}
+          </button>
+        ))}
+        <span className="ml-auto text-[11px] tabular-nums text-neutral-500">
+          {filtered.length} live pick{filtered.length === 1 ? "" : "s"}
+        </span>
+      </div>
+
       {loading && <CardSkeleton rows={3} />}
 
-      {!loading && props.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <EmptyState
-          title="No live research reports"
-          description="Start the data platform and open the NBA or NFL board to sync props."
+          title="No live optional picks right now"
+          description={`No live ${app?.name || "pick'em"} lines for ${leagueFilter === "All" ? "any league" : leagueFilter}. Switch apps or check back when the slate is open — mock warehouse odds are never shown here.`}
         />
       )}
 
-      {props.length > 0 && (
+      {filtered.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-[#1a1a1a] bg-[#0d0d0d]">
           <div className="overflow-x-auto">
             <table className="min-w-[960px] w-full text-left text-sm">
@@ -159,7 +241,7 @@ export default function ResearchHubPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#151515]">
-                {props.map((prop) => (
+                {filtered.map((prop) => (
                   <tr key={prop.id} className="transition hover:bg-white/[0.02]">
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
@@ -184,7 +266,7 @@ export default function ResearchHubPage() {
                     </td>
                     <td className="px-3 py-3">
                       <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-300">
-                        +{prop.evPercent.toFixed(1)}%
+                        +{Number(prop.evPercent || 0).toFixed(1)}%
                       </span>
                     </td>
                     <td className="px-3 py-3">

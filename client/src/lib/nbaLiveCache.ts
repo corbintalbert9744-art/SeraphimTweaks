@@ -172,6 +172,11 @@ export function asPropDetailFromApi(row: Record<string, unknown>): PropDetail {
     underProbability: row.underProbability != null ? Number(row.underProbability) : undefined,
     bestValueBook: row.bestValueBook != null ? String(row.bestValueBook) : books.find((b) => b.isBestValue)?.book,
     linesAreMock: Boolean(row.linesAreMock ?? books.some((b) => b.isMock || b.requiresIntegration)),
+    linesUpdatedAt: row.linesUpdatedAt != null ? String(row.linesUpdatedAt) : null,
+    linesDiffer: Boolean(row.linesDiffer),
+    connectedBookCount:
+      row.connectedBookCount != null ? Number(row.connectedBookCount) : undefined,
+    consensusLine: row.consensusLine != null ? Number(row.consensusLine) : null,
     homeAway: row.homeAway as PropDetail["homeAway"],
     minutesTrend: row.minutesTrend as PropDetail["minutesTrend"],
     projectedMinutes: row.projectedMinutes != null ? Number(row.projectedMinutes) : undefined,

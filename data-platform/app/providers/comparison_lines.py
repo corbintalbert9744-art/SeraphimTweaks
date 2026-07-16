@@ -5,7 +5,8 @@ Live quotes come from the multi-provider aggregator (PropLine, SharpAPI,
 The Odds API, Antelytics) cached in Postgres.
 
 Canonical operators (always returned):
-  PrizePicks, Underdog, FanDuel, DraftKings, BetMGM, Bovada, Pinnacle, BetRivers
+  PrizePicks, Underdog, FanDuel, DraftKings, BetMGM, Caesars, Fanatics,
+  ESPN BET, Bovada, Pinnacle, BetRivers
 
 Missing operators are marked requires_integration / unavailable — never fabricated.
 """
@@ -66,6 +67,24 @@ CANONICAL_LINE_PROVIDERS: tuple[LineProviderSpec, ...] = (
         notes="Live via PropLine / SharpAPI / The Odds API when keyed.",
     ),
     LineProviderSpec(
+        "caesars",
+        "Caesars",
+        "sportsbook",
+        notes="Live via The Odds API (williamhill_us) / PropLine when keyed.",
+    ),
+    LineProviderSpec(
+        "fanatics",
+        "Fanatics",
+        "sportsbook",
+        notes="Live via PropLine / The Odds API when keyed.",
+    ),
+    LineProviderSpec(
+        "espnbet",
+        "ESPN BET",
+        "sportsbook",
+        notes="Live via PropLine / The Odds API when keyed.",
+    ),
+    LineProviderSpec(
         "bovada",
         "Bovada",
         "sportsbook",
@@ -102,6 +121,7 @@ class ComparisonLine:
     provider: str = "comparison-lines"
     source_provider: Optional[str] = None
     notes: str = ""
+    captured_at: Optional[datetime] = None
 
 
 def edge_vs_projection(projected: float, line: float, model_side: str) -> float:
@@ -147,20 +167,38 @@ class ComparisonLinesProvider(Protocol):
 
 _SLUG_ALIASES = {
     "draftkings": "draftkings",
+    "dk": "draftkings",
     "fanduel": "fanduel",
+    "fd": "fanduel",
     "betmgm": "betmgm",
+    "mgm": "betmgm",
     "williamhill_us": "caesars",
+    "williamhill": "caesars",
     "caesars": "caesars",
+    "czr": "caesars",
     "espnbet": "espnbet",
     "espn_bet": "espnbet",
+    "espn": "espnbet",
     "fanatics": "fanatics",
     "bovada": "bovada",
     "pinnacle": "pinnacle",
     "betrivers": "betrivers",
     "prizepicks": "prizepicks",
     "underdog": "underdog",
+    "underdogfantasy": "underdog",
     "unibet": "unibet",
+    "sleeper": "sleeper",
+    "parlayplay": "parlayplay",
 }
+
+
+def normalize_book_slug(slug: str | None) -> str:
+    raw = (slug or "").lower().replace(" ", "").replace("-", "").replace("_", "")
+    # Keep underscore form for williamhill_us before stripping
+    spaced = (slug or "").lower().replace(" ", "").replace("-", "_")
+    if spaced in _SLUG_ALIASES:
+        return _SLUG_ALIASES[spaced]
+    return _SLUG_ALIASES.get(raw, raw)
 
 
 class CatalogComparisonLinesProvider:
@@ -197,8 +235,7 @@ class CatalogComparisonLinesProvider:
         _ = (league, player_name, player_external_id, market, projected_value, game_external_id)
         live_by_slug: dict[str, dict[str, NormalizedOddsQuote]] = {}
         for q in live_quotes or []:
-            slug = (q.sportsbook_slug or "").lower().replace(" ", "").replace("-", "")
-            key = _SLUG_ALIASES.get(slug, slug)
+            key = normalize_book_slug(q.sportsbook_slug)
             bucket = live_by_slug.setdefault(key, {})
             if q.side not in bucket or q.side == "Over":
                 bucket[q.side] = q
@@ -217,6 +254,12 @@ class CatalogComparisonLinesProvider:
                     if line_q
                     else None
                 )
+                captured = None
+                for candidate in (over_q, under_q, line_q):
+                    if candidate is not None and getattr(candidate, "captured_at", None):
+                        ts = candidate.captured_at
+                        if captured is None or (ts and ts > captured):
+                            captured = ts
                 out.append(
                     ComparisonLine(
                         name=spec.name,
@@ -231,6 +274,7 @@ class CatalogComparisonLinesProvider:
                         provider=source or "line-aggregator",
                         source_provider=source,
                         notes=f"Live via {source or 'aggregator'}",
+                        captured_at=captured,
                     )
                 )
                 continue
@@ -249,6 +293,7 @@ class CatalogComparisonLinesProvider:
                     provider="unavailable",
                     source_provider=None,
                     notes=spec.notes or "Unavailable from configured line providers — not fabricated.",
+                    captured_at=None,
                 )
             )
         return out
@@ -293,7 +338,7 @@ class CatalogComparisonLinesProvider:
                         sportsbook_slug=row.slug,
                         sportsbook_name=row.name,
                         game_external_id=game_external_id,
-                        captured_at=now,
+                        captured_at=row.captured_at or now,
                         is_mock=row.is_mock,
                         source_provider=row.source_provider,
                     )

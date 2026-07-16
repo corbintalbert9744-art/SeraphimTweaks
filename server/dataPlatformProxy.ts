@@ -215,6 +215,25 @@ export function registerDataPlatformProxy(
     }
   });
 
+  // Live Odds Comparison — canonical books + pick'em via provider adapters
+  app.get("/api/odds/providers", async (_req, res) => {
+    await proxyGet(`/api/v1/odds/providers`, res, async () => {
+      res.status(503).json({ error: "Odds providers require the data platform", providers: [] });
+    });
+  });
+
+  app.get("/api/odds/comparison/:id", async (req, res) => {
+    const propId = req.params.id;
+    const qs = typeof req.query.league === "string" ? `?league=${encodeURIComponent(req.query.league)}` : "";
+    await proxyGet(
+      `/api/v1/odds/comparison/${encodeURIComponent(propId)}${qs}`,
+      res,
+      async () => {
+        res.status(503).json({ error: "Live odds comparison requires the data platform", books: [] });
+      },
+    );
+  });
+
   app.get("/api/v1/providers/runs", async (req, res) => {
     const limit = typeof req.query.limit === "string" ? req.query.limit : "25";
     try {

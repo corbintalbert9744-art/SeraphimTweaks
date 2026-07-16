@@ -29,6 +29,14 @@ export interface BookQuote {
   /** Upstream adapter that supplied this line (propline, sharpapi, …). */
   sourceProvider?: string | null;
   provider?: string | null;
+  /** ISO timestamp when this operator’s line was captured in Postgres. */
+  capturedAt?: string | null;
+  /** True when connected books disagree on the line. */
+  linesDiffer?: boolean;
+  /** Line minus consensus among connected books. */
+  lineDiffFromConsensus?: number | null;
+  /** Signed gap vs best-value line for the model side. */
+  lineDiffFromBest?: number | null;
 }
 
 export interface OpponentDefense {
@@ -75,6 +83,11 @@ export interface PropDetail {
   underProbability?: number;
   bestValueBook?: string;
   linesAreMock?: boolean;
+  /** Newest connected book capture time (ISO). */
+  linesUpdatedAt?: string | null;
+  linesDiffer?: boolean;
+  connectedBookCount?: number;
+  consensusLine?: number | null;
   homeAway?: {
     home: { samples: number; average: number | null; rate?: number | null };
     away: { samples: number; average: number | null; rate?: number | null };

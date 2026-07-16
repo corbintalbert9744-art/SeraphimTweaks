@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db.session import get_db
 from app.ingestion.generic_board import ensure_league_board, list_league_props
-from app.ingestion.comparison_books import build_market_comparison_books
+from app.ingestion.comparison_books import build_live_odds_comparison
 from app.ingestion.multi_sport_sync import (
     sync_all_sports,
     sync_mlb_warehouse,
@@ -274,16 +274,27 @@ def mlb_prop_detail(prop_id: str, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="Prop not found")
     projected = float(row.get("projectedValue") or row.get("line") or 0)
-    books = build_market_comparison_books(
+    comparison = build_live_odds_comparison(
         db,
         league="MLB",
         base=row,
         projected=projected,
         model_side=str(row.get("side") or "Over"),
     )
+    books = comparison["books"]
     return {
         "ok": True,
-        "prop": {**row, "books": books, "lines": books},
+        "prop": {
+            **row,
+            "books": books,
+            "lines": books,
+            "linesUpdatedAt": comparison.get("linesUpdatedAt"),
+            "linesDiffer": comparison.get("linesDiffer", False),
+            "connectedBookCount": comparison.get("connectedCount", 0),
+            "consensusLine": comparison.get("consensusLine"),
+            "bestValueBook": comparison.get("bestLineBook"),
+            "oddsComparison": comparison,
+        },
         "live": True,
         "league": "MLB",
     }
@@ -296,16 +307,27 @@ def nhl_prop_detail(prop_id: str, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="Prop not found")
     projected = float(row.get("projectedValue") or row.get("line") or 0)
-    books = build_market_comparison_books(
+    comparison = build_live_odds_comparison(
         db,
         league="NHL",
         base=row,
         projected=projected,
         model_side=str(row.get("side") or "Over"),
     )
+    books = comparison["books"]
     return {
         "ok": True,
-        "prop": {**row, "books": books, "lines": books},
+        "prop": {
+            **row,
+            "books": books,
+            "lines": books,
+            "linesUpdatedAt": comparison.get("linesUpdatedAt"),
+            "linesDiffer": comparison.get("linesDiffer", False),
+            "connectedBookCount": comparison.get("connectedCount", 0),
+            "consensusLine": comparison.get("consensusLine"),
+            "bestValueBook": comparison.get("bestLineBook"),
+            "oddsComparison": comparison,
+        },
         "live": True,
         "league": "NHL",
     }
@@ -512,16 +534,28 @@ def tennis_prop_detail(
     if not row:
         raise HTTPException(status_code=404, detail="Prop not found")
     projected = float(row.get("projectedValue") or row.get("line") or 0)
-    books = build_market_comparison_books(
+    comparison = build_live_odds_comparison(
         db,
         league=code,
         base={**row, "league": code},
         projected=projected,
         model_side=str(row.get("side") or "Over"),
     )
+    books = comparison["books"]
     return {
         "ok": True,
-        "prop": {**row, "league": code, "books": books, "lines": books},
+        "prop": {
+            **row,
+            "league": code,
+            "books": books,
+            "lines": books,
+            "linesUpdatedAt": comparison.get("linesUpdatedAt"),
+            "linesDiffer": comparison.get("linesDiffer", False),
+            "connectedBookCount": comparison.get("connectedCount", 0),
+            "consensusLine": comparison.get("consensusLine"),
+            "bestValueBook": comparison.get("bestLineBook"),
+            "oddsComparison": comparison,
+        },
         "live": True,
         "league": code,
     }

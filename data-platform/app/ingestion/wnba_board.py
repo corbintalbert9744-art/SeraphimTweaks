@@ -31,7 +31,7 @@ from app.ingestion.warehouse import (
     upsert_prop,
 )
 from app.providers.comparison_lines import get_comparison_lines_provider
-from app.ingestion.comparison_books import build_market_comparison_books
+from app.ingestion.comparison_books import build_live_odds_comparison
 from app.providers.base import NormalizedGame, NormalizedPlayer
 from app.providers.registry import get_wnba_providers
 
@@ -477,13 +477,14 @@ def get_wnba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
     projected = float(base.get("projectedValue") or (analytics.projected_value if analytics else 0) or 0)
     model_side = str(base.get("side") or "Over")
 
-    books = build_market_comparison_books(
+    comparison = build_live_odds_comparison(
         db,
         league="WNBA",
         base=base,
         projected=projected,
         model_side=model_side,
     )
+    books = comparison["books"]
 
     line = float(base["line"])
     movement = [
@@ -568,7 +569,13 @@ def get_wnba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
         "checks": analytics.checks if analytics and analytics.checks else [],
         "books": books,
         "lines": books,  # alias for pick'em + sportsbook comparison UI
-        "bestValueBook": books[0]["book"] if books else None,
+        "bestValueBook": comparison.get("bestLineBook")
+        or next((b["book"] for b in books if b.get("isBestValue")), books[0]["book"] if books else None),
+        "linesUpdatedAt": comparison.get("linesUpdatedAt"),
+        "linesDiffer": comparison.get("linesDiffer", False),
+        "connectedBookCount": comparison.get("connectedCount", 0),
+        "consensusLine": comparison.get("consensusLine"),
+        "oddsComparison": comparison,
         "movement": movement,
         "analysis": analytics.explain_bullets if analytics else [],
         "opponentDefense": {

@@ -418,10 +418,11 @@ export default function PropDetailPage() {
             books={prop.books}
             projected={projected}
             modelSide={recommendation}
-            consensusLine={prop.line}
+            consensusLine={prop.consensusLine ?? prop.line}
             selectedSide={selectedSide}
             selectedBook={selectedBook}
             onSelectBook={setSelectedBook}
+            linesUpdatedAt={prop.linesUpdatedAt}
           />
         </div>
 

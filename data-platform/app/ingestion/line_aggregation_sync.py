@@ -6,7 +6,6 @@ Runs on the scheduler — pages read cached warehouse rows, not live vendor APIs
 from __future__ import annotations
 
 import logging
-import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -14,8 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db.models import LineSnapshot, Player, Prop, PropAnalytics
-from app.ingestion.warehouse import ensure_sportsbook, insert_odds
+from app.db.models import Player, Prop, PropAnalytics
+from app.ingestion.warehouse import insert_odds
 from app.providers.base import NormalizedOddsQuote, run_provider_job
 from app.providers.line_aggregation.factory import get_line_aggregator
 from app.providers.propline.markets import PICKEM_SLUGS, normalize_league
@@ -145,26 +144,8 @@ def _apply_quotes_to_open_props(
 
         for q in hits:
             source = q.source_provider or "line-aggregator"
-            insert_odds(db, q, prop.id, provider_name=source)
-            book = ensure_sportsbook(
-                db,
-                q.sportsbook_slug,
-                q.sportsbook_name,
-                kind="pickem" if q.sportsbook_slug in PICKEM_SLUGS else "sportsbook",
-                provider=source,
-            )
-            db.flush()
-            db.add(
-                LineSnapshot(
-                    id=str(uuid.uuid4()),
-                    prop_id=prop.id,
-                    sportsbook_id=book.id,
-                    line=float(q.line),
-                    american_odds=int(q.american_odds),
-                    source=source,
-                    captured_at=q.captured_at or now,
-                )
-            )
+            # insert_odds also writes a timestamped line_snapshots row
+            insert_odds(db, q, prop.id, provider_name=source, write_snapshot=True)
             snapshots += 1
 
     return matched_props, snapshots
