@@ -463,6 +463,7 @@ def get_nba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
     analytics = db.execute(select(PropAnalytics).where(PropAnalytics.prop_id == prop_id)).scalar_one_or_none()
     projected = float(base.get("projectedValue") or (analytics.projected_value if analytics else 0) or 0)
     model_side = str(base.get("side") or "Over")
+    line = float(base.get("line") or base.get("comparisonLine") or projected or 0)
 
     comparison = build_live_odds_comparison(
         db,

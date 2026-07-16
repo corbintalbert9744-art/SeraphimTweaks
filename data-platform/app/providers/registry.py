@@ -283,6 +283,7 @@ def provider_status() -> list[dict]:
             "operators": [
                 "PrizePicks",
                 "Underdog",
+                "Sleeper",
                 "FanDuel",
                 "DraftKings",
                 "BetMGM",

@@ -37,24 +37,38 @@ def _infer_league(prop_id: str, league: str | None) -> str | None:
 
 
 def _prop_base(db: Session, prop_id: str, league: str | None) -> tuple[dict, str]:
-    """Resolve a prop row + league for comparison."""
+    """Resolve a prop row + league for comparison.
+
+    Prefer board rows + build_live_odds_comparison over full detail builders so a
+    secondary research-detail bug cannot blank the entire Live Odds table.
+    """
     inferred = _infer_league(prop_id, league)
     order = (
         [inferred]
         if inferred
         else ["NBA", "WNBA", "NFL", "MLB", "NHL", "Soccer", "ATP", "WTA"]
     )
-    # Prefer rich detail builders when available
     for code in order:
         if code == "NBA":
-            detail = get_nba_prop_detail(db, prop_id)
-            if detail:
-                return detail, "NBA"
             board = {p["id"]: p for p in list_nba_props_from_warehouse(db)}
             if prop_id in board:
                 return board[prop_id], "NBA"
+            try:
+                detail = get_nba_prop_detail(db, prop_id)
+            except Exception:  # noqa: BLE001 — comparison must degrade gracefully
+                detail = None
+            if detail:
+                return detail, "NBA"
         elif code == "WNBA":
-            detail = get_wnba_prop_detail(db, prop_id)
+            from app.ingestion.wnba_board import list_wnba_props_from_warehouse
+
+            board = {p["id"]: p for p in list_wnba_props_from_warehouse(db)}
+            if prop_id in board:
+                return board[prop_id], "WNBA"
+            try:
+                detail = get_wnba_prop_detail(db, prop_id)
+            except Exception:  # noqa: BLE001
+                detail = None
             if detail:
                 return detail, "WNBA"
         props = list_league_props(db, code)

@@ -11,10 +11,11 @@ Rules:
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models import LineSnapshot, Odds, Player, Prop, Sportsbook
@@ -31,6 +32,11 @@ PICKEM_SLUGS = {"prizepicks", "underdog", "sleeper", "parlayplay"}
 
 def _slugify_book(slug: str | None, name: str) -> str:
     return normalize_book_slug(slug or name)
+
+
+def _player_name_slug(name: str) -> str:
+    """Normalize a display name for cross-platform pick'em prop id matching."""
+    return re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-")
 
 
 def _platform_from_prop_id(prop_id: str) -> Optional[str]:
@@ -107,8 +113,14 @@ def _collect_live_odds_rows(
     market: str,
     league: str,
 ) -> list[tuple[Odds, Sportsbook]]:
-    """Live odds on this prop, same-player siblings, and same-name peers."""
-    prop_ids: set[str] = {prop_id}
+    """Live odds on this prop, same-player siblings, and same-name peers.
+
+    Peers include other pick'em platforms (PrizePicks / Underdog / Sleeper) that
+    share the player display name or slugified name in the prop id — board props
+    and pick'em props often use different warehouse player ids.
+    """
+    prop_ids: set[str] = {prop_id} if prop_id else set()
+    league_codes = {league, league.upper(), league.lower()} if league else set()
 
     if player_warehouse_id:
         for row in (
@@ -125,16 +137,11 @@ def _collect_live_odds_rows(
             prop_ids.add(str(row))
 
     if player_name:
-        peer_ids = (
-            db.execute(
-                select(Player.id).where(
-                    Player.full_name == player_name,
-                    or_(Player.league == league, Player.league == league.upper()),
-                )
-            )
-            .scalars()
-            .all()
-        )
+        name_norm = player_name.strip().lower()
+        peer_q = select(Player.id).where(func.lower(Player.full_name) == name_norm)
+        if league_codes:
+            peer_q = peer_q.where(Player.league.in_(list(league_codes)))
+        peer_ids = db.execute(peer_q).scalars().all()
         if peer_ids:
             for row in (
                 db.execute(
@@ -148,6 +155,35 @@ def _collect_live_odds_rows(
                 .all()
             ):
                 prop_ids.add(str(row))
+
+        # Cross-platform pick'em ids: wnba:pickem:sleeper:carla-leite:points
+        slug = _player_name_slug(player_name)
+        if slug:
+            market_token = re.sub(r"[^a-z0-9]+", "", (market or "").lower())
+            league_prefix = (league or "").split()[0].lower() if league else ""
+            id_filters = [Prop.id.contains(f":{slug}:")]
+            if league_prefix:
+                id_filters.append(Prop.id.startswith(f"{league_prefix}:"))
+            slug_props = (
+                db.execute(
+                    select(Prop.id).where(
+                        *id_filters,
+                        Prop.market == market,
+                        Prop.status == "open",
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for row in slug_props:
+                pid = str(row)
+                # Prefer props whose trailing market token matches (points, assists, …)
+                if market_token and market_token not in pid.replace("+", "").replace("-", ""):
+                    continue
+                prop_ids.add(pid)
+
+    if not prop_ids:
+        return []
 
     rows = (
         db.execute(

@@ -16,6 +16,7 @@ def test_canonical_catalog_includes_major_books():
     for expected in (
         "prizepicks",
         "underdog",
+        "sleeper",
         "fanduel",
         "draftkings",
         "betmgm",
