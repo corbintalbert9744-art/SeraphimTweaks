@@ -16,3 +16,9 @@ export {
   NoVigOddsCard,
   BookLineStrip,
 } from "./DeskPrimitives";
+export {
+  MarketVsModelPanel,
+  MarketVsModelMetrics,
+  summarizeMarketVsModel,
+  type MarketVsModelSummary,
+} from "./MarketVsModelPanel";

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Plus, Check, Info } from "lucide-react";
+import { ArrowLeft, Plus, Check } from "lucide-react";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { propIdToBuilderLeg } from "@/lib/addPropToBuilder";
@@ -23,9 +23,9 @@ import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
-  BookLineStrip,
   HitRateSummaryBoxes,
   MarketTabs,
+  MarketVsModelPanel,
   NoVigOddsCard,
 } from "@/components/research";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
@@ -754,34 +754,22 @@ export default function PlayerPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Metric
-              label="Our Projection"
-              value={market.projectedValue.toFixed(1)}
-              hint="Seraphim model"
-              lean={market.side}
-            />
-            <Metric
-              label="Edge"
-              value={`${market.edgeVsLine > 0 ? "+" : ""}${market.edgeVsLine.toFixed(1)}`}
-              hint="vs platform line"
-              lean={market.side}
-            />
-            <Metric
-              label="Edge %"
-              value={`${market.edgePercent > 0 ? "+" : ""}${market.edgePercent.toFixed(1)}%`}
-              hint="edge / line"
-              lean={market.side}
-            />
-            <Metric label="Confidence" value={`${market.confidence}%`} hint="model certainty" />
-            <Metric label="Research Score" value={`${market.researchScore}`} hint="checklist-backed" />
-            <Metric
-              label="Model EV"
-              value={`+${market.evPercent.toFixed(1)}%`}
-              hint="vs comparison odds"
-              lean={market.side}
-            />
-          </div>
+          <MarketVsModelPanel
+            propId={market.propId}
+            projected={market.projectedValue}
+            line={market.line}
+            side={market.side === "Under" ? "Under" : "Over"}
+            overProbability={market.overProbability}
+            underProbability={market.underProbability}
+            confidence={market.confidence}
+            researchScore={market.researchScore}
+            evPercent={market.evPercent}
+            selectedSide={selectedSide === "Under" ? "Under" : "Over"}
+            onSelectSide={(s) => setSide(s)}
+            showComparison
+            showMovement={false}
+            compact
+          />
 
           <ProOnly
             title="Why this lean"
@@ -819,24 +807,6 @@ export default function PlayerPage() {
             }
             vigPct={5.2}
             side={selectedSide}
-          />
-
-          <BookLineStrip
-            books={[
-              {
-                book: "Seraphim",
-                line: market.line,
-                odds: market.americanOdds > 0 ? `+${market.americanOdds}` : String(market.americanOdds),
-                evPct: market.evPercent,
-                highlight: true,
-              },
-              {
-                book: "Consensus",
-                line: market.line,
-                odds: "-110",
-                evPct: null,
-              },
-            ]}
           />
 
           <div className="rounded-2xl border border-[#1a1a1a] bg-[#0c0c0c] p-4">
@@ -926,32 +896,3 @@ export default function PlayerPage() {
   );
 }
 
-function Metric({
-  label,
-  value,
-  hint,
-  lean,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  lean?: "Over" | "Under" | string | null;
-}) {
-  return (
-    <div className="card-3d rounded-2xl border border-[#1a1a1a] p-3.5">
-      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
-        {label}
-        {hint && <Info className="h-3 w-3 opacity-50" aria-label={hint} />}
-      </div>
-      <p
-        className={cn(
-          "mt-2 text-xl font-semibold tabular-nums",
-          lean ? leanTextClass(lean) : "text-white",
-        )}
-      >
-        {value}
-      </p>
-      {hint && <p className="mt-1 text-[10px] text-neutral-600">{hint}</p>}
-    </div>
-  );
-}

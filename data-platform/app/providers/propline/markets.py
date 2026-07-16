@@ -190,12 +190,18 @@ LABEL_TO_MARKET_KEYS: dict[str, tuple[str, ...]] = {
 }
 
 # Bookmakers returned by PropLine (docs). Used for UI catalog + kind.
+# Aliases (williamhill_us, espn_bet, …) normalize via comparison_lines.normalize_book_slug.
 PROPLINE_BOOKMAKERS: dict[str, dict[str, str]] = {
     "prizepicks": {"name": "PrizePicks", "kind": "pickem"},
     "underdog": {"name": "Underdog", "kind": "pickem"},
     "fanduel": {"name": "FanDuel", "kind": "sportsbook"},
     "draftkings": {"name": "DraftKings", "kind": "sportsbook"},
     "betmgm": {"name": "BetMGM", "kind": "sportsbook"},
+    "caesars": {"name": "Caesars", "kind": "sportsbook"},
+    "williamhill_us": {"name": "Caesars", "kind": "sportsbook"},
+    "fanatics": {"name": "Fanatics", "kind": "sportsbook"},
+    "espnbet": {"name": "ESPN BET", "kind": "sportsbook"},
+    "espn_bet": {"name": "ESPN BET", "kind": "sportsbook"},
     "bovada": {"name": "Bovada", "kind": "sportsbook"},
     "pinnacle": {"name": "Pinnacle", "kind": "sportsbook"},
     "betrivers": {"name": "BetRivers", "kind": "sportsbook"},

@@ -31,7 +31,7 @@ from app.ingestion.warehouse import (
     upsert_prop,
 )
 from app.providers.comparison_lines import get_comparison_lines_provider
-from app.ingestion.comparison_books import build_live_odds_comparison
+from app.ingestion.comparison_books import build_line_movement, build_live_odds_comparison
 from app.providers.base import NormalizedGame, NormalizedPlayer
 from app.providers.registry import get_wnba_providers
 
@@ -486,12 +486,14 @@ def get_wnba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
     )
     books = comparison["books"]
 
-    line = float(base["line"])
-    movement = [
-        {"label": "Open", "line": line + 0.5, "odds": -110},
-        {"label": "AM", "line": line, "odds": -110},
-        {"label": "Now", "line": line, "odds": base["americanOdds"]},
-    ]
+    movement = build_line_movement(
+        db,
+        prop_id=prop_id,
+        player_warehouse_id=str(base.get("playerWarehouseId") or "") or None,
+        player_name=str(base.get("player") or ""),
+        market=str(base.get("market") or ""),
+        league="WNBA",
+    )
 
     # Research context from warehouse gamelogs
     player = None

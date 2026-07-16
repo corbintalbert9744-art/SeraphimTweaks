@@ -21,12 +21,11 @@ import { decodeRouteId, playerProfilePath, propResearchPath } from "@/lib/player
 import { cn } from "@/lib/utils";
 import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
-import { LineComparison } from "@/components/shared/LineComparison";
 import {
   EvPlusBadge,
   HitRateBars,
   HitRateSummaryBoxes,
-  LineMovementChart,
+  MarketVsModelPanel,
   NoVigOddsCard,
   parseHitRate,
   type HitWindow,
@@ -416,15 +415,30 @@ export default function PropDetailPage() {
             />
           </section>
 
-          <LineComparison
-            books={prop.books}
+          <MarketVsModelPanel
+            propId={prop.id}
             projected={projected}
-            modelSide={recommendation}
-            consensusLine={prop.consensusLine ?? prop.line}
+            line={prop.consensusLine ?? prop.line}
+            side={recommendation}
+            overProbability={prop.overProbability ?? prop.noVigProb}
+            underProbability={prop.underProbability ?? prop.noVigOpposite}
+            confidence={prop.confidence}
+            researchScore={prop.researchScore}
+            evPercent={prop.evPercent}
+            books={prop.books}
+            movement={prop.movement}
+            linesUpdatedAt={prop.linesUpdatedAt}
+            bestLine={
+              prop.books.find((b) => b.isBestValue && !b.requiresIntegration)?.line ?? null
+            }
+            bestLineBook={prop.bestValueBook ?? prop.bestEvBook ?? null}
+            connectedCount={prop.connectedBookCount}
             selectedSide={selectedSide}
+            onSelectSide={setSide}
             selectedBook={selectedBook}
             onSelectBook={setSelectedBook}
-            linesUpdatedAt={prop.linesUpdatedAt}
+            showComparison
+            showMovement
           />
         </div>
 
@@ -497,44 +511,35 @@ export default function PropDetailPage() {
         </aside>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <section className={cn(panel, "p-3 sm:p-4")}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <h2 className="text-sm font-semibold text-white">Home vs Away</h2>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {(["home", "away"] as const).map((key) => {
-                  const split = prop.homeAway?.[key];
-                  return (
-                    <div key={key} className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
-                      <p className="text-[10px] uppercase tracking-wider text-neutral-500">{key}</p>
-                      <p className="mt-0.5 text-lg font-semibold tabular-nums text-white">
-                        {split?.average != null ? split.average.toFixed(1) : "—"}
-                      </p>
-                      <p className="text-[10px] text-neutral-500">{split?.samples ?? 0} samples</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-white">Opponent</h2>
-              <p className="mt-2 text-xs text-yellow-400/90">
-                vs {prop.opponentHistory?.opponent ?? prop.opponent}
-                {prop.opponentHistory?.average != null ? ` · avg ${prop.opponentHistory.average.toFixed(1)}` : ""}
-              </p>
-              <p className="mt-1 text-[11px] text-neutral-500">{prop.opponentDefense.note}</p>
+      <section className={cn(panel, "p-3 sm:p-4")}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <h2 className="text-sm font-semibold text-white">Home vs Away</h2>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {(["home", "away"] as const).map((key) => {
+                const split = prop.homeAway?.[key];
+                return (
+                  <div key={key} className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-neutral-500">{key}</p>
+                    <p className="mt-0.5 text-lg font-semibold tabular-nums text-white">
+                      {split?.average != null ? split.average.toFixed(1) : "—"}
+                    </p>
+                    <p className="text-[10px] text-neutral-500">{split?.samples ?? 0} samples</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </section>
-
-        <section className={cn(panel, "p-3 sm:p-4")} data-feature="line-movement">
-          <h2 className="text-sm font-semibold text-white">Line movement</h2>
-          <div className="mt-2">
-            <LineMovementChart points={prop.movement} />
+          <div>
+            <h2 className="text-sm font-semibold text-white">Opponent</h2>
+            <p className="mt-2 text-xs text-yellow-400/90">
+              vs {prop.opponentHistory?.opponent ?? prop.opponent}
+              {prop.opponentHistory?.average != null ? ` · avg ${prop.opponentHistory.average.toFixed(1)}` : ""}
+            </p>
+            <p className="mt-1 text-[11px] text-neutral-500">{prop.opponentDefense.note}</p>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
 
       <ProOnly
         title="AI explanation"

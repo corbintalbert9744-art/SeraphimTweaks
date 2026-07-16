@@ -77,8 +77,28 @@ def _prop_base(db: Session, prop_id: str, league: str | None) -> tuple[dict, str
 
 @router.get("/providers")
 def odds_providers():
-    """Canonical sportsbook + pick'em catalog (frontend adapters map onto these slugs)."""
-    return {"ok": True, "providers": canonical_provider_catalog()}
+    """Canonical sportsbook + pick'em catalog + upstream adapter configuration status.
+
+    Operator rows stay unavailable until a live quote is captured — never fabricated.
+    """
+    from app.providers.line_aggregation.factory import get_line_aggregator
+
+    try:
+        agg = get_line_aggregator().status()
+        adapters = list(agg.get("adapters") or [])
+    except Exception:  # noqa: BLE001 — status must never 500 the catalog
+        adapters = []
+    configured = [a for a in adapters if a.get("configured")]
+    return {
+        "ok": True,
+        "providers": canonical_provider_catalog(),
+        "adapters": adapters,
+        "configuredAdapterCount": len(configured),
+        "disclaimer": (
+            "Connected books only show live captured lines. "
+            "Unavailable operators stay blank — market data is never fabricated."
+        ),
+    }
 
 
 @router.get("/comparison/{prop_id:path}")
