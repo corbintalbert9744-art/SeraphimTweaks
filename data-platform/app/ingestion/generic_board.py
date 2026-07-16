@@ -25,6 +25,18 @@ from app.providers.comparison_lines import get_comparison_lines_provider
 
 log = logging.getLogger(__name__)
 
+
+def normalize_league(league: str) -> str:
+    """Canonical league codes used in Prop.league / Player.league."""
+    raw = (league or "").strip()
+    if not raw:
+        return raw
+    upper = raw.upper()
+    if upper == "SOCCER":
+        return "Soccer"
+    return upper
+
+
 # Default markets when callers do not pass an explicit list.
 # Values are (market_name, raw_stat_key | None). None = use PlayerGameLog.points.
 DEFAULT_LEAGUE_MARKETS: dict[str, tuple[tuple[str, Optional[str]], ...]] = {
@@ -126,7 +138,7 @@ def ensure_league_board(
     builder always recomputes from current warehouse rows.
     """
     _ = force
-    code = (league or league_code or "").upper()
+    code = normalize_league(league or league_code or "")
     if not code:
         return {"ok": False, "count": 0, "props": [], "error": "league required"}
 
@@ -331,7 +343,7 @@ def ensure_league_board(
 
 def list_league_props(db: Session, league: str, *, limit: int = 200) -> list[dict[str, Any]]:
     """Serialize open props + analytics for a league board."""
-    code = league.upper()
+    code = normalize_league(league)
     rows = (
         db.execute(
             select(Prop, PropAnalytics, Player)
