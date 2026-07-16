@@ -57,22 +57,34 @@ Node Express can proxy these (see `server/dataPlatformProxy.ts`) so the React ap
 
 | Job | Default | Purpose |
 |-----|---------|---------|
-| import_games | 05:10 UTC daily | Today's NBA schedule |
+| bootstrap_nba_sync | on start | ESPN → warehouse (games, players, logs, injuries, props) |
+| nba_full_sync | every 60m | Full NBA day sync (`NBA_SYNC_MINUTES`) |
+| import_games | 05:10 UTC daily | Today's NBA (+ NFL) schedule |
 | refresh_odds | every 15m | Odds refresh (live or mock) |
 | update_injuries | every 30m | Injury feed |
-| import_stats | every 2h | Gamelog refresh |
+| import_stats | every 2h | Slate / gamelog refresh |
 | recalculate_analytics | every 20m | L5/L10/L20, EV, scores |
 
-Disable with `ENABLE_SCHEDULER=false`.
+Disable with `ENABLE_SCHEDULER=false`. Skip bootstrap with `BOOTSTRAP_NBA_SYNC=false`.
+
+```bash
+# Manual full sync
+npm run data-platform:sync
+# or
+curl -X POST http://localhost:8000/api/v1/nba/jobs/sync
+```
 
 ## Provider configuration (required vs mock)
 
 | Provider | Status | Config |
 |----------|--------|--------|
-| **espn-nba** | Live | None |
+| **espn-nba** | Live (first legitimate provider) | None — public ESPN APIs |
 | **the-odds-api** | Live when keyed | `ODDS_API_KEY` — without it, **mock -110** odds are used and flagged `oddsAreMock: true` |
-| **espn-nfl / wnba** | Planned | Build after NBA warehouse stable |
+| **espn-nfl** | Live | None |
+| **espn-wnba** | Planned | Build after NBA warehouse stable |
 | **ATP / WTA** | Needs selection | Choose a licensed tennis + odds provider before production |
+
+See `PROVIDERS.md` for the adapter framework.
 
 ## Analytics transparency
 
@@ -97,8 +109,8 @@ SQLAlchemy models in `app/db/models.py` align with `shared/schema.ts` and add:
 ## Development order
 
 1. ✅ Database schema  
-2. ✅ Provider adapter framework  
-3. ✅ NBA live data (ESPN)  
+2. ✅ Provider adapter framework (`framework.py` + registry)  
+3. ✅ NBA live data (ESPN) + scheduled warehouse sync  
 4. ✅ NBA analytics + **rule-based prediction engine**  
 5. ✅ FastAPI + scheduler  
 6. ✅ Connect frontend (Express proxy)  

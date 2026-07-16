@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     schedule_odds_minutes: int = 15
     schedule_injuries_minutes: int = 30
     schedule_analytics_minutes: int = 20
+    schedule_nba_sync_minutes: int = Field(default=60, alias="NBA_SYNC_MINUTES")
+    bootstrap_nba_sync: bool = Field(default=True, alias="BOOTSTRAP_NBA_SYNC")
+    nba_sync_max_games: int = Field(default=8, alias="NBA_SYNC_MAX_GAMES")
+    nba_sync_per_team: int = Field(default=3, alias="NBA_SYNC_PER_TEAM")
 
     odds_api_key: str | None = Field(default=None, alias="ODDS_API_KEY")
     espn_user_agent: str = "SeraphimAnalytics/1.0 (+data-platform)"

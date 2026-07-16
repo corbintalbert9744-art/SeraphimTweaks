@@ -1,7 +1,7 @@
-"""ESPN NBA adapter — public APIs, no key required.
+"""ESPN NBA adapter — first legitimate sports data provider (public APIs, no key).
 
-Capabilities: schedule, gamelog, injuries, featured athlete.
-Odds / props: not provided by ESPN — use OddsProvider separately.
+Capabilities: schedule, roster, gamelog, injuries, featured athlete, slate athletes.
+Odds / props: not provided by ESPN — use OddsProvider / comparison lines separately.
 """
 
 from __future__ import annotations
@@ -9,13 +9,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-import httpx
-
 from app.providers.base import (
     NormalizedGame,
     NormalizedGamelog,
     NormalizedInjury,
     NormalizedPlayer,
+    ProviderHttpClient,
     ProviderMeta,
 )
 
@@ -24,23 +23,29 @@ ESPN_WEB = "https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba"
 
 
 class EspnNbaProvider:
+    """Live ESPN NBA provider implementing schedule/roster/gamelog/injuries/slate."""
+
     meta = ProviderMeta(
         name="espn-nba",
         leagues=["NBA"],
-        capabilities=["schedule", "gamelog", "injuries", "featured", "roster"],
+        capabilities=["schedule", "gamelog", "injuries", "featured", "roster", "slate"],
         requires_api_key=False,
         is_mock=False,
-        notes="Live ESPN public endpoints for NBA scoreboard, gamelogs, injuries, and rosters.",
+        notes="Live ESPN public endpoints for NBA scoreboard, rosters, gamelogs, and injuries.",
+        homepage="https://www.espn.com/nba/",
     )
 
-    def __init__(self, user_agent: str = "SeraphimAnalytics/1.0") -> None:
+    def __init__(
+        self,
+        user_agent: str = "SeraphimAnalytics/1.0",
+        *,
+        http: ProviderHttpClient | None = None,
+    ) -> None:
         self.user_agent = user_agent
+        self.http = http or ProviderHttpClient(user_agent=user_agent)
 
     def _get(self, url: str) -> Any:
-        with httpx.Client(timeout=30.0, headers={"User-Agent": self.user_agent, "Accept": "application/json"}) as client:
-            res = client.get(url)
-            res.raise_for_status()
-            return res.json()
+        return self.http.get_json(url)
 
     def fetch_schedule(self, league: str = "NBA", date: Optional[str] = None) -> list[NormalizedGame]:
         if league.upper() != "NBA":
@@ -196,7 +201,6 @@ class EspnNbaProvider:
                     else None,
                     team_external_id=str(team.get("id") or ""),
                 )
-        # Upcoming / empty leaders — roster fallback
         athletes = self.pick_slate_athletes(game_external_id, per_team=1)
         return athletes[0] if athletes else None
 
@@ -263,7 +267,6 @@ class EspnNbaProvider:
         if len(picked) >= per_team * 2:
             return picked[: per_team * 2]
 
-        # Roster fallback for both teams from header
         header = data.get("header") or {}
         competitions = header.get("competitions") or []
         team_ids: list[str] = []

@@ -1,8 +1,9 @@
-"""APScheduler jobs for automatic warehouse updates (NBA + NFL)."""
+"""APScheduler jobs — keep the warehouse updated from live providers."""
 
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -15,6 +16,7 @@ from app.ingestion.nba_pipeline import (
     import_nba_schedule,
     recalculate_open_prop_analytics,
 )
+from app.ingestion.nba_sync import sync_nba_warehouse
 from app.ingestion.nfl_pipeline import (
     build_and_store_featured_nfl_prop,
     import_nfl_injuries_for_open_games,
@@ -65,13 +67,19 @@ def job_update_injuries() -> None:
 
 
 def job_import_stats() -> None:
+    """Refresh NBA slate gamelogs + props (ESPN → warehouse)."""
     def _run(db):
-        return {
-            "nba": build_and_store_featured_prop(db),
-            "nfl": build_and_store_featured_nfl_prop(db),
-        }
+        return sync_nba_warehouse(db)
 
     _safe("import_stats", _run)
+
+
+def job_nba_full_sync() -> None:
+    """Primary scheduled sync: today's games, players, logs, injuries, props."""
+    def _run(db):
+        return sync_nba_warehouse(db)
+
+    _safe("nba_full_sync", _run)
 
 
 def job_recalculate_analytics() -> None:
@@ -82,6 +90,14 @@ def job_recalculate_analytics() -> None:
         }
 
     _safe("recalculate_analytics", _run)
+
+
+def _bootstrap_nba_sync() -> None:
+    settings = get_settings()
+    if not settings.bootstrap_nba_sync:
+        return
+    log.info("Bootstrap NBA warehouse sync starting (espn-nba → %s)", "sqlite" if settings.is_sqlite() else "postgres")
+    _safe("bootstrap_nba_sync", lambda db: sync_nba_warehouse(db))
 
 
 def start_scheduler() -> BackgroundScheduler:
@@ -105,6 +121,13 @@ def start_scheduler() -> BackgroundScheduler:
         id="update_injuries",
         replace_existing=True,
     )
+    sched.add_job(
+        job_nba_full_sync,
+        "interval",
+        minutes=settings.schedule_nba_sync_minutes,
+        id="nba_full_sync",
+        replace_existing=True,
+    )
     sched.add_job(job_import_stats, "cron", hour="*/2", minute=20, id="import_stats", replace_existing=True)
     sched.add_job(
         job_recalculate_analytics,
@@ -115,6 +138,9 @@ def start_scheduler() -> BackgroundScheduler:
     )
     sched.start()
     _scheduler = sched
+
+    # Fire-and-forget bootstrap so the API is ready while ESPN sync runs.
+    threading.Thread(target=_bootstrap_nba_sync, name="nba-bootstrap-sync", daemon=True).start()
     return sched
 
 
@@ -123,3 +149,18 @@ def stop_scheduler() -> None:
     if _scheduler and _scheduler.running:
         _scheduler.shutdown(wait=False)
     _scheduler = None
+
+
+def list_scheduled_jobs() -> list[dict]:
+    if not _scheduler:
+        return []
+    out = []
+    for job in _scheduler.get_jobs():
+        out.append(
+            {
+                "id": job.id,
+                "nextRunAt": job.next_run_time.isoformat() if job.next_run_time else None,
+                "trigger": str(job.trigger),
+            }
+        )
+    return out

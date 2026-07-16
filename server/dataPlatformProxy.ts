@@ -128,6 +128,39 @@ export function registerDataPlatformProxy(
     }
   });
 
+  app.get("/api/v1/providers/runs", async (req, res) => {
+    const limit = typeof req.query.limit === "string" ? req.query.limit : "25";
+    try {
+      const upstream = await fetch(`${BASE}/api/v1/providers/runs?limit=${encodeURIComponent(limit)}`, {
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (!upstream.ok) throw new Error(String(upstream.status));
+      res.json(await upstream.json());
+    } catch {
+      res.status(503).json({ error: "Data platform unavailable", runs: [] });
+    }
+  });
+
+  app.post("/api/nba/jobs/sync", async (req, res) => {
+    const qs = new URLSearchParams();
+    if (typeof req.query.dates === "string") qs.set("dates", req.query.dates);
+    if (typeof req.query.max_games === "string") qs.set("max_games", req.query.max_games);
+    if (typeof req.query.per_team === "string") qs.set("per_team", req.query.per_team);
+    const suffix = qs.toString() ? `?${qs}` : "";
+    try {
+      const upstream = await fetch(`${BASE}/api/v1/nba/jobs/sync${suffix}`, {
+        method: "POST",
+        signal: AbortSignal.timeout(300_000),
+      });
+      res.status(upstream.status).json(await upstream.json());
+    } catch {
+      res.status(503).json({
+        error: "NBA sync requires the Python data platform",
+        hint: "Start with: npm run data-platform",
+      });
+    }
+  });
+
   app.get("/api/v1/health", async (_req, res) => {
     try {
       const upstream = await fetch(`${BASE}/api/v1/health`, { signal: AbortSignal.timeout(5_000) });

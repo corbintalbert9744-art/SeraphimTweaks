@@ -18,6 +18,7 @@ from app.ingestion.nba_pipeline import (
     import_nba_schedule,
     recalculate_open_prop_analytics,
 )
+from app.ingestion.nba_sync import sync_nba_warehouse
 from app.providers.registry import get_nba_providers
 
 router = APIRouter(prefix="/nba", tags=["nba"])
@@ -126,8 +127,8 @@ def job_import_injuries(db: Session = Depends(get_db)):
 
 @router.post("/jobs/import-slate")
 def job_import_slate(
-    max_games: int = 4,
-    per_team: int = 2,
+    max_games: int = 8,
+    per_team: int = 3,
     db: Session = Depends(get_db),
 ):
     return import_nba_slate(
@@ -135,6 +136,22 @@ def job_import_slate(
         max_games=max_games,
         per_team=per_team,
         markets=("Points", "Rebounds", "Assists"),
+    )
+
+
+@router.post("/jobs/sync")
+def job_sync_warehouse(
+    dates: Optional[str] = None,
+    max_games: int = 8,
+    per_team: int = 3,
+    db: Session = Depends(get_db),
+):
+    """Full ESPN → warehouse sync: schedule, players, gamelogs, injuries, props."""
+    return sync_nba_warehouse(
+        db,
+        date=dates,
+        max_games=max_games,
+        per_team=per_team,
     )
 
 

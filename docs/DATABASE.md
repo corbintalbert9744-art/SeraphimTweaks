@@ -42,3 +42,4 @@ Without `DATABASE_URL`, Node uses in-memory membership and the data platform use
 - **Odds / pick'em** are comparison-only (`odds.is_mock`, `sportsbooks.kind` = `sportsbook` \| `pickem`).
 - **Research Score** and **Confidence Score** are separate integer columns on `prop_analytics`.
 - NBA is the first live league; `sports` seeds NFL / WNBA / ATP / WTA / MLB for expansion.
+- Local Postgres: `npm run db:up` then set `DATABASE_URL` (see `.env.example`). ESPN sync writes games/players/logs/injuries/props + `provider_runs` via `npm run data-platform:sync`.
