@@ -241,7 +241,7 @@ export function LineComparison({
                       ? "—"
                       : `${(row.edgeVsProjection ?? 0) > 0 ? "+" : ""}${(row.edgeVsProjection ?? 0).toFixed(1)}`}
                   </td>
-                  <td className="px-4 py-3 text-xs text-neutral-500">
+                  <td className="px-2.5 py-1.5 text-[11px] text-neutral-500">
                     {unavailable ? (
                       <span className="text-amber-300/80" title={row.integrationNote || undefined}>
                         Unavailable
