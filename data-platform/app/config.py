@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     sharpapi_api_key: str | None = Field(default=None, alias="SHARPAPI_API_KEY")
     antelytics_api_key: str | None = Field(default=None, alias="ANTELYTICS_API_KEY")
     antelytics_base_url: str = Field(
-        default="https://api.antelytics.com/v1",
+        default="https://backend.antehq.com/v1",
         alias="ANTELYTICS_BASE_URL",
     )
     # Comma-separated priority: first wins on duplicate book/player/market/side

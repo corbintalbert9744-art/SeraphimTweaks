@@ -34,7 +34,7 @@ def build_line_aggregator(
         "the-odds-api": TheOddsApiProvider(api_key=settings.odds_api_key or ""),
         "antelytics": AntelyticsAdapter(
             api_key=settings.antelytics_api_key or "",
-            base_url=settings.antelytics_base_url or "https://api.antelytics.com/v1",
+            base_url=settings.antelytics_base_url or "https://backend.antehq.com/v1",
         ),
     }
 
@@ -65,7 +65,7 @@ def build_pickem_aggregator(
     *,
     priority: Optional[list[str]] = None,
 ) -> PickemLineAggregator:
-    """Short-circuit PropLine → SharpAPI → Odds API for DFS pick'em boards."""
+    """Short-circuit PropLine → SharpAPI → Odds API → Antelytics for DFS pick'em boards."""
     settings = get_settings()
     order = priority or list(DEFAULT_PICKEM_PRIORITY)
 
@@ -73,6 +73,10 @@ def build_pickem_aggregator(
         "propline": PropLineAdapter(api_key=settings.propline_api_key or "", max_events=24),
         "sharpapi": SharpApiAdapter(api_key=settings.sharpapi_api_key or ""),
         "the-odds-api": TheOddsApiProvider(api_key=settings.odds_api_key or ""),
+        "antelytics": AntelyticsAdapter(
+            api_key=settings.antelytics_api_key or "",
+            base_url=settings.antelytics_base_url or "https://backend.antehq.com/v1",
+        ),
     }
 
     providers = []

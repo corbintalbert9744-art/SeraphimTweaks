@@ -1,5 +1,5 @@
 /**
- * Market Comparison desk — provider adapters + projection vs live books.
+ * Market Comparison desk — projection vs live books.
  * Unavailable operators stay marked Unavailable; market data is never fabricated.
  */
 import { useMemo, useState } from "react";
@@ -11,29 +11,12 @@ import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { propResearchPath } from "@/lib/playerLinks";
-import { CANONICAL_LINE_PROVIDERS } from "@/data/lineProviders";
 import { EvPlusBadge, summarizeMarketVsModel } from "@/components/research";
 import { usePickemApp } from "@/context/PickemAppContext";
 import { PickemAppGate, PickemAppSwitcher } from "@/components/shared/PickemAppGate";
 import { asPropDetailFromApi } from "@/lib/nbaLiveCache";
 import type { LeagueCode } from "@/data/mock";
 import { cn } from "@/lib/utils";
-
-type CatalogProvider = {
-  slug: string;
-  name: string;
-  kind: string;
-  notes?: string;
-  requiresIntegration?: boolean;
-};
-
-type AdapterStatus = {
-  source: string;
-  name: string;
-  configured: boolean;
-  notes?: string;
-  leagues?: string[];
-};
 
 type BoardRow = {
   id: string;
@@ -98,21 +81,6 @@ export default function MarketComparisonPage() {
   const platform = appId || "prizepicks";
   const [league, setLeague] = useState<(typeof LEAGUES)[number]>("All");
 
-  const providers = useQuery({
-    queryKey: ["odds-providers"],
-    queryFn: async () => {
-      const res = await fetch("/api/odds/providers");
-      if (!res.ok) throw new Error("providers");
-      return res.json() as Promise<{
-        providers: CatalogProvider[];
-        adapters?: AdapterStatus[];
-        configuredAdapterCount?: number;
-        disclaimer?: string;
-      }>;
-    },
-    staleTime: 120_000,
-  });
-
   const board = useQuery({
     queryKey: ["market-comparison-board", platform, league],
     enabled: ready,
@@ -172,18 +140,6 @@ export default function MarketComparisonPage() {
     refetchInterval: 300_000,
   });
 
-  const catalog = providers.data?.providers?.length
-    ? providers.data.providers
-    : CANONICAL_LINE_PROVIDERS.map((p) => ({
-        slug: p.slug,
-        name: p.name,
-        kind: p.kind,
-        notes: p.notes,
-        requiresIntegration: true,
-      }));
-
-  const adapters = providers.data?.adapters ?? [];
-  const configuredAdapters = adapters.filter((a) => a.configured);
   const rows = board.data ?? [];
 
   const ranked = useMemo(() => {
@@ -234,63 +190,6 @@ export default function MarketComparisonPage() {
         description={`Seraphim model vs live ${app?.name || "pick'em"} and sportsbook lines — edge, probabilities, EV, and movement timestamps. Unavailable books stay blank.`}
         actions={<PickemAppSwitcher />}
       />
-
-      <section className="mb-5 rounded-2xl border border-[#1a1a1a] bg-[#0c0c0c] p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-yellow-500/90">
-              Provider adapters
-            </p>
-            <h2 className="mt-1 text-sm font-semibold text-white">
-              {configuredAdapters.length
-                ? `${configuredAdapters.length} upstream adapter${configuredAdapters.length === 1 ? "" : "s"} keyed`
-                : "No live odds adapters keyed"}
-            </h2>
-            <p className="mt-0.5 max-w-2xl text-[11px] text-neutral-500">
-              {providers.data?.disclaimer ||
-                "Connected books only show captured lines. Unavailable operators stay blank — never fabricated."}
-            </p>
-          </div>
-          {adapters.length > 0 ? (
-            <ul className="flex flex-wrap gap-1.5">
-              {adapters.map((a) => (
-                <li
-                  key={a.source}
-                  className={cn(
-                    "rounded-lg border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider",
-                    a.configured
-                      ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300"
-                      : "border-[#222] text-neutral-500",
-                  )}
-                  title={a.notes}
-                >
-                  {a.name || a.source}
-                  {!a.configured ? " · off" : ""}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-
-        <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {catalog.map((p) => (
-            <li
-              key={p.slug}
-              className="rounded-xl border border-[#1f1f1f] bg-black/30 px-3 py-2.5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-white">{p.name}</p>
-                <span className="rounded-md border border-[#2a2a2a] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-neutral-500">
-                  {p.kind}
-                </span>
-              </div>
-              <p className="mt-1 text-[10px] leading-relaxed text-neutral-500">
-                {p.notes || "Live when an aggregator returns this book — otherwise Unavailable."}
-              </p>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {LEAGUES.map((lg) => (
