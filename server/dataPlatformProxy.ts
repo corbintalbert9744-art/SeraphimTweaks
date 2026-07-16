@@ -349,6 +349,29 @@ export function registerDataPlatformProxy(
       res.status(503).json({ error: "Data platform unavailable" });
     }
   });
+  app.get("/api/tennis/props/:id", async (req, res) => {
+    try {
+      const tour =
+        typeof req.query.tour === "string" ? `?tour=${encodeURIComponent(req.query.tour)}` : "";
+      const up = await fetch(
+        `${BASE}/api/v1/tennis/props/${encodeURIComponent(req.params.id)}${tour}`,
+        { signal: AbortSignal.timeout(30_000) },
+      );
+      res.status(up.status).json(await up.json());
+    } catch {
+      res.status(503).json({ error: "Data platform unavailable" });
+    }
+  });
+  app.get("/api/soccer/props/:id", async (req, res) => {
+    try {
+      const up = await fetch(`${BASE}/api/v1/soccer/props/${encodeURIComponent(req.params.id)}`, {
+        signal: AbortSignal.timeout(30_000),
+      });
+      res.status(up.status).json(await up.json());
+    } catch {
+      res.status(503).json({ error: "Data platform unavailable" });
+    }
+  });
 
   app.post("/api/jobs/sync-all", async (req, res) => {
     const qs = typeof req.query.dates === "string" ? `?dates=${encodeURIComponent(req.query.dates)}` : "";

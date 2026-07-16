@@ -224,6 +224,20 @@ export default function PropDetailPage() {
         } catch {
           /* ignore */
         }
+        if (propId.startsWith("soccer:")) {
+          const d = await tryProp(
+            `/api/soccer/props/${encoded}${platformQs ? `?${platformQs}` : ""}`,
+            "Soccer",
+          );
+          if (d) return d;
+        } else {
+          const tour = league;
+          const d = await tryProp(
+            `/api/tennis/props/${encoded}?tour=${tour}${platformQs ? `&${platformQs}` : ""}`,
+            league,
+          );
+          if (d) return d;
+        }
         const path = propId.startsWith("soccer:")
           ? `/api/soccer/props${platformQs ? `?${platformQs}` : ""}`
           : `/api/tennis/props?tour=${league}${platformQs ? `&${platformQs}` : ""}`;

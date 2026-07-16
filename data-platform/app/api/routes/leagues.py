@@ -420,10 +420,34 @@ def tennis_props(
         props, players, meta = _scope_to_platform(
             db, [], platform, league=code, refresh=refresh
         )
+        # When live pick'em is empty (rate limit / no cache), keep the board usable
+        # with the ESPN research slate — never invent PrizePicks lines, but don't
+        # leave Tennis blank when matchups exist.
+        if not props:
+            if refresh or not list_league_props(db, code):
+                ensure_tennis_pickem_board(db, tour=code)
+            props = list_league_props(db, code)
+            players = _players_from_props(props)
+            label = meta.get("platformLabel") or platform
+            prior = (meta.get("note") or "").strip()
+            meta = {
+                **meta,
+                "ok": bool(props),
+                "fallback": True,
+                "fallbackSource": "espn-tennis",
+                "source": "espn-tennis",
+                "dataSource": "espn-tennis-research",
+                "note": (
+                    f"{prior} ".strip()
+                    + f" Showing {code} research slate (Fantasy Score, Total Games, Total Sets) "
+                    f"from ESPN matchups until live {label} lines sync. "
+                    "These are Seraphim research lines — not scraped from the pick'em app."
+                ).strip(),
+            }
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         return {
-            "ok": True,
+            "ok": bool(props) or bool(meta.get("ok")),
             "league": code,
             "props": props,
             "players": players,
@@ -467,6 +491,40 @@ def tennis_players(tour: str = Query("ATP"), db: Session = Depends(get_db)):
     if not list_league_props(db, code):
         ensure_tennis_pickem_board(db, tour=code)
     return {"ok": True, "league": code, "players": _players_from_props(list_league_props(db, code))}
+
+
+@router.get("/tennis/props/{prop_id}")
+def tennis_prop_detail(
+    prop_id: str,
+    tour: str = Query("ATP"),
+    db: Session = Depends(get_db),
+):
+    code = "WTA" if tour.upper() == "WTA" else "ATP"
+    # Prefer exact league; also search sibling tour (ATP/WTA mirrors)
+    props = list_league_props(db, code)
+    row = next((p for p in props if p["id"] == prop_id), None)
+    if not row:
+        sibling = "WTA" if code == "ATP" else "ATP"
+        props = list_league_props(db, sibling)
+        row = next((p for p in props if p["id"] == prop_id), None)
+        if row:
+            code = sibling
+    if not row:
+        raise HTTPException(status_code=404, detail="Prop not found")
+    projected = float(row.get("projectedValue") or row.get("line") or 0)
+    books = build_market_comparison_books(
+        db,
+        league=code,
+        base={**row, "league": code},
+        projected=projected,
+        model_side=str(row.get("side") or "Over"),
+    )
+    return {
+        "ok": True,
+        "prop": {**row, "league": code, "books": books, "lines": books},
+        "live": True,
+        "league": code,
+    }
 
 
 @router.post("/tennis/jobs/sync")

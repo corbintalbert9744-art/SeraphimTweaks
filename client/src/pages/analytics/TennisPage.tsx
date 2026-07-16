@@ -37,7 +37,7 @@ export default function TennisPage({ tour: initialTour }: { tour?: "ATP" | "WTA"
         }
         propsPath={`/api/tennis/props?tour=${tour}`}
         queryKey={`tennis-board-${tour}`}
-        emptyHint={`${tour} shows live pick'em tennis lines only. If empty, PropLine may be rate-limited — try again after the daily reset.`}
+        emptyHint={`${tour} shows live pick'em tennis lines when PropLine has them. If the feed is rate-limited, we fall back to the ESPN research slate (Fantasy Score, Total Games, Total Sets) so the board isn’t blank.`}
       />
     </div>
   );

@@ -19,7 +19,7 @@ from app.analytics.engine import expected_value, home_away_split, rest_days, str
 from app.analytics.factors.base import PredictionContext
 from app.analytics.prediction import predict_prop
 from app.config import get_settings
-from app.db.models import Player, PlayerGameLog, Prop, PropAnalytics, Team
+from app.db.models import Game, Player, PlayerGameLog, Prop, PropAnalytics, Team
 from app.ingestion.warehouse import insert_odds, upsert_prop
 from app.providers.comparison_lines import get_comparison_lines_provider
 
@@ -369,6 +369,13 @@ def list_league_props(db: Session, league: str, *, limit: int = 200) -> list[dic
             first = str(bullets[0])
             if " vs " in first:
                 opponent = first.rsplit(" vs ", 1)[-1].rstrip(".")
+        tip = None
+        if prop.game_id:
+            game = db.get(Game, prop.game_id)
+            if game and game.tipoff_at:
+                tip = game.tipoff_at.isoformat()
+        if tip is None and getattr(analytics, "computed_at", None):
+            tip = analytics.computed_at.isoformat()
         out.append(
             {
                 "id": prop.id,
@@ -393,6 +400,8 @@ def list_league_props(db: Session, league: str, *, limit: int = 200) -> list[dic
                 "season": f"{analytics.season_hits}/{analytics.season_samples}"
                 if analytics.season_samples
                 else "—",
+                "tipTime": tip,
+                "league": code,
                 "projectedValue": analytics.projected_value,
                 "edgeVsLine": analytics.edge_vs_line,
                 "modelVersion": analytics.model_version,

@@ -110,6 +110,8 @@ export function SportResearchBoard({
         disclaimer?: string;
         rateLimited?: boolean;
         cached?: boolean;
+        fallback?: boolean;
+        fallbackSource?: string | null;
       }>;
     },
     staleTime: 120_000,
@@ -124,6 +126,7 @@ export function SportResearchBoard({
 
   const livePlayers = board.data?.players ?? [];
   const rateLimited = Boolean(board.data?.rateLimited);
+  const isFallback = Boolean(board.data?.fallback);
 
   const marketOptions = useMemo(() => {
     const fromApi = (board.data as { markets?: string[] } | undefined)?.markets;
@@ -204,7 +207,11 @@ export function SportResearchBoard({
       <PageHeader
         eyebrow={league}
         title={title}
-        description={`${description} Live ${app?.name ?? "app"} props only — model runs after the platform feed loads.`}
+        description={
+          isFallback
+            ? `${description} Research slate active while live ${app?.name ?? "app"} lines sync.`
+            : `${description} Live ${app?.name ?? "app"} props only — model runs after the platform feed loads.`
+        }
         actions={
           <div className="flex flex-wrap items-center gap-3">
             {headerExtra}
@@ -274,11 +281,15 @@ export function SportResearchBoard({
             <StatCard
               card={{
                 id: `${league}-props`,
-                label: `${app?.shortName ?? "App"} props`,
+                label: isFallback ? "Research props" : `${app?.shortName ?? "App"} props`,
                 value: String(filtered.length),
-                delta: board.isFetching ? "Refreshing…" : `${liveProps.length} on platform`,
+                delta: board.isFetching
+                  ? "Refreshing…"
+                  : isFallback
+                    ? "ESPN slate fallback"
+                    : `${liveProps.length} on platform`,
                 deltaTone: "neutral",
-                hint: platformLabel || "Platform board",
+                hint: isFallback ? "Research slate" : platformLabel || "Platform board",
               }}
             />
             <StatCard
