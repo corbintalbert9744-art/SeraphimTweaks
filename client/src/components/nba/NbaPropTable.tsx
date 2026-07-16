@@ -6,7 +6,7 @@ import { LeanBadge } from "@/components/shared/LeanBadge";
 import { type NbaProp } from "@/data/nbaMock";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
 import { leanTextClass } from "@/lib/leanTheme";
-import { playerProfilePath } from "@/lib/playerLinks";
+import { playerProfilePath, propResearchPath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
 
 function edgePercentDisplay(row: NbaProp): number | null {
@@ -84,7 +84,7 @@ export function NbaPropTable({
                     </p>
                   </td>
                   <td className="px-4 py-4">
-                    <Link href={`/prop/${row.id}`} className="text-neutral-300 hover:text-yellow-400">
+                    <Link href={propResearchPath(row.id)} className="text-neutral-300 hover:text-yellow-400">
                       {row.market}
                     </Link>
                     <div className="mt-1.5">

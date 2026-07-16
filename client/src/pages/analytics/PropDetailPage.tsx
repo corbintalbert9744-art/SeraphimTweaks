@@ -18,7 +18,7 @@ import {
   getCachedNbaPropDetail,
 } from "@/lib/nbaLiveCache";
 import { recomputeLegSide } from "@/lib/legStats";
-import { playerProfilePath } from "@/lib/playerLinks";
+import { decodeRouteId, playerProfilePath, propResearchPath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
 import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
@@ -178,7 +178,7 @@ function HitHistoryChart({
 
 export default function PropDetailPage() {
   const [, params] = useRoute("/prop/:id");
-  const propId = params?.id ?? "";
+  const propId = decodeRouteId(params?.id);
   const cached = getCachedNbaPropDetail(propId);
 
   const live = useQuery({
@@ -188,23 +188,27 @@ export default function PropDetailPage() {
       const tryProp = async (path: string, league?: string) => {
         const res = await fetch(path);
         if (!res.ok) return null;
+        const ct = res.headers.get("content-type") || "";
+        if (!ct.includes("application/json")) return null;
         const data = await res.json();
         const raw = (data.prop ?? data) as Record<string, unknown>;
+        if (!raw?.id && raw?.line == null) return null;
         const detail = asPropDetailFromApi(league ? { ...raw, league } : raw);
         cacheNbaPropDetail(detail);
         return detail;
       };
 
+      const encoded = encodeURIComponent(propId);
       if (propId.startsWith("wnba:")) {
-        const d = await tryProp(`/api/wnba/props/${encodeURIComponent(propId)}`, "WNBA");
+        const d = await tryProp(`/api/wnba/props/${encoded}`, "WNBA");
         if (d) return d;
       }
       if (propId.startsWith("mlb:")) {
-        const d = await tryProp(`/api/mlb/props/${encodeURIComponent(propId)}`, "MLB");
+        const d = await tryProp(`/api/mlb/props/${encoded}`, "MLB");
         if (d) return d;
       }
       if (propId.startsWith("nhl:")) {
-        const d = await tryProp(`/api/nhl/props/${encodeURIComponent(propId)}`, "NHL");
+        const d = await tryProp(`/api/nhl/props/${encoded}`, "NHL");
         if (d) return d;
       }
       if (propId.startsWith("soccer:") || propId.startsWith("atp:") || propId.startsWith("wta:")) {
@@ -213,9 +217,16 @@ export default function PropDetailPage() {
           : propId.startsWith("wta:")
             ? "WTA"
             : "ATP";
+        let platformQs = "";
+        try {
+          const saved = localStorage.getItem("seraphim.pickemApp");
+          if (saved) platformQs = `platform=${encodeURIComponent(saved)}`;
+        } catch {
+          /* ignore */
+        }
         const path = propId.startsWith("soccer:")
-          ? "/api/soccer/props"
-          : `/api/tennis/props?tour=${league}`;
+          ? `/api/soccer/props${platformQs ? `?${platformQs}` : ""}`
+          : `/api/tennis/props?tour=${league}${platformQs ? `&${platformQs}` : ""}`;
         const board = await fetch(path);
         if (board.ok) {
           const data = (await board.json()) as { props: Record<string, unknown>[] };
@@ -239,17 +250,28 @@ export default function PropDetailPage() {
           }
         }
       }
-      const nba = await tryProp(`/api/nba/props/${encodeURIComponent(propId)}`);
+      const nba = await tryProp(`/api/nba/props/${encoded}`);
       if (nba) return nba;
-      const wnba = await tryProp(`/api/wnba/props/${encodeURIComponent(propId)}`, "WNBA");
+      const wnba = await tryProp(`/api/wnba/props/${encoded}`, "WNBA");
       if (wnba) return wnba;
-      // Fallback: scan MLB/NHL boards
+      // Fallback: scan boards with selected pick'em platform
+      let platformQs = "";
+      try {
+        const saved = localStorage.getItem("seraphim.pickemApp");
+        if (saved) platformQs = `?platform=${encodeURIComponent(saved)}`;
+      } catch {
+        /* ignore */
+      }
       for (const [path, league] of [
-        ["/api/mlb/props", "MLB"],
-        ["/api/nhl/props", "NHL"],
+        [`/api/mlb/props${platformQs}`, "MLB"],
+        [`/api/nhl/props${platformQs}`, "NHL"],
+        [`/api/wnba/props${platformQs}`, "WNBA"],
+        [`/api/nba/props${platformQs}`, "NBA"],
       ] as const) {
         const board = await fetch(path);
         if (!board.ok) continue;
+        const ct = board.headers.get("content-type") || "";
+        if (!ct.includes("application/json")) continue;
         const data = (await board.json()) as { props: Record<string, unknown>[] };
         const row = data.props.find((p) => String(p.id) === propId);
         if (row) {
@@ -272,7 +294,7 @@ export default function PropDetailPage() {
   const recommendation = prop?.recommendation ?? prop?.side ?? "Over";
   const selectedSide = side ?? recommendation;
   const best = useMemo(
-    () => (prop && prop.books.length ? bestBookForSide(prop, selectedSide) : null),
+    () => (prop ? bestBookForSide(prop, selectedSide) : null),
     [prop, selectedSide],
   );
 
@@ -287,7 +309,7 @@ export default function PropDetailPage() {
     return <CardSkeleton rows={4} />;
   }
 
-  if (!prop || !best) {
+  if (!prop) {
     return (
       <div className="rounded-3xl border border-white/[0.06] bg-[#0d0d0d] p-12 text-center">
         <h1 className="text-xl font-semibold text-white">Report not found</h1>
@@ -306,10 +328,19 @@ export default function PropDetailPage() {
   const selectedEv =
     selectedSide === prop.side ? prop.evPercent : Math.max(0.2, prop.evPercent - 2.4);
   const added = hasLeg(prop.id);
+  const resolvedBest =
+    best ??
+    ({
+      book: "Consensus",
+      line: prop.line,
+      over: prop.americanOdds,
+      under: -110,
+    } as const);
   const activeBook =
     rankedBooks.find((b) => b.book === selectedBook) ??
     rankedBooks.find((b) => b.isBestValue) ??
-    rankedBooks[0];
+    rankedBooks[0] ??
+    resolvedBest;
 
   const similar = prop.similarPropIds
     .map((id) => getCachedNbaPropDetail(id))
@@ -649,7 +680,7 @@ export default function PropDetailPage() {
                   >
                     <div>
                       <Link
-                        href={`/prop/${s.id}`}
+                        href={propResearchPath(s.id)}
                         className="text-sm font-medium text-neutral-100 hover:text-yellow-400"
                       >
                         {s.player} · {s.market} {s.recommendation ?? s.side}{" "}
@@ -673,11 +704,11 @@ export default function PropDetailPage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
               Selected book
             </p>
-            <p className="mt-3 text-lg font-semibold text-white">{activeBook?.book ?? best.book}</p>
+            <p className="mt-3 text-lg font-semibold text-white">{activeBook?.book ?? resolvedBest.book}</p>
             <div className="mt-8 space-y-6">
               <SidebarStat
                 label="Line"
-                value={`${activeBook?.line ?? best.line}`}
+                value={`${activeBook?.line ?? resolvedBest.line}`}
                 sub={`vs projection ${projected.toFixed(1)}`}
               />
               <SidebarStat

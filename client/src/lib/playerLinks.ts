@@ -1,4 +1,4 @@
-/** Stable hrefs for player research pages (IDs may contain `:`). */
+/** Stable hrefs for player / prop research pages (IDs may contain `:`). */
 
 export function playerProfilePath(playerId: string | null | undefined): string {
   const id = String(playerId || "").trim();
@@ -6,7 +6,13 @@ export function playerProfilePath(playerId: string | null | undefined): string {
   return `/player/${encodeURIComponent(id)}`;
 }
 
-export function decodePlayerRouteId(raw: string | null | undefined): string {
+export function propResearchPath(propId: string | null | undefined): string {
+  const id = String(propId || "").trim();
+  if (!id) return "/research";
+  return `/prop/${encodeURIComponent(id)}`;
+}
+
+export function decodeRouteId(raw: string | null | undefined): string {
   const value = String(raw || "").trim();
   if (!value) return "";
   try {
@@ -14,6 +20,11 @@ export function decodePlayerRouteId(raw: string | null | undefined): string {
   } catch {
     return value;
   }
+}
+
+/** @deprecated use decodeRouteId */
+export function decodePlayerRouteId(raw: string | null | undefined): string {
+  return decodeRouteId(raw);
 }
 
 /** Prefer a short provider id over warehouse stub keys for URLs. */

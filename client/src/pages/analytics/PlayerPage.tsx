@@ -12,10 +12,11 @@ import {
 } from "@/lib/nbaLiveCache";
 import {
   asLivePlayerResearch,
+  getPlayerResearchFromProps,
   type ChartGame,
   type PlayerResearchProfile,
 } from "@/lib/playerResearchProfile";
-import { decodePlayerRouteId } from "@/lib/playerLinks";
+import { decodePlayerRouteId, propResearchPath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
 import { leanTextClass } from "@/lib/leanTheme";
 import { ProOnly } from "@/components/membership/ProOnly";
@@ -30,94 +31,94 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
   if (!games.length) {
     return <p className="py-10 text-center text-sm text-neutral-500">No gamelogs for this market yet.</p>;
   }
-  const maxStat = Math.max(...games.map((g) => g.value), line, 1) * 1.15;
-  const maxMin = Math.max(...games.map((g) => g.minutes), 1);
-  const w = 560;
-  const h = 200;
-  const padL = 28;
+  const maxStat = Math.max(...games.map((g) => Math.abs(g.value)), Math.abs(line), 1) * 1.2;
+  const w = 640;
+  const h = 240;
+  const padL = 24;
   const padR = 12;
-  const padT = 16;
-  const padB = 36;
+  const padT = 22;
+  const padB = 52;
   const innerW = w - padL - padR;
   const innerH = h - padT - padB;
-  const barW = Math.min(28, (innerW / games.length) * 0.55);
-  const lineY = padT + innerH - (line / maxStat) * innerH;
-
-  const minCoords = games.map((g, i) => {
-    const x = padL + ((i + 0.5) / games.length) * innerW;
-    const y = padT + innerH - (g.minutes / maxMin) * innerH;
-    return { x, y, m: g.minutes };
-  });
-  const minPoly = minCoords.map((c) => `${c.x},${c.y}`).join(" ");
+  const barW = Math.min(32, (innerW / games.length) * 0.58);
+  const lineY = padT + innerH - (Math.max(0, line) / maxStat) * innerH;
 
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-neutral-500">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" /> Over
+          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" /> Over line
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-red-500/70" /> Under
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-px w-4 border-t border-dashed border-yellow-400" /> Minutes / snaps
+          <span className="h-2.5 w-2.5 rounded-sm bg-red-500/70" /> Under line
         </span>
         <span className="tabular-nums text-neutral-400">Line {line}</span>
       </div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="h-52 w-full">
-        <line x1={padL} y1={lineY} x2={w - padR} y2={lineY} stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
+      <svg viewBox={`0 0 ${w} ${h}`} className="h-56 w-full sm:h-64">
+        <line
+          x1={padL}
+          y1={lineY}
+          x2={w - padR}
+          y2={lineY}
+          stroke="rgba(250,204,21,0.55)"
+          strokeWidth="1.5"
+          strokeDasharray="5 4"
+        />
+        <text x={w - padR} y={lineY - 4} textAnchor="end" className="fill-yellow-400/80" fontSize="9">
+          {line}
+        </text>
         {games.map((g, i) => {
-          const x = padL + ((i + 0.5) / games.length) * innerW - barW / 2;
-          const barH = (g.value / maxStat) * innerH;
+          const cx = padL + ((i + 0.5) / games.length) * innerW;
+          const x = cx - barW / 2;
+          const raw = Number.isFinite(g.value) ? g.value : 0;
+          const barH = (Math.abs(raw) / maxStat) * innerH;
           const y = padT + innerH - barH;
+          const over = raw > line;
           return (
-            <g key={g.label}>
+            <g key={`${g.label}-${i}`}>
+              <defs>
+                <linearGradient id={`bar-${i}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={over ? "rgb(52, 211, 153)" : "rgb(248, 113, 113)"} />
+                  <stop offset="100%" stopColor={over ? "rgb(5, 150, 105)" : "rgb(185, 28, 28)"} />
+                </linearGradient>
+              </defs>
               <rect
                 x={x}
                 y={y}
                 width={barW}
-                height={Math.max(2, barH)}
-                rx={3}
-                fill={g.hit ? "rgb(16, 185, 129)" : "rgb(239, 68, 68)"}
-                opacity={0.85}
+                height={Math.max(3, barH)}
+                rx={4}
+                fill={`url(#bar-${i})`}
+                opacity={0.92}
               />
               <text
-                x={padL + ((i + 0.5) / games.length) * innerW}
-                y={Math.max(12, y - 4)}
+                x={cx}
+                y={Math.max(14, y - 5)}
                 textAnchor="middle"
-                className="fill-neutral-200"
-                fontSize="9"
-                fontWeight="600"
+                className="fill-neutral-100"
+                fontSize="10"
+                fontWeight="700"
               >
                 {Number.isFinite(g.value) ? g.value : "—"}
               </text>
+              <text x={cx} y={h - 28} textAnchor="middle" className="fill-neutral-300" fontSize="9">
+                {g.opponent || "OPP"}
+              </text>
+              <text x={cx} y={h - 14} textAnchor="middle" className="fill-neutral-600" fontSize="8">
+                {g.date}
+              </text>
               <text
-                x={padL + ((i + 0.5) / games.length) * innerW}
-                y={h - 8}
+                x={cx}
+                y={h - 2}
                 textAnchor="middle"
-                className="fill-neutral-600"
+                className={g.home ? "fill-emerald-400/80" : "fill-neutral-500"}
                 fontSize="8"
               >
-                {g.opponent || (g.time ? `${g.date} ${g.time}` : g.date)}
+                {g.home ? "H" : "A"}
               </text>
             </g>
           );
         })}
-        <polyline
-          fill="none"
-          stroke="rgb(250, 204, 21)"
-          strokeWidth="2"
-          strokeDasharray="5 4"
-          points={minPoly}
-        />
-        {minCoords.map((c, i) => (
-          <g key={`m-${i}`}>
-            <circle cx={c.x} cy={c.y} r="3" fill="#0a0a0a" stroke="rgb(250,204,21)" strokeWidth="1.5" />
-            <text x={c.x} y={c.y - 6} textAnchor="middle" className="fill-yellow-400/90" fontSize="8">
-              {Math.round(c.m)}
-            </text>
-          </g>
-        ))}
       </svg>
     </div>
   );
@@ -164,6 +165,10 @@ export default function PlayerPage() {
         { path: `/api/mlb/players/${encoded}`, league: "MLB", href: "/mlb" },
         { path: `/api/wnba/players/${encoded}`, league: "WNBA", href: "/wnba" },
         { path: `/api/nba/players/${encoded}`, league: "NBA", href: "/nba" },
+        { path: `/api/nhl/players/${encoded}`, league: "NHL", href: "/nhl" },
+        { path: `/api/nfl/players/${encoded}`, league: "NFL", href: "/nfl" },
+        { path: `/api/soccer/players/${encoded}`, league: "Soccer", href: "/soccer" },
+        { path: `/api/tennis/players/${encoded}`, league: "ATP", href: "/tennis" },
       ];
       for (const t of leagueTries) {
         const hit = await tryLeague(t.path, t.league, t.href);
@@ -182,11 +187,11 @@ export default function PlayerPage() {
         { path: `/api/wnba/props${platformQs}`, league: "WNBA", boardHref: "/wnba" },
         { path: `/api/nba/props${platformQs}`, league: "NBA", boardHref: "/nba" },
         { path: `/api/nfl/props`, league: "NFL", boardHref: "/nfl" },
-        { path: `/api/mlb/props`, league: "MLB", boardHref: "/mlb" },
-        { path: `/api/nhl/props`, league: "NHL", boardHref: "/nhl" },
-        { path: `/api/soccer/props`, league: "Soccer", boardHref: "/soccer" },
-        { path: `/api/tennis/props?tour=ATP`, league: "ATP", boardHref: "/tennis" },
-        { path: `/api/tennis/props?tour=WTA`, league: "WTA", boardHref: "/tennis" },
+        { path: `/api/mlb/props${platformQs}`, league: "MLB", boardHref: "/mlb" },
+        { path: `/api/nhl/props${platformQs}`, league: "NHL", boardHref: "/nhl" },
+        { path: `/api/soccer/props${platformQs}`, league: "Soccer", boardHref: "/soccer" },
+        { path: `/api/tennis/props?tour=ATP${platformQs ? `&${platformQs.slice(1)}` : ""}`, league: "ATP", boardHref: "/tennis" },
+        { path: `/api/tennis/props?tour=WTA${platformQs ? `&${platformQs.slice(1)}` : ""}`, league: "WTA", boardHref: "/tennis" },
       ];
 
       function matchesPlayer(p: Record<string, unknown>): boolean {
@@ -208,66 +213,44 @@ export default function PlayerPage() {
       for (const src of boardSources) {
         const res = await fetch(src.path);
         if (!res.ok) continue;
+        const ct = res.headers.get("content-type") || "";
+        if (!ct.includes("application/json")) continue;
         const board = (await res.json()) as { props: Record<string, unknown>[] };
         const mine = (board.props ?? []).filter(matchesPlayer);
         if (!mine.length) continue;
-        const top = mine[0];
-        const markets = mine.map((p) => ({
-          propId: String(p.id),
+        const typed = mine.map((p) => ({
+          id: String(p.id),
+          playerId: String(p.playerId ?? playerId),
+          player: String(p.player ?? ""),
+          team: String(p.team ?? ""),
+          opponent: String(p.opponent ?? ""),
+          position: String(p.position ?? ""),
           market: String(p.market),
           side: (p.side === "Under" ? "Under" : "Over") as "Over" | "Under",
           line: Number(p.line),
           americanOdds: Number(p.americanOdds ?? -110),
-          projectedValue: Number(p.projectedValue ?? p.line),
-          edgeVsLine: Number(p.edgeVsLine ?? 0),
-          edgePercent: Number(p.line) ? (Number(p.edgeVsLine ?? 0) / Number(p.line)) * 100 : 0,
-          researchScore: Number(p.researchScore ?? p.confidence ?? 50),
-          confidence: Number(p.confidence ?? 50),
+          noVigProb: Number(p.noVigProb ?? 0.5),
           evPercent: Number(p.evPercent ?? 0),
-          explanation: (p.explanation as string[]) || [],
-          why: `${p.side} ${p.line} ${p.market}`,
-          hitWindows: [
-            { key: "l5", label: "L5", average: null, hitRate: 0, hitPct: 0, hits: String(p.l5 ?? "0/0") },
-            { key: "l10", label: "L10", average: null, hitRate: 0, hitPct: 0, hits: String(p.l10 ?? "0/0") },
-            { key: "l20", label: "L20", average: null, hitRate: 0, hitPct: 0, hits: String(p.l20 ?? "0/0") },
-            { key: "all", label: "Season", average: null, hitRate: 0, hitPct: 0, hits: String(p.season ?? "0/0") },
-            { key: "matchup", label: "H2H", average: null, hitRate: 0, hitPct: 0, hits: "0/0" },
-          ],
-          chartGames: [] as ChartGame[],
-        }));
-        return asLivePlayerResearch({
-          id: playerId,
-          name: String(top.player),
+          confidence: Number(p.confidence ?? 50),
+          l5: String(p.l5 ?? "0/0"),
+          l10: String(p.l10 ?? "0/0"),
+          l20: String(p.l20 ?? "0/0"),
+          season: String(p.season ?? "0/0"),
+          tipTime: String(p.tipTime ?? ""),
+          projectedValue: p.projectedValue != null ? Number(p.projectedValue) : undefined,
+          researchScore: p.researchScore != null ? Number(p.researchScore) : undefined,
+          injury: String(p.injury ?? "None"),
           league: src.league,
-          team: String(top.team ?? ""),
-          opponent: String(top.opponent ?? ""),
-          position: String(top.position ?? ""),
-          initials: String(top.player)
-            .split(/\s+/)
-            .slice(0, 2)
-            .map((s) => s[0] ?? "")
-            .join("")
-            .toUpperCase(),
-          injury: "None",
-          tipTime: String(top.tipTime ?? ""),
-          researchScore: Number(top.researchScore ?? top.confidence ?? 50),
-          dataQualityScore: Number(top.dqs ?? 70),
-          aiExplain: {
-            verdict: "neutral",
-            headline: String((top.explanation as string[] | undefined)?.[0] ?? `Live ${src.league} lean`),
-            body: `Built from live ${src.league} warehouse props.`,
-          },
-          matchup: {
-            title: `vs ${top.opponent}`,
-            defenseRank: "Live slate",
-            bullets: [`${top.market} ${top.side} ${top.line}`],
-          },
-          homeSplit: { label: "Home", samples: 0, averages: {} },
-          awaySplit: { label: "Away", samples: 0, averages: {} },
-          recentLogs: [],
-          markets,
-          boardHref: src.boardHref,
-        });
+          insight: Array.isArray(p.explanation) ? String(p.explanation[0] ?? "") : undefined,
+        }));
+        const built = getPlayerResearchFromProps(playerId, typed);
+        if (built) {
+          return asLivePlayerResearch({
+            ...built,
+            id: playerId,
+            boardHref: src.boardHref,
+          });
+        }
       }
 
       throw new Error("player");
@@ -501,6 +484,37 @@ export default function PlayerPage() {
             </button>
           ))}
         </div>
+
+        {/* Selected prop header — OddsIQ style */}
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t border-[#1a1a1a] pt-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+              Selected prop
+            </p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              {market.market}
+            </h2>
+            <p className="mt-1 text-sm text-neutral-400">
+              {market.side} {market.line} · proj {market.projectedValue.toFixed(1)} ·{" "}
+              <span className={leanTextClass(market.side)}>
+                {market.edgeVsLine > 0 ? "+" : ""}
+                {market.edgeVsLine.toFixed(1)} vs line
+              </span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-center">
+              <p className="text-[10px] uppercase tracking-wider text-yellow-500/80">Line</p>
+              <p className="text-xl font-semibold tabular-nums text-yellow-300">{market.line}</p>
+            </div>
+            <Link
+              href={propResearchPath(market.propId)}
+              className="rounded-xl border border-[#2a2a2a] bg-[#141414] px-3 py-2.5 text-xs font-semibold text-yellow-400 transition hover:border-yellow-500/40 hover:bg-yellow-500/10"
+            >
+              Full report →
+            </Link>
+          </div>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -574,12 +588,42 @@ export default function PlayerPage() {
 
             {tab === "chart" && (
               <div>
-                <p className="mb-2 text-xs text-neutral-500">
-                  Last {market.chartGames.length || 10} games · line {market.line} · proj{" "}
-                  {market.projectedValue.toFixed(1)} (
-                  {market.edgeVsLine > 0 ? "+" : ""}
-                  {market.edgeVsLine.toFixed(1)} vs line)
-                </p>
+                {(() => {
+                  const games = market.chartGames;
+                  const n = games.length;
+                  const avg =
+                    n > 0 ? games.reduce((s, g) => s + (Number.isFinite(g.value) ? g.value : 0), 0) / n : null;
+                  const vs = avg != null ? avg - market.line : null;
+                  return (
+                    <p className="mb-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
+                      <span>
+                        {n} tracked game{n === 1 ? "" : "s"}
+                      </span>
+                      <span>
+                        avg{" "}
+                        <span className="font-semibold tabular-nums text-neutral-200">
+                          {avg != null ? avg.toFixed(1) : "—"}
+                        </span>
+                      </span>
+                      {vs != null && (
+                        <span
+                          className={cn(
+                            "font-semibold tabular-nums",
+                            vs >= 0 ? "text-emerald-400" : "text-red-400",
+                          )}
+                        >
+                          {vs >= 0 ? "+" : ""}
+                          {vs.toFixed(1)} vs line
+                        </span>
+                      )}
+                      <span>
+                        proj {market.projectedValue.toFixed(1)} (
+                        {market.edgeVsLine > 0 ? "+" : ""}
+                        {market.edgeVsLine.toFixed(1)})
+                      </span>
+                    </p>
+                  );
+                })()}
                 <GameChart games={market.chartGames} line={market.line} />
               </div>
             )}
@@ -588,25 +632,38 @@ export default function PlayerPage() {
               <ul className="space-y-2">
                 {markets.map((m, i) => (
                   <li key={m.propId}>
-                    <button
-                      type="button"
-                      onClick={() => setMarketIdx(i)}
+                    <div
                       className={cn(
-                        "flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left text-sm",
+                        "flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-3 text-sm",
                         i === marketIdx
                           ? "border-yellow-500/35 bg-yellow-500/10"
                           : "border-[#1a1a1a] bg-black/20",
                       )}
                     >
-                      <span className="text-neutral-200">
-                        {m.market} · {m.side} {m.line}
-                      </span>
-                      <span className={cn("tabular-nums", leanTextClass(m.side))}>
-                        Proj {m.projectedValue.toFixed(1)} ·{" "}
-                        {m.edgePercent > 0 ? "+" : ""}
-                        {m.edgePercent.toFixed(1)}%
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMarketIdx(i);
+                          setTab("chart");
+                        }}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <span className="block text-neutral-200">
+                          {m.market} · {m.side} {m.line}
+                        </span>
+                        <span className={cn("mt-0.5 block text-xs tabular-nums", leanTextClass(m.side))}>
+                          Proj {m.projectedValue.toFixed(1)} ·{" "}
+                          {m.edgePercent > 0 ? "+" : ""}
+                          {m.edgePercent.toFixed(1)}%
+                        </span>
+                      </button>
+                      <Link
+                        href={propResearchPath(m.propId)}
+                        className="shrink-0 text-xs font-medium text-yellow-400 hover:underline"
+                      >
+                        Report
+                      </Link>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -811,7 +868,7 @@ export default function PlayerPage() {
               ))}
             </ul>
             <Link
-              href={`/prop/${encodeURIComponent(market.propId)}`}
+              href={propResearchPath(market.propId)}
               className="mt-3 inline-flex text-xs font-medium text-yellow-400 hover:underline"
             >
               Full research report →

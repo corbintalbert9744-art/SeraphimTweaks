@@ -8,6 +8,7 @@ import { asNbaPropFromApi, cacheNbaBoardProps, propDetailFromNbaProp } from "@/l
 import { cacheNflBoardProps } from "@/lib/addPropToBuilder";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { propResearchPath } from "@/lib/playerLinks";
 import type { NflProp } from "@/data/nflMock";
 
 function asNflProp(row: Record<string, unknown>): NflProp {
@@ -191,7 +192,7 @@ export default function ResearchHubPage() {
                     </td>
                     <td className="px-4 py-3 tabular-nums text-neutral-400">{prop.dqs}</td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/prop/${prop.id}`} className="text-xs text-yellow-400 hover:underline">
+                      <Link href={propResearchPath(prop.id)} className="text-xs text-yellow-400 hover:underline">
                         Report
                       </Link>
                     </td>
