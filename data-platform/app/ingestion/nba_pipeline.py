@@ -473,20 +473,37 @@ def recalculate_open_prop_analytics(db: Session) -> dict[str, Any]:
 def build_command_center(db: Session) -> dict[str, Any]:
     featured = build_and_store_featured_prop(db)
     schedule = get_nba_providers().schedule.fetch_schedule("NBA") if get_nba_providers().schedule else []
+    board_date = ""
+    if schedule:
+        board_date = schedule[0].tipoff_at.date().isoformat()
+    else:
+        board_date = datetime.now(timezone.utc).date().isoformat()
+
     games_soon = [
         {
             "id": g.external_id,
             "shortName": f"{g.away_abbr} @ {g.home_abbr}",
             "tipoffAt": g.tipoff_at.isoformat(),
             "status": g.status,
+            "statusDetail": g.status,
         }
         for g in sorted(schedule, key=lambda x: x.tipoff_at)[:6]
     ]
     prop = featured.get("prop") if featured.get("ok") else None
-    top_props = []
-    if prop:
+
+    # Prefer warehouse board props when available for richer Command Center.
+    try:
+        from app.ingestion.nba_board import list_nba_props_from_warehouse
+
+        warehouse_props = list_nba_props_from_warehouse(db)
+    except Exception:
+        warehouse_props = []
+
+    top_props: list[dict[str, Any]] = []
+    if warehouse_props:
+        top_props = sorted(warehouse_props, key=lambda p: p.get("evPercent") or 0, reverse=True)[:8]
+    elif prop:
         top_props = [prop]
-        # Lightweight variants — labeled as model estimates, not separate live markets yet
         for market, scale, delta_rs in (("Rebounds", 0.28, 6), ("Assists", 0.18, 8)):
             clone = {**prop, "id": f"{prop['id']}-{market.lower()[:3]}", "market": market}
             clone["line"] = max(0.5, round(prop["line"] * scale * 2) / 2)
@@ -495,16 +512,35 @@ def build_command_center(db: Session) -> dict[str, Any]:
             clone["isModelEstimate"] = True
             top_props.append(clone)
 
+    best_ev = top_props[0] if top_props else prop
+    highest = (
+        max(top_props, key=lambda p: p.get("confidence") or 0) if top_props else prop
+    )
+
     return {
         "ok": True,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "disclaimer": get_settings().model_disclaimer,
+        "board": {
+            "date": board_date,
+            "games": [
+                {
+                    "id": g.external_id,
+                    "shortName": f"{g.away_abbr} @ {g.home_abbr}",
+                    "tipoffAt": g.tipoff_at.isoformat(),
+                    "status": g.status,
+                    "statusDetail": g.status,
+                }
+                for g in schedule
+            ],
+        },
         "propOfTheDay": prop,
         "topProps": top_props,
+        "bestEvToday": best_ev,
         "gamesStartingSoon": games_soon,
         "injuryAlerts": featured.get("injuries") or [],
         "savedParlays": [],
-        "highestConfidence": prop,
+        "highestConfidence": highest,
         "featured": featured,
         "providers": {
             "schedule": "espn-nba",

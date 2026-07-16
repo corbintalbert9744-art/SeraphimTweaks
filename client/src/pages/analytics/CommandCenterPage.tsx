@@ -10,15 +10,15 @@ import { cn } from "@/lib/utils";
 
 type CommandCenterResponse = {
   generatedAt: string;
-  board: { date: string; games: Array<any> };
-  gamesStartingSoon: Array<any>;
-  bestEvToday: any | null;
-  highestConfidence: any | null;
-  propOfTheDay: any | null;
-  topProps: any[];
-  injuryAlerts: Array<{ team: string; player: string; status: string; detail?: string }>;
-  savedParlays: Array<{ id: string; title: string; legs: number }>;
-  featured: { ok: boolean; source?: any };
+  board?: { date?: string; games?: Array<any> } | null;
+  gamesStartingSoon?: Array<any>;
+  bestEvToday?: any | null;
+  highestConfidence?: any | null;
+  propOfTheDay?: any | null;
+  topProps?: any[];
+  injuryAlerts?: Array<{ team: string; player: string; status: string; detail?: string }>;
+  savedParlays?: Array<{ id: string; title: string; legs: number }>;
+  featured?: { ok: boolean; source?: any };
 };
 
 async function fetchCommandCenter(): Promise<CommandCenterResponse> {
@@ -81,10 +81,10 @@ export default function CommandCenterPage() {
         <>
           <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
             <span className="rounded-full border border-[#1a1a1a] bg-[#111] px-3 py-1.5">
-              ESPN slate · {data.board.date}
+              ESPN slate · {data.board?.date || "today"}
             </span>
             <span className="rounded-full border border-[#1a1a1a] bg-[#111] px-3 py-1.5">
-              {data.board.games.length} games
+              {(data.board?.games ?? data.gamesStartingSoon ?? []).length} games
             </span>
             <span className="rounded-full border border-[#1a1a1a] bg-[#111] px-3 py-1.5">
               Updated {new Date(data.generatedAt).toLocaleTimeString()}
@@ -108,7 +108,7 @@ export default function CommandCenterPage() {
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Best EV today"
-              value={data.bestEvToday ? `+${data.bestEvToday.evPercent.toFixed(1)}%` : "—"}
+              value={data.bestEvToday ? `+${Number(data.bestEvToday.evPercent ?? 0).toFixed(1)}%` : "—"}
               sub={data.bestEvToday ? `${data.bestEvToday.player} · ${data.bestEvToday.market}` : "Waiting on slate"}
               accent="emerald"
             />
@@ -124,12 +124,12 @@ export default function CommandCenterPage() {
             />
             <MetricCard
               label="Injury alerts"
-              value={`${data.injuryAlerts.length}`}
+              value={`${(data.injuryAlerts ?? []).length}`}
               sub="From ESPN game summaries"
             />
             <MetricCard
               label="Saved parlays"
-              value={`${data.savedParlays.length}`}
+              value={`${(data.savedParlays ?? []).length}`}
               sub="Sign-in + DB coming next"
             />
           </div>
@@ -142,11 +142,11 @@ export default function CommandCenterPage() {
                   NBA board
                 </Link>
               </div>
-              {data.topProps.length === 0 ? (
+              {(data.topProps ?? []).length === 0 ? (
                 <EmptyState title="No props computed" description="Gamelog + line derivation needed." className="py-10" />
               ) : (
                 <ul className="divide-y divide-[#151515]">
-                  {data.topProps.map((p) => (
+                  {(data.topProps ?? []).map((p) => (
                     <li
                       key={p.id}
                       className="flex flex-wrap items-center justify-between gap-3 py-3 transition hover:bg-white/[0.02]"
@@ -157,7 +157,7 @@ export default function CommandCenterPage() {
                           <p className="font-medium text-neutral-100">{p.player}</p>
                         </div>
                         <p className="mt-1 text-xs text-neutral-500">
-                          {p.market} {p.side} {p.line} · EV +{p.evPercent.toFixed(1)}% · Conf {p.confidence}
+                          {p.market} {p.side} {p.line} · EV +{Number(p.evPercent ?? 0).toFixed(1)}% · Conf {p.confidence}
                         </p>
                       </div>
                       <ResearchScoreBadge score={p.researchScore} size="sm" />
@@ -171,17 +171,17 @@ export default function CommandCenterPage() {
               <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5 transition hover:border-yellow-500/20">
                 <h2 className="text-base font-semibold text-white">Games starting soon</h2>
                 <ul className="mt-4 space-y-2">
-                  {data.gamesStartingSoon.length === 0 && (
+                  {(data.gamesStartingSoon ?? []).length === 0 && (
                     <p className="text-sm text-neutral-500">No games on the current ESPN day.</p>
                   )}
-                  {data.gamesStartingSoon.map((g) => (
+                  {(data.gamesStartingSoon ?? []).map((g) => (
                     <li
                       key={g.id}
                       className="rounded-xl border border-[#1a1a1a] bg-black/25 px-3 py-3 transition hover:border-neutral-700"
                     >
                       <p className="text-sm font-medium text-neutral-100">{g.shortName}</p>
                       <p className="mt-1 text-[11px] text-neutral-500">
-                        {g.statusDetail} · {new Date(g.tipoffAt).toLocaleString()}
+                        {g.statusDetail || g.status} · {new Date(g.tipoffAt).toLocaleString()}
                       </p>
                     </li>
                   ))}
@@ -191,10 +191,10 @@ export default function CommandCenterPage() {
               <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5 transition hover:border-yellow-500/20">
                 <h2 className="text-base font-semibold text-white">Injury alerts</h2>
                 <ul className="mt-4 space-y-2">
-                  {data.injuryAlerts.length === 0 && (
+                  {(data.injuryAlerts ?? []).length === 0 && (
                     <p className="text-sm text-neutral-500">No injury tags on the featured game.</p>
                   )}
-                  {data.injuryAlerts.map((a, i) => (
+                  {(data.injuryAlerts ?? []).map((a, i) => (
                     <li key={`${a.player}-${i}`} className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3 py-3">
                       <p className="text-sm text-neutral-100">
                         {a.player} · {a.team}
