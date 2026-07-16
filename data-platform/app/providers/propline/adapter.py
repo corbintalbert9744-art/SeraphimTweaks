@@ -23,6 +23,7 @@ from app.providers.base import (
     ProviderRateLimitError,
 )
 from app.providers.propline.markets import (
+    LEAGUE_EXTRA_SPORTS,
     PICKEM_SLUGS,
     PROPLINE_BOOKMAKERS,
     SOCCER_EXTRA_SPORTS,
@@ -214,6 +215,8 @@ class PropLineAdapter:
         sport_keys = [sport]
         if code == "Soccer":
             sport_keys.extend(SOCCER_EXTRA_SPORTS)
+        else:
+            sport_keys.extend(LEAGUE_EXTRA_SPORTS.get(code, ()))
 
         allowed = {p.lower() for p in platforms} if platforms else None
         limit = max_events if max_events is not None else self.max_events

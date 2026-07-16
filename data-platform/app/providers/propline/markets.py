@@ -22,6 +22,12 @@ SPORT_KEYS: dict[str, str] = {
     "WTA": "tennis",
 }
 
+# Extra sport keys polled when the primary league key has no events (e.g. NBA off-season).
+LEAGUE_EXTRA_SPORTS: dict[str, tuple[str, ...]] = {
+    "NBA": ("basketball_nba_summer_league",),
+    "Soccer": (),  # SOCCER_EXTRA_SPORTS used below
+}
+
 # Additional soccer competitions when expanding Soccer sync.
 SOCCER_EXTRA_SPORTS: tuple[str, ...] = (
     "soccer_mls",
