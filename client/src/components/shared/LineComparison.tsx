@@ -1,5 +1,5 @@
 import { formatAmericanOdds, type BookQuote } from "@/data/propsCatalog";
-import { CANONICAL_LINE_PROVIDERS } from "@/data/lineProviders";
+import { CANONICAL_LINE_PROVIDERS, providerSpecByName } from "@/data/lineProviders";
 import { cn } from "@/lib/utils";
 
 export type LineComparisonRow = BookQuote & {
@@ -55,13 +55,69 @@ export function mergeLineComparison(
     };
   });
 
-  // Rank: connected first by edge, then placeholders
   return rows.sort((a, b) => {
     const aPend = a.requiresIntegration ? 1 : 0;
     const bPend = b.requiresIntegration ? 1 : 0;
     if (aPend !== bPend) return aPend - bPend;
     return (b.edgeVsProjection ?? 0) - (a.edgeVsProjection ?? 0);
   });
+}
+
+/** Horizontal betting-app switcher — pick which book’s line you’re comparing. */
+export function SportsbookAppSwitcher({
+  rows,
+  selectedBook,
+  onSelectBook,
+}: {
+  rows: LineComparisonRow[];
+  selectedBook: string | null;
+  onSelectBook: (book: string) => void;
+}) {
+  const best = rows.find((r) => r.isBestValue && !r.requiresIntegration) ?? rows.find((r) => !r.requiresIntegration);
+  const activeName = selectedBook ?? best?.book ?? rows[0]?.book;
+
+  return (
+    <div className="overflow-x-auto pb-1" data-feature="sportsbook-switcher">
+      <div className="flex min-w-max items-center gap-3">
+        {rows.map((b) => {
+          const spec = providerSpecByName(b.book) ?? CANONICAL_LINE_PROVIDERS.find((p) => p.slug === b.slug);
+          const active = activeName === b.book;
+          const pending = Boolean(b.requiresIntegration || b.placeholder);
+          const accent = spec?.accent ?? "#737373";
+          return (
+            <button
+              key={b.slug || b.book}
+              type="button"
+              onClick={() => onSelectBook(b.book)}
+              title={pending ? b.integrationNote || "Requires integration" : b.book}
+              className={cn(
+                "group flex items-center gap-3 rounded-2xl border px-4 py-3 transition",
+                active
+                  ? "border-white/20 bg-white/[0.08] shadow-[0_0_0_1px_rgba(255,255,255,0.06)]"
+                  : "border-transparent bg-white/[0.03] hover:border-white/10 hover:bg-white/[0.05]",
+                pending && !active && "opacity-70",
+              )}
+            >
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[11px] font-bold tracking-wide text-black"
+                style={{ backgroundColor: accent }}
+              >
+                {spec?.mark ?? b.book.slice(0, 2).toUpperCase()}
+              </span>
+              <span className="text-left">
+                <span className={cn("block text-sm font-semibold", active ? "text-white" : "text-neutral-300")}>
+                  {b.book}
+                </span>
+                <span className="mt-0.5 block text-[11px] tabular-nums text-neutral-500">
+                  {pending ? "Connect" : `Line ${b.line}`}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export function LineComparison({
@@ -84,89 +140,73 @@ export function LineComparison({
   const rows = mergeLineComparison(books, { projected, modelSide, consensusLine });
   const best = rows.find((r) => r.isBestValue && !r.requiresIntegration) ?? rows.find((r) => !r.requiresIntegration);
   const activeName = selectedBook ?? best?.book ?? rows[0]?.book;
+  const active = rows.find((r) => r.book === activeName) ?? rows[0];
+  const odds = active ? (selectedSide === "Over" ? active.over : active.under) : -110;
+  const pending = Boolean(active?.requiresIntegration || active?.placeholder);
+  const spec = active ? providerSpecByName(active.book) : undefined;
 
   return (
-    <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5" data-feature="line-comparison">
-      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-white">Line Comparison</h2>
-        <p className="text-[11px] text-neutral-500">Our projection vs supported operators</p>
+    <section
+      className="rounded-3xl border border-white/[0.06] bg-[#0d0d0d] p-6 sm:p-8"
+      data-feature="line-comparison"
+    >
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Compare apps</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Switch books to see how their line sits vs our projection ({projected.toFixed(1)}).
+          </p>
+        </div>
+        <p className="text-xs text-neutral-600">
+          Lean <span className="text-yellow-400">{modelSide}</span>
+        </p>
       </div>
-      <p className="mb-4 text-xs text-neutral-500">
-        Projection <span className="tabular-nums text-neutral-300">{projected.toFixed(1)}</span>
-        {" · "}
-        lean <span className="text-yellow-400">{modelSide}</span>
-        {" · "}
-        best available line highlighted when a provider is connected. Unconnected operators show
-        placeholders marked Requires integration.
-      </p>
 
-      <ul className="space-y-2">
-        {rows.map((b) => {
-          const active = activeName === b.book;
-          const odds = selectedSide === "Over" ? b.over : b.under;
-          const pending = Boolean(b.requiresIntegration || b.placeholder);
-          return (
-            <li key={b.slug || b.book}>
-              <button
-                type="button"
-                onClick={() => onSelectBook(b.book)}
-                className={cn(
-                  "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm transition",
-                  active
-                    ? "border-yellow-500/40 bg-yellow-500/10"
-                    : "border-[#1a1a1a] bg-black/20 hover:border-neutral-700",
-                  pending && "opacity-90",
-                )}
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-neutral-100">{b.book}</span>
-                    <span className="rounded border border-[#222] px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-neutral-500">
-                      {b.kind === "pickem" ? "Pick'em" : "Sportsbook"}
-                    </span>
-                    {b.isBestValue && !pending && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
-                        Best Value
-                      </span>
-                    )}
-                    {pending && (
-                      <span className="rounded border border-amber-500/35 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200">
-                        Requires integration
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-[11px] text-neutral-500">
-                    {pending ? (
-                      <>
-                        Placeholder vs projection{" "}
-                        <span className="tabular-nums text-neutral-400">
-                          {(b.edgeVsProjection ?? 0) > 0 ? "+" : ""}
-                          {(b.edgeVsProjection ?? 0).toFixed(1)}
-                        </span>
-                        {b.integrationNote ? ` · ${b.integrationNote}` : ""}
-                      </>
-                    ) : (
-                      <>
-                        Edge vs projection{" "}
-                        <span className="tabular-nums text-neutral-300">
-                          {(b.edgeVsProjection ?? 0) > 0 ? "+" : ""}
-                          {(b.edgeVsProjection ?? 0).toFixed(1)}
-                        </span>
-                      </>
-                    )}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-semibold tabular-nums text-white">{b.line}</p>
-                  {b.kind !== "pickem" && (
-                    <p className="text-xs tabular-nums text-neutral-400">{formatAmericanOdds(odds)}</p>
-                  )}
-                </div>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <SportsbookAppSwitcher rows={rows} selectedBook={selectedBook} onSelectBook={onSelectBook} />
+
+      {active && (
+        <div className="mt-8 grid gap-6 border-t border-white/[0.06] pt-8 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div className="flex items-start gap-4">
+            <span
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-black"
+              style={{ backgroundColor: spec?.accent ?? "#737373" }}
+            >
+              {spec?.mark ?? active.book.slice(0, 2).toUpperCase()}
+            </span>
+            <div>
+              <p className="text-base font-semibold text-white">{active.book}</p>
+              <p className="mt-1 text-sm text-neutral-500">
+                {pending
+                  ? active.integrationNote || "Requires integration — placeholder vs projection"
+                  : active.isBestValue
+                    ? "Best value among connected books"
+                    : `${active.kind === "pickem" ? "Pick'em" : "Sportsbook"} line`}
+              </p>
+              <p className="mt-3 text-sm text-neutral-400">
+                Edge vs projection{" "}
+                <span className="tabular-nums text-neutral-200">
+                  {(active.edgeVsProjection ?? 0) > 0 ? "+" : ""}
+                  {(active.edgeVsProjection ?? 0).toFixed(1)}
+                </span>
+              </p>
+            </div>
+          </div>
+          <div className="text-left sm:text-right">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+              {selectedSide} line
+            </p>
+            <p className="mt-1 text-4xl font-semibold tabular-nums text-white">{active.line}</p>
+            {active.kind !== "pickem" && (
+              <p className="mt-1 text-sm tabular-nums text-neutral-400">{formatAmericanOdds(odds)}</p>
+            )}
+            {pending && (
+              <p className="mt-2 text-[11px] font-medium uppercase tracking-wider text-amber-300/90">
+                Requires integration
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

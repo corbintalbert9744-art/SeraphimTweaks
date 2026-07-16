@@ -23,6 +23,15 @@ import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { LineComparison } from "@/components/shared/LineComparison";
 
+type HitWindow = "L5" | "L10" | "L20" | "Season";
+
+function parseHitRate(value: string): { hits: number; samples: number; pct: number } {
+  const [hits, samples] = value.split("/").map(Number);
+  const h = Number.isFinite(hits) ? hits : 0;
+  const s = Number.isFinite(samples) ? samples : 0;
+  return { hits: h, samples: s, pct: s ? Math.round((h / s) * 100) : 0 };
+}
+
 function MovementChart({
   points,
 }: {
@@ -44,7 +53,7 @@ function MovementChart({
 
   return (
     <div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-36 w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-40 w-full">
         <polyline
           fill="none"
           stroke="rgb(250, 204, 21)"
@@ -54,10 +63,18 @@ function MovementChart({
           strokeLinejoin="round"
         />
         {coords.map((c, i) => (
-          <circle key={points[i].label} cx={c.x} cy={c.y} r="4" fill="#0a0a0a" stroke="rgb(250, 204, 21)" strokeWidth="2" />
+          <circle
+            key={points[i].label}
+            cx={c.x}
+            cy={c.y}
+            r="4"
+            fill="#0a0a0a"
+            stroke="rgb(250, 204, 21)"
+            strokeWidth="2"
+          />
         ))}
       </svg>
-      <div className="mt-1 flex justify-between text-[10px] text-neutral-500">
+      <div className="mt-2 flex justify-between text-[11px] text-neutral-500">
         {points.map((p) => (
           <span key={p.label}>
             {p.label} · {p.line}
@@ -68,109 +85,91 @@ function MovementChart({
   );
 }
 
-function HitRateBars({ prop }: { prop: PropDetail }) {
-  const rows = [
-    { label: "L5", value: prop.l5 },
-    { label: "L10", value: prop.l10 },
-    { label: "L20", value: prop.l20 },
-    { label: "Season", value: prop.season },
-  ];
-  return (
-    <div className="space-y-3">
-      {rows.map((row) => {
-        const [hits, samples] = row.value.split("/").map(Number);
-        const pct = samples ? Math.round((hits / samples) * 100) : 0;
-        return (
-          <div key={row.label}>
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="text-neutral-400">{row.label}</span>
-              <span className="tabular-nums text-neutral-200">
-                {row.value} · {pct}%
-              </span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-white/5">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-amber-700 to-yellow-400 transition-all duration-500"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function MinutesTrend({ points }: { points: NonNullable<PropDetail["minutesTrend"]> }) {
-  if (!points.length) return <p className="text-sm text-neutral-500">Minutes trend fills as gamelogs land.</p>;
-  const values = points.map((p) => p.minutes);
-  const max = Math.max(...values, 1);
-  return (
-    <div className="flex items-end gap-1.5 h-28">
-      {points.map((p) => (
-        <div key={`${p.date}-${p.opponent}`} className="flex flex-1 flex-col items-center gap-1">
-          <div
-            className="w-full rounded-t bg-gradient-to-t from-amber-700/80 to-yellow-400/90"
-            style={{ height: `${Math.max(8, (p.minutes / max) * 100)}%` }}
-            title={`${p.minutes} min · ${p.value ?? "—"}`}
-          />
-          <span className="text-[9px] text-neutral-600">{p.date}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function HitHistoryChart({
   history,
   line,
+  window,
+  windowLabel,
 }: {
   history: NonNullable<PropDetail["hitHistory"]>;
   line: number;
+  window: HitWindow;
+  windowLabel: string;
 }) {
-  if (!history.length) {
+  const limit = window === "L5" ? 5 : window === "L10" ? 10 : window === "L20" ? 20 : history.length;
+  const slice = history.slice(0, Math.max(limit, 0));
+  if (!slice.length) {
     return <p className="text-sm text-neutral-500">Hit-rate history fills as warehouse gamelogs land.</p>;
   }
-  const vals = history.map((h) => h.value ?? 0);
-  const max = Math.max(...vals, line, 1) * 1.15;
+  const vals = slice.map((h) => h.value ?? 0);
+  const max = Math.max(...vals, line, 1) * 1.2;
+  const hits = slice.filter((g) => g.hit).length;
+
   return (
     <div>
-      <div className="mb-3 flex flex-wrap gap-3 text-[11px] text-neutral-500">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" /> Hit
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-red-500/70" /> Miss
-        </span>
-        <span className="tabular-nums text-neutral-400">Line {line}</span>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
+            Hit rate · {windowLabel}
+          </p>
+          <p className="mt-2 text-5xl font-semibold tabular-nums tracking-tight text-white sm:text-6xl">
+            {hits}
+            <span className="text-neutral-600">/{slice.length}</span>
+          </p>
+          <p className="mt-2 text-sm text-neutral-500">
+            Cleared line {line} in {hits} of last {slice.length} games
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-4 text-xs text-neutral-500">
+          <span className="inline-flex items-center gap-2">
+            <span className="h-3 w-3 rounded-sm bg-emerald-500" /> Hit
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span className="h-3 w-3 rounded-sm bg-red-500/80" /> Miss
+          </span>
+        </div>
       </div>
-      <div className="flex h-36 items-end gap-1">
-        {history.map((g, i) => {
-          const v = g.value ?? 0;
-          const h = Math.max(8, (v / max) * 100);
-          return (
-            <div key={`${g.label}-${i}`} className="flex h-full flex-1 flex-col items-center justify-end">
-              <span
-                className={cn(
-                  "mb-1 text-[9px] font-semibold tabular-nums",
-                  g.hit ? "text-emerald-300" : "text-red-300/80",
-                )}
-              >
-                {g.value != null ? g.value : "—"}
-              </span>
-              <div
-                className={cn(
-                  "w-full max-w-[22px] rounded-t-md",
-                  g.hit
-                    ? "bg-gradient-to-t from-emerald-700 to-emerald-400"
-                    : "bg-gradient-to-t from-red-900/80 to-red-500/70",
-                )}
-                style={{ height: `${h}%` }}
-                title={g.label}
-              />
-            </div>
-          );
-        })}
+
+      <div className="relative h-56 sm:h-64">
+        <div
+          className="pointer-events-none absolute inset-x-0 z-10 flex items-center"
+          style={{ bottom: `${(line / max) * 100}%` }}
+        >
+          <div className="h-px flex-1 border-t border-dashed border-neutral-500/60" />
+          <span className="ml-3 shrink-0 rounded-md bg-[#0d0d0d] px-2 py-0.5 text-[11px] font-medium text-neutral-400">
+            Line {line}
+          </span>
+        </div>
+
+        <div className="absolute inset-0 flex items-end justify-between gap-2 px-1">
+          {slice.map((g, i) => {
+            const v = g.value ?? 0;
+            const h = Math.max(10, (v / max) * 100);
+            return (
+              <div key={`${g.label}-${i}`} className="flex h-full flex-1 flex-col items-center justify-end">
+                <span
+                  className={cn(
+                    "mb-2 text-[11px] font-semibold tabular-nums sm:text-xs",
+                    g.hit ? "text-emerald-300" : "text-red-300/85",
+                  )}
+                >
+                  {g.value != null ? g.value : "—"}
+                </span>
+                <div
+                  className={cn(
+                    "w-full max-w-[36px] rounded-t-lg transition-all duration-500",
+                    g.hit
+                      ? "bg-gradient-to-t from-emerald-800 to-emerald-400"
+                      : "bg-gradient-to-t from-red-950/90 to-red-500/75",
+                  )}
+                  style={{ height: `${h}%` }}
+                  title={g.label}
+                />
+                <span className="mt-3 text-[10px] tabular-nums text-neutral-600">{g.label}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -245,6 +244,7 @@ export default function PropDetailPage() {
   const { addLeg, hasLeg } = useParlayDraft();
   const [side, setSide] = useState<"Over" | "Under" | null>(null);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
+  const [hitWindow, setHitWindow] = useState<HitWindow>("L10");
 
   const recommendation = prop?.recommendation ?? prop?.side ?? "Over";
   const selectedSide = side ?? recommendation;
@@ -266,12 +266,12 @@ export default function PropDetailPage() {
 
   if (!prop || !best) {
     return (
-      <div className="card-3d rounded-2xl border border-[#1a1a1a] p-10 text-center">
+      <div className="rounded-3xl border border-white/[0.06] bg-[#0d0d0d] p-12 text-center">
         <h1 className="text-xl font-semibold text-white">Report not found</h1>
-        <p className="mt-2 text-sm text-neutral-400">
+        <p className="mt-3 text-sm text-neutral-400">
           No live Research Report for “{propId}”. Open a board after starting the data platform.
         </p>
-        <Link href="/nba" className="mt-6 inline-block text-sm text-yellow-400 hover:underline">
+        <Link href="/nba" className="mt-8 inline-block text-sm text-yellow-400 hover:underline">
           Back to NBA board
         </Link>
       </div>
@@ -279,7 +279,6 @@ export default function PropDetailPage() {
   }
 
   const projected = prop.projectedValue ?? prop.line;
-  const selectedOdds = selectedSide === "Over" ? best.over : best.under;
   const selectedNoVig = selectedSide === prop.side ? prop.noVigProb : prop.noVigOpposite;
   const selectedEv =
     selectedSide === prop.side ? prop.evPercent : Math.max(0.2, prop.evPercent - 2.4);
@@ -292,6 +291,10 @@ export default function PropDetailPage() {
   const similar = prop.similarPropIds
     .map((id) => getCachedNbaPropDetail(id))
     .filter((p): p is PropDetail => Boolean(p));
+
+  const windowRate = parseHitRate(
+    hitWindow === "L5" ? prop.l5 : hitWindow === "L10" ? prop.l10 : hitWindow === "L20" ? prop.l20 : prop.season,
+  );
 
   function handleAdd() {
     if (!prop) return;
@@ -311,135 +314,155 @@ export default function PropDetailPage() {
             ? "/wta"
             : "/nba";
 
+  const panel = "rounded-3xl border border-white/[0.06] bg-[#0d0d0d]";
+
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-        <Link href="/research" className="inline-flex items-center gap-2 text-neutral-400 transition hover:text-yellow-400">
-          <ArrowLeft className="h-4 w-4" />
-          Research Reports
-        </Link>
-        <span className="text-neutral-700">·</span>
-        <Link href={boardHref} className="text-neutral-500 hover:text-yellow-400">
-          {prop.league} board
-        </Link>
-      </div>
-
-      <PageHeader
-        eyebrow="Independent model research"
-        title={`${prop.player} · ${prop.market}`}
-        description={`${prop.team} vs ${prop.opponent} · ${prop.position} · Our projection vs operator lines — not a sportsbook copy.`}
-        actions={
-          <button
-            type="button"
-            disabled={added}
-            onClick={handleAdd}
-            className={cn(
-              "btn-3d inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
-              added
-                ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
-                : "bg-gradient-to-b from-yellow-400 to-amber-500 text-black",
-            )}
+    <div className="space-y-10">
+      <div>
+        <div className="mb-5 flex flex-wrap items-center gap-3 text-sm">
+          <Link
+            href="/research"
+            className="inline-flex items-center gap-2 text-neutral-400 transition hover:text-yellow-400"
           >
-            {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            {added ? "In Builder" : "Add to Builder"}
-          </button>
-        }
-      />
+            <ArrowLeft className="h-4 w-4" />
+            Research Reports
+          </Link>
+          <span className="text-neutral-700">·</span>
+          <Link href={boardHref} className="text-neutral-500 hover:text-yellow-400">
+            {prop.league} board
+          </Link>
+        </div>
 
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <LeagueBadge league={prop.league} />
-        <Link href={`/player/${prop.playerId}`} className="text-sm font-medium text-yellow-400 hover:underline">
-          Open Player Profile
-        </Link>
-        {prop.linesAreMock && (
-          <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-200">
-            Some lines · require integration
-          </span>
-        )}
+        <PageHeader
+          eyebrow="Independent model research"
+          title={`${prop.player} · ${prop.market}`}
+          description={`${prop.team} vs ${prop.opponent} · ${prop.position} · Our projection vs operator lines — not a sportsbook copy.`}
+          actions={
+            <button
+              type="button"
+              disabled={added}
+              onClick={handleAdd}
+              className={cn(
+                "btn-3d inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold",
+                added
+                  ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                  : "bg-gradient-to-b from-yellow-400 to-amber-500 text-black",
+              )}
+            >
+              {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {added ? "In Builder" : "Add to Builder"}
+            </button>
+          }
+        />
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <LeagueBadge league={prop.league} />
+          <Link
+            href={`/player/${prop.playerId}`}
+            className="text-sm font-medium text-yellow-400 hover:underline"
+          >
+            Open Player Profile
+          </Link>
+          {prop.linesAreMock && (
+            <span className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[10px] uppercase tracking-wider text-amber-200">
+              Some lines · require integration
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Model hero */}
-      <section className="card-3d mb-6 rounded-2xl border border-yellow-500/25 bg-gradient-to-br from-yellow-500/[0.08] to-transparent p-5 sm:p-6">
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+      {/* Hero: projection + Over/Under — one composition */}
+      <section className={cn(panel, "p-6 sm:p-8")}>
+        <div className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-yellow-500/90">
-              Seraphim model
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-yellow-500/90">
+              Seraphim projection
             </p>
-            <p className="mt-3 text-sm text-neutral-400">Projected {prop.market}</p>
-            <p className="mt-1 text-5xl font-semibold tabular-nums text-white">{projected.toFixed(1)}</p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-300">
-                Recommendation · {recommendation}
+            <p className="mt-4 text-sm text-neutral-500">{prop.market}</p>
+            <p className="mt-1 text-6xl font-semibold tabular-nums tracking-tight text-white sm:text-7xl">
+              {projected.toFixed(1)}
+            </p>
+            <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-500">{prop.why}</p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <span className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300">
+                Lean {recommendation}
               </span>
               {prop.edgeVsLine != null && (
-                <span className="rounded-lg border border-[#1a1a1a] bg-black/30 px-3 py-1.5 text-sm tabular-nums text-neutral-200">
-                  Edge vs consensus {prop.edgeVsLine > 0 ? "+" : ""}
-                  {prop.edgeVsLine.toFixed(1)}
+                <span className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm tabular-nums text-neutral-200">
+                  Edge {prop.edgeVsLine > 0 ? "+" : ""}
+                  {prop.edgeVsLine.toFixed(1)} vs consensus
                 </span>
               )}
             </div>
-            <p className="mt-3 text-xs leading-relaxed text-neutral-500">{prop.why}</p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Metric label="Confidence" value={`${prop.confidence}%`} accent="gold" />
-            <Metric label="Research Score" value={`${prop.researchScore}/100`} accent="gold" />
-            <Metric
-              label="Over prob"
-              value={`${((prop.overProbability ?? prop.noVigProb) * 100).toFixed(0)}%`}
-            />
-            <Metric
-              label="Under prob"
-              value={`${((prop.underProbability ?? prop.noVigOpposite) * 100).toFixed(0)}%`}
-            />
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(["Over", "Under"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setSide(s)}
+                className={cn(
+                  "rounded-2xl border px-5 py-5 text-left transition",
+                  selectedSide === s
+                    ? "border-yellow-500/35 bg-yellow-500/[0.08]"
+                    : "border-white/[0.06] bg-white/[0.02] hover:border-white/15",
+                )}
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{s}</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-white">
+                  {formatAmericanOdds(
+                    s === "Over"
+                      ? bestBookForSide(prop, "Over").over
+                      : bestBookForSide(prop, "Under").under,
+                  )}
+                </p>
+                {s === recommendation && (
+                  <p className="mt-2 text-[10px] uppercase tracking-wider text-yellow-400">Model lean</p>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </section>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2">
-        {(["Over", "Under"] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setSide(s)}
-            className={cn(
-              "rounded-2xl border px-4 py-4 text-left transition",
-              selectedSide === s
-                ? "border-yellow-500/40 bg-yellow-500/10 shadow-[0_0_28px_-12px_rgba(234,179,8,0.5)]"
-                : "border-[#1a1a1a] bg-black/20 hover:border-neutral-700",
-            )}
-          >
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{s}</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-white">
-              vs model {projected.toFixed(1)}
-            </p>
-            <p className="mt-1 text-sm text-neutral-400">
-              Best book {formatAmericanOdds(s === "Over" ? bestBookForSide(prop, "Over").over : bestBookForSide(prop, "Under").under)}
-              {s === recommendation && (
-                <span className="ml-2 text-[10px] uppercase tracking-wider text-yellow-400">Model lean</span>
-              )}
-            </p>
-          </button>
-        ))}
-      </div>
+      {/* Main research composition: chart + sidebar */}
+      <div className="grid gap-8 xl:grid-cols-[1.4fr_0.85fr]">
+        <div className="space-y-8">
+          <section className={cn(panel, "p-6 sm:p-8")} data-feature="hit-history">
+            <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Game log vs line</h2>
+                <p className="mt-1 text-sm text-neutral-500">
+                  Green cleared {prop.line} · red missed · lean {recommendation}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2" data-feature="hit-rates">
+                {(["L5", "L10", "L20", "Season"] as const).map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => setHitWindow(w)}
+                    className={cn(
+                      "rounded-full px-4 py-2 text-xs font-semibold tracking-wide transition",
+                      hitWindow === w
+                        ? "bg-white text-black"
+                        : "bg-white/[0.04] text-neutral-400 hover:bg-white/[0.08] hover:text-neutral-200",
+                    )}
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <HitHistoryChart
+              history={prop.hitHistory ?? []}
+              line={prop.line}
+              window={hitWindow}
+              windowLabel={hitWindow}
+            />
+          </section>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" data-feature="metrics-row">
-        <Metric
-          label="Best value line"
-          value={`${activeBook?.line ?? best.line}`}
-          sub={activeBook?.book ?? best.book}
-        />
-        <Metric
-          label="Edge vs line"
-          value={`${(activeBook?.edgeVsProjection ?? 0) > 0 ? "+" : ""}${(activeBook?.edgeVsProjection ?? 0).toFixed(1)}`}
-          accent="emerald"
-        />
-        <Metric label="No-Vig" value={`${(selectedNoVig * 100).toFixed(1)}%`} dataFeature="no-vig" />
-        <Metric label="Model EV" value={`+${selectedEv.toFixed(1)}%`} accent="emerald" />
-        <Metric label="DQS" value={`${prop.dqs}`} />
-      </div>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
-        <div className="space-y-6 xl:col-span-2">
           <LineComparison
             books={prop.books}
             projected={projected}
@@ -450,105 +473,76 @@ export default function PropDetailPage() {
             onSelectBook={setSelectedBook}
           />
 
-          <section data-feature="hit-rates" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
-            <h2 className="text-base font-semibold text-white">L5 / L10 / L20 hit rates</h2>
-            <p className="mt-1 text-xs text-neutral-500">Clear rate at the consensus research line ({prop.line})</p>
-            <div className="mt-4">
-              <HitRateBars prop={prop} />
-            </div>
-          </section>
-
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5" data-feature="hit-history">
-            <h2 className="text-base font-semibold text-white">Historical hit-rate</h2>
-            <p className="mt-1 text-xs text-neutral-500">
-              Warehouse gamelogs vs line {prop.line} · lean {recommendation}
-            </p>
-            <div className="mt-4">
-              <HitHistoryChart history={prop.hitHistory ?? []} line={prop.line} />
-            </div>
-          </section>
-
-          <section className="grid gap-4 sm:grid-cols-2">
-            <div className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
-              <h2 className="text-base font-semibold text-white">Home vs Away</h2>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {(["home", "away"] as const).map((key) => {
-                  const split = prop.homeAway?.[key];
-                  return (
-                    <div key={key} className="rounded-xl border border-[#1a1a1a] bg-black/25 px-3 py-3">
-                      <p className="text-[10px] uppercase tracking-wider text-neutral-500">{key}</p>
-                      <p className="mt-1 text-xl font-semibold tabular-nums text-white">
-                        {split?.average != null ? split.average.toFixed(1) : "—"}
-                      </p>
-                      <p className="mt-1 text-[11px] text-neutral-500">{split?.samples ?? 0} samples</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
-              <h2 className="text-base font-semibold text-white">Opponent history</h2>
-              <p className="mt-2 text-sm text-yellow-400/90">
-                vs {prop.opponentHistory?.opponent ?? prop.opponent}
-                {prop.opponentHistory?.average != null
-                  ? ` · avg ${prop.opponentHistory.average.toFixed(1)}`
-                  : ""}
-              </p>
-              <p className="mt-1 text-xs text-neutral-500">
-                {prop.opponentHistory?.meetings ?? 0} meetings in warehouse gamelogs
-              </p>
-              <ul className="mt-3 space-y-1.5">
-                {(prop.opponentHistory?.recent ?? []).slice(0, 4).map((m) => (
-                  <li key={`${m.date}-${m.value}`} className="flex justify-between text-xs text-neutral-400">
-                    <span>{m.date}</span>
-                    <span className="tabular-nums text-neutral-200">{m.value ?? "—"}</span>
-                  </li>
-                ))}
-                {(prop.opponentHistory?.recent ?? []).length === 0 && (
-                  <li className="text-xs text-neutral-600">No H2H logs vs this opponent yet.</li>
-                )}
-              </ul>
-            </div>
-          </section>
-
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
-            <div className="mb-4 flex items-end justify-between gap-3">
+          <section className={cn(panel, "p-6 sm:p-8")}>
+            <div className="grid gap-10 sm:grid-cols-2">
               <div>
-                <h2 className="text-base font-semibold text-white">Minutes / trend</h2>
-                <p className="mt-1 text-xs text-neutral-500">
-                  Projected workload · {prop.projectedMinutes ?? "—"} min · Usage proxy{" "}
-                  {prop.usageRate != null ? `${prop.usageRate}%` : "—"}
+                <h2 className="text-base font-semibold text-white">Home vs Away</h2>
+                <div className="mt-6 grid grid-cols-2 gap-4">
+                  {(["home", "away"] as const).map((key) => {
+                    const split = prop.homeAway?.[key];
+                    return (
+                      <div key={key} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-5">
+                        <p className="text-[10px] uppercase tracking-wider text-neutral-500">{key}</p>
+                        <p className="mt-2 text-3xl font-semibold tabular-nums text-white">
+                          {split?.average != null ? split.average.toFixed(1) : "—"}
+                        </p>
+                        <p className="mt-2 text-xs text-neutral-500">{split?.samples ?? 0} samples</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-white">Opponent history</h2>
+                <p className="mt-3 text-sm text-yellow-400/90">
+                  vs {prop.opponentHistory?.opponent ?? prop.opponent}
+                  {prop.opponentHistory?.average != null
+                    ? ` · avg ${prop.opponentHistory.average.toFixed(1)}`
+                    : ""}
                 </p>
+                <p className="mt-1 text-xs text-neutral-500">
+                  {prop.opponentHistory?.meetings ?? 0} meetings in warehouse gamelogs
+                </p>
+                <ul className="mt-5 space-y-3">
+                  {(prop.opponentHistory?.recent ?? []).slice(0, 4).map((m) => (
+                    <li key={`${m.date}-${m.value}`} className="flex justify-between text-sm text-neutral-400">
+                      <span>{m.date}</span>
+                      <span className="tabular-nums text-neutral-200">{m.value ?? "—"}</span>
+                    </li>
+                  ))}
+                  {(prop.opponentHistory?.recent ?? []).length === 0 && (
+                    <li className="text-sm text-neutral-600">No H2H logs vs this opponent yet.</li>
+                  )}
+                </ul>
               </div>
             </div>
-            <MinutesTrend points={prop.minutesTrend ?? []} />
           </section>
 
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5" data-feature="game-logs">
+          <section className={cn(panel, "p-6 sm:p-8")} data-feature="game-logs">
             <h2 className="text-base font-semibold text-white">Recent game logs</h2>
-            <p className="mt-1 text-xs text-neutral-500">{prop.market} from warehouse gamelogs</p>
+            <p className="mt-1 text-sm text-neutral-500">{prop.market} from warehouse</p>
             {(prop.recentGameLogs ?? []).length === 0 ? (
-              <p className="mt-4 text-sm text-neutral-500">Game logs appear after sync.</p>
+              <p className="mt-6 text-sm text-neutral-500">Game logs appear after sync.</p>
             ) : (
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="text-[10px] uppercase tracking-wider text-neutral-500">
+              <div className="mt-6 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-[11px] uppercase tracking-wider text-neutral-500">
                     <tr>
-                      <th className="pb-2 pr-3 font-medium">Date</th>
-                      <th className="pb-2 pr-3 font-medium">Opp</th>
-                      <th className="pb-2 pr-3 font-medium">Min</th>
-                      <th className="pb-2 font-medium tabular-nums">{prop.market}</th>
+                      <th className="pb-3 pr-4 font-medium">Date</th>
+                      <th className="pb-3 pr-4 font-medium">Opp</th>
+                      <th className="pb-3 pr-4 font-medium">Min</th>
+                      <th className="pb-3 font-medium tabular-nums">{prop.market}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#1a1a1a]">
+                  <tbody className="divide-y divide-white/[0.05]">
                     {(prop.recentGameLogs ?? []).map((g) => (
                       <tr key={`${g.date}-${g.opponent}`}>
-                        <td className="py-2 pr-3 text-neutral-400">{g.date}</td>
-                        <td className="py-2 pr-3 text-neutral-300">
+                        <td className="py-3.5 pr-4 text-neutral-400">{g.date}</td>
+                        <td className="py-3.5 pr-4 text-neutral-300">
                           {g.home ? "vs" : "@"} {g.opponent}
                         </td>
-                        <td className="py-2 pr-3 tabular-nums text-neutral-400">{g.minutes ?? "—"}</td>
-                        <td className="py-2 tabular-nums font-medium text-neutral-100">
+                        <td className="py-3.5 pr-4 tabular-nums text-neutral-400">{g.minutes ?? "—"}</td>
+                        <td className="py-3.5 tabular-nums font-medium text-neutral-100">
                           {g.value != null ? g.value : "—"}
                         </td>
                       </tr>
@@ -559,12 +553,14 @@ export default function PropDetailPage() {
             )}
           </section>
 
-          <section data-feature="line-movement" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
+          <section className={cn(panel, "p-6 sm:p-8")} data-feature="line-movement">
             <h2 className="text-base font-semibold text-white">Line movement</h2>
-            <p className="mt-1 text-xs text-neutral-500">
-              {prop.movement.length ? "Open → current (warehouse ticks when available)" : "Snapshots wire as providers land"}
+            <p className="mt-1 text-sm text-neutral-500">
+              {prop.movement.length
+                ? "Open → current (warehouse ticks when available)"
+                : "Snapshots wire as providers land"}
             </p>
-            <div className="mt-4">
+            <div className="mt-6">
               <MovementChart points={prop.movement} />
             </div>
           </section>
@@ -574,9 +570,9 @@ export default function PropDetailPage() {
             description="Standard keeps projection, hit rates, and line comparison. Upgrade to Pro for the AI writeup."
             ctaLabel="Upgrade to Pro"
           >
-            <section data-feature="ai-analysis" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
+            <section className={cn(panel, "p-6 sm:p-8")} data-feature="ai-analysis">
               <h2 className="text-base font-semibold text-white">AI explanation</h2>
-              <ul className="mt-3 space-y-2">
+              <ul className="mt-5 space-y-3">
                 {(prop.analysis.length ? prop.analysis : [prop.why]).map((line) => (
                   <li key={line} className="text-sm leading-relaxed text-neutral-400">
                     <span className="mr-2 text-yellow-500">•</span>
@@ -588,20 +584,23 @@ export default function PropDetailPage() {
           </ProOnly>
 
           {similar.length > 0 && (
-            <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
+            <section className={cn(panel, "p-6 sm:p-8")}>
               <h2 className="text-base font-semibold text-white">Similar props</h2>
-              <ul className="mt-4 space-y-2">
+              <ul className="mt-6 space-y-3">
                 {similar.map((s) => (
                   <li
                     key={s.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-[#1a1a1a] bg-black/20 px-3 py-3"
+                    className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-4"
                   >
                     <div>
-                      <Link href={`/prop/${s.id}`} className="text-sm font-medium text-neutral-100 hover:text-yellow-400">
+                      <Link
+                        href={`/prop/${s.id}`}
+                        className="text-sm font-medium text-neutral-100 hover:text-yellow-400"
+                      >
                         {s.player} · {s.market} {s.recommendation ?? s.side}{" "}
                         {Number(s.projectedValue ?? s.line).toFixed(1)}
                       </Link>
-                      <p className="mt-0.5 text-[11px] text-neutral-500">
+                      <p className="mt-1 text-xs text-neutral-500">
                         EV +{s.evPercent.toFixed(1)}% · Conf {s.confidence}
                       </p>
                     </div>
@@ -613,32 +612,59 @@ export default function PropDetailPage() {
           )}
         </div>
 
-        <div className="space-y-6">
+        {/* Roomier right rail */}
+        <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+          <section className={cn(panel, "p-6 sm:p-8")} data-feature="metrics-row">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+              Selected book
+            </p>
+            <p className="mt-3 text-lg font-semibold text-white">{activeBook?.book ?? best.book}</p>
+            <div className="mt-8 space-y-6">
+              <SidebarStat
+                label="Line"
+                value={`${activeBook?.line ?? best.line}`}
+                sub={`vs projection ${projected.toFixed(1)}`}
+              />
+              <SidebarStat
+                label="Edge"
+                value={`${(activeBook?.edgeVsProjection ?? 0) > 0 ? "+" : ""}${(activeBook?.edgeVsProjection ?? 0).toFixed(1)}`}
+                accent="emerald"
+              />
+              <SidebarStat
+                label={`${hitWindow} hit rate`}
+                value={`${windowRate.pct}%`}
+                sub={`${windowRate.hits}/${windowRate.samples}`}
+              />
+              <SidebarStat label="No-vig" value={`${(selectedNoVig * 100).toFixed(1)}%`} dataFeature="no-vig" />
+              <SidebarStat label="Model EV" value={`+${selectedEv.toFixed(1)}%`} accent="emerald" />
+            </div>
+          </section>
+
           <section
             data-feature="research-score"
-            className="card-3d rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/[0.07] to-transparent p-5"
+            className={cn(panel, "border-yellow-500/15 bg-gradient-to-br from-yellow-500/[0.06] to-[#0d0d0d] p-6 sm:p-8")}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-yellow-500/90">
                   Research Score
                 </p>
-                <h2 className="mt-2 text-3xl font-semibold tabular-nums text-white">{prop.researchScore}</h2>
-                <p className="mt-1 text-xs text-neutral-500">Checklist-backed · not win probability</p>
+                <h2 className="mt-3 text-5xl font-semibold tabular-nums text-white">{prop.researchScore}</h2>
+                <p className="mt-2 text-xs text-neutral-500">Checklist-backed · not win probability</p>
               </div>
               <ResearchScoreBadge score={prop.researchScore} />
             </div>
-            <ul className="mt-5 space-y-2">
+            <ul className="mt-8 space-y-2.5">
               {prop.checks.length === 0 && (
-                <li className="rounded-lg border border-[#1a1a1a] bg-black/20 px-3 py-2.5 text-sm text-neutral-400">
-                  Influential factors: {(prop.analysis.slice(0, 2).join(" · ") || prop.why)}
+                <li className="rounded-xl border border-white/[0.06] bg-black/20 px-4 py-3 text-sm text-neutral-400">
+                  Influential factors: {prop.analysis.slice(0, 2).join(" · ") || prop.why}
                 </li>
               )}
               {prop.checks.map((check) => (
                 <li
                   key={check.code}
                   className={cn(
-                    "flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm",
+                    "flex items-start gap-2 rounded-xl border px-4 py-3 text-sm",
                     check.status === "pass" && "border-emerald-500/20 bg-black/20 text-emerald-200",
                     check.status === "warn" && "border-amber-500/20 bg-black/20 text-amber-200",
                     check.status === "fail" && "border-red-500/20 bg-black/20 text-red-200",
@@ -654,25 +680,39 @@ export default function PropDetailPage() {
             </ul>
           </section>
 
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
+          <section className={cn(panel, "p-6 sm:p-8")}>
             <h2 className="text-base font-semibold text-white">Confidence</h2>
-            <p className="mt-2 text-3xl font-semibold tabular-nums text-yellow-400">{prop.confidence}%</p>
-            <p className="mt-2 text-xs text-neutral-500">
+            <p className="mt-3 text-4xl font-semibold tabular-nums text-yellow-400">{prop.confidence}%</p>
+            <p className="mt-3 text-sm leading-relaxed text-neutral-500">
               Model certainty in the projection — separate from Research Score and EV.
             </p>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
+            <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-white/5">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-amber-600 to-yellow-400"
                 style={{ width: `${prop.confidence}%` }}
               />
             </div>
+            <div className="mt-8 grid grid-cols-2 gap-4 border-t border-white/[0.06] pt-8">
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-neutral-500">Over</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
+                  {((prop.overProbability ?? prop.noVigProb) * 100).toFixed(0)}%
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-neutral-500">Under</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
+                  {((prop.underProbability ?? prop.noVigOpposite) * 100).toFixed(0)}%
+                </p>
+              </div>
+            </div>
           </section>
 
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
-            <h2 className="text-base font-semibold text-white">Injury impact</h2>
+          <section className={cn(panel, "p-6 sm:p-8")}>
+            <h2 className="text-base font-semibold text-white">Injury</h2>
             <p
               className={cn(
-                "mt-2 text-sm font-medium",
+                "mt-3 text-base font-medium",
                 prop.injuryImpact?.status === "None" || !prop.injuryImpact
                   ? "text-emerald-300"
                   : "text-amber-300",
@@ -680,35 +720,35 @@ export default function PropDetailPage() {
             >
               {prop.injuryImpact?.status ?? "None"}
             </p>
-            <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+            <p className="mt-3 text-sm leading-relaxed text-neutral-500">
               {prop.injuryImpact?.detail ?? "No active injury designation in warehouse."}
             </p>
           </section>
 
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
-            <h2 className="text-base font-semibold text-white">Opponent defensive matchup</h2>
-            <p className="mt-2 text-sm text-yellow-400/90">
+          <section className={cn(panel, "p-6 sm:p-8")}>
+            <h2 className="text-base font-semibold text-white">Opponent defense</h2>
+            <p className="mt-3 text-sm text-yellow-400/90">
               #{prop.opponentDefense.rank} of {prop.opponentDefense.of} · {prop.opponentDefense.label}
             </p>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-400">{prop.opponentDefense.note}</p>
+            <p className="mt-3 text-sm leading-relaxed text-neutral-400">{prop.opponentDefense.note}</p>
           </section>
 
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
+          <section className={cn(panel, "p-6 sm:p-8")}>
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-white">Data Quality</h2>
-              <span className="text-2xl font-semibold tabular-nums text-yellow-400">{prop.dqs}</span>
+              <h2 className="text-base font-semibold text-white">Data quality</h2>
+              <span className="text-3xl font-semibold tabular-nums text-yellow-400">{prop.dqs}</span>
             </div>
-            <p className="mt-2 text-xs text-neutral-500">
-              Trust in inputs (freshness, injuries, book agreement). Separate from Research Score and Confidence.
+            <p className="mt-3 text-sm text-neutral-500">
+              Trust in inputs (freshness, injuries, book agreement).
             </p>
           </section>
-        </div>
+        </aside>
       </div>
     </div>
   );
 }
 
-function Metric({
+function SidebarStat({
   label,
   value,
   sub,
@@ -722,11 +762,11 @@ function Metric({
   dataFeature?: string;
 }) {
   return (
-    <div data-feature={dataFeature} className="card-3d rounded-2xl border border-[#1a1a1a] p-4">
+    <div data-feature={dataFeature}>
       <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{label}</p>
       <p
         className={cn(
-          "mt-2 text-xl font-semibold tabular-nums sm:text-2xl",
+          "mt-1.5 text-3xl font-semibold tabular-nums",
           accent === "emerald" && "text-emerald-300",
           accent === "gold" && "text-yellow-400",
           !accent && "text-white",
@@ -734,7 +774,7 @@ function Metric({
       >
         {value}
       </p>
-      {sub && <p className="mt-1 text-[11px] text-neutral-500">{sub}</p>}
+      {sub && <p className="mt-1 text-xs text-neutral-500">{sub}</p>}
     </div>
   );
 }
