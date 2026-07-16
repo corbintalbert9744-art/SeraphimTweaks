@@ -33,6 +33,37 @@ import type { NbaProp } from "@/data/nbaMock";
 
 type Tab = "chart" | "lines" | "matchup" | "log";
 
+const LINE_STEP = 0.5;
+const MIN_LINE = 0.5;
+
+function edgeVsLine(projected: number, line: number, side: "Over" | "Under"): number {
+  return side === "Over" ? projected - line : line - projected;
+}
+
+/** Recompute L5/L10/L20-style hit rates against a what-if line using chart values. */
+function hitWindowsAtLine(
+  games: ChartGame[],
+  line: number,
+  base: { key: string; label: string; average: number | null; hitRate: number; hitPct: number; hits: string }[],
+) {
+  if (!games.length) return base;
+  return base.map((w) => {
+    const n =
+      w.key === "l5" ? 5 : w.key === "l10" ? 10 : w.key === "l20" ? 20 : games.length;
+    const slice = games.slice(0, Math.min(n, games.length));
+    if (!slice.length) return w;
+    const hits = slice.filter((g) => g.value > line).length;
+    const avg = slice.reduce((s, g) => s + (Number.isFinite(g.value) ? g.value : 0), 0) / slice.length;
+    return {
+      ...w,
+      average: Number(avg.toFixed(1)),
+      hitRate: hits / slice.length,
+      hitPct: Math.round((hits / slice.length) * 100),
+      hits: `${hits}/${slice.length}`,
+    };
+  });
+}
+
 function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
   if (!games.length) {
     return <p className="py-10 text-center text-sm text-neutral-500">No gamelogs for this market yet.</p>;
@@ -282,16 +313,24 @@ export default function PlayerPage() {
   const [marketIdx, setMarketIdx] = useState(0);
   const [side, setSide] = useState<"Over" | "Under" | null>(null);
   const [windowKey, setWindowKey] = useState("l10");
+  /** Local what-if line from the stepper; null means use the platform market line. */
+  const [lineOverride, setLineOverride] = useState<number | null>(null);
 
   const markets = profile?.markets ?? [];
   useEffect(() => {
     setMarketIdx(0);
     setSide(null);
     setWindowKey("l10");
+    setLineOverride(null);
   }, [playerId]);
 
   const market = markets[Math.min(marketIdx, Math.max(0, markets.length - 1))] ?? null;
   const selectedSide = (side ?? market?.side ?? "Over") as "Over" | "Under";
+  const analysisLine = lineOverride ?? market?.line ?? 0;
+
+  useEffect(() => {
+    setLineOverride(null);
+  }, [market?.propId]);
 
   useEffect(() => {
     if (boardProps.data?.props?.length) {
@@ -299,10 +338,31 @@ export default function PlayerPage() {
     }
   }, [boardProps.data]);
 
+  const analysisEdge = useMemo(() => {
+    if (!market) return 0;
+    return Number(edgeVsLine(market.projectedValue, analysisLine, selectedSide).toFixed(2));
+  }, [market, analysisLine, selectedSide]);
+
+  const analysisEdgePercent = useMemo(() => {
+    if (!market || !analysisLine) return 0;
+    return Number(((analysisEdge / analysisLine) * 100).toFixed(1));
+  }, [market, analysisLine, analysisEdge]);
+
+  const analysisHitWindows = useMemo(() => {
+    if (!market) return [];
+    return hitWindowsAtLine(market.chartGames, analysisLine, market.hitWindows ?? []);
+  }, [market, analysisLine]);
+
   const activeWindow = useMemo(
-    () => market?.hitWindows?.find((w) => w.key === windowKey) ?? market?.hitWindows?.[1],
-    [market, windowKey],
+    () => analysisHitWindows.find((w) => w.key === windowKey) ?? analysisHitWindows[1],
+    [analysisHitWindows, windowKey],
   );
+
+  function stepLine(delta: number) {
+    const base = lineOverride ?? market?.line ?? MIN_LINE;
+    const next = Math.max(MIN_LINE, Number((base + delta).toFixed(1)));
+    setLineOverride(next);
+  }
 
   if (live.isLoading && !profile) {
     return <CardSkeleton rows={5} />;
@@ -344,7 +404,7 @@ export default function PlayerPage() {
           position: profile!.position,
           market: market!.market as NbaProp["market"],
           side: market!.side === "Under" ? "Under" : "Over",
-          line: market!.line,
+          line: analysisLine,
           americanOdds: market!.americanOdds,
           noVigProb: market!.overProbability ?? 0.5,
           evPercent: market!.evPercent,
@@ -357,9 +417,9 @@ export default function PlayerPage() {
           projectedMinutes: 32,
           injury: "None",
         } as NbaProp);
-      leg = nbaToBuilderLeg({ ...row, side: s });
+      leg = nbaToBuilderLeg({ ...row, side: s, line: analysisLine });
     } else {
-      leg = { ...leg, side: s };
+      leg = { ...leg, side: s, line: analysisLine };
     }
     addLeg(leg);
   }
@@ -418,7 +478,7 @@ export default function PlayerPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-center">
               <p className="text-[10px] uppercase tracking-wider text-yellow-500/80">Line</p>
-              <p className="text-xl font-semibold tabular-nums text-yellow-300">{market.line}</p>
+              <p className="text-xl font-semibold tabular-nums text-yellow-300">{analysisLine}</p>
             </div>
             <button
               type="button"
@@ -479,6 +539,7 @@ export default function PlayerPage() {
           onSelect={(i) => {
             setMarketIdx(i);
             setSide(null);
+            setLineOverride(null);
             setTab("chart");
           }}
         />
@@ -492,31 +553,36 @@ export default function PlayerPage() {
               {market.market}
             </h2>
             <p className="mt-1 text-sm text-neutral-400">
-              {market.side} {market.line} · proj {market.projectedValue.toFixed(1)} ·{" "}
-              <span className={leanTextClass(market.side)}>
-                {market.edgeVsLine > 0 ? "+" : ""}
-                {market.edgeVsLine.toFixed(1)} vs line
+              {selectedSide} {analysisLine} · proj {market.projectedValue.toFixed(1)} ·{" "}
+              <span className={leanTextClass(selectedSide)}>
+                {analysisEdge > 0 ? "+" : ""}
+                {analysisEdge.toFixed(1)} vs line
               </span>
+              {lineOverride != null && lineOverride !== market.line ? (
+                <span className="ml-1.5 text-[11px] text-neutral-600">
+                  (platform {market.line})
+                </span>
+              ) : null}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 rounded-xl border border-[#222] bg-[#0c0c0c] px-2 py-1.5">
               <button
                 type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white"
-                onClick={() => {
-                  /* line is from market; UI affordance for desk parity */
-                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white disabled:opacity-40"
+                onClick={() => stepLine(-LINE_STEP)}
+                disabled={analysisLine <= MIN_LINE}
                 aria-label="Lower line"
               >
                 −
               </button>
               <span className="min-w-[3rem] text-center text-lg font-semibold tabular-nums text-white">
-                {market.line}
+                {analysisLine}
               </span>
               <button
                 type="button"
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white"
+                onClick={() => stepLine(LINE_STEP)}
                 aria-label="Higher line"
               >
                 +
@@ -549,7 +615,7 @@ export default function PlayerPage() {
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="space-y-4">
           <HitRateSummaryBoxes
-            windows={(market.hitWindows ?? []).map((w) => ({
+            windows={analysisHitWindows.map((w) => ({
               key: w.key,
               label: w.label,
               hitPct: w.hitPct,
@@ -562,7 +628,7 @@ export default function PlayerPage() {
           {activeWindow && (
             <p className="text-[11px] text-neutral-500">
               {activeWindow.label}: {activeWindow.hits} hits ({activeWindow.hitPct}% over) vs line{" "}
-              {market.line}
+              {analysisLine}
             </p>
           )}
 
@@ -604,7 +670,7 @@ export default function PlayerPage() {
                   const n = games.length;
                   const avg =
                     n > 0 ? games.reduce((s, g) => s + (Number.isFinite(g.value) ? g.value : 0), 0) / n : null;
-                  const vs = avg != null ? avg - market.line : null;
+                  const vs = avg != null ? avg - analysisLine : null;
                   return (
                     <p className="mb-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
                       <span>
@@ -629,13 +695,13 @@ export default function PlayerPage() {
                       )}
                       <span>
                         proj {market.projectedValue.toFixed(1)} (
-                        {market.edgeVsLine > 0 ? "+" : ""}
-                        {market.edgeVsLine.toFixed(1)})
+                        {analysisEdge > 0 ? "+" : ""}
+                        {analysisEdge.toFixed(1)})
                       </span>
                     </p>
                   );
                 })()}
-                <GameChart games={market.chartGames} line={market.line} />
+                <GameChart games={market.chartGames} line={analysisLine} />
               </div>
             )}
 
@@ -759,19 +825,19 @@ export default function PlayerPage() {
               label="Our Projection"
               value={market.projectedValue.toFixed(1)}
               hint="Seraphim model"
-              lean={market.side}
+              lean={selectedSide}
             />
             <Metric
               label="Edge"
-              value={`${market.edgeVsLine > 0 ? "+" : ""}${market.edgeVsLine.toFixed(1)}`}
-              hint="vs platform line"
-              lean={market.side}
+              value={`${analysisEdge > 0 ? "+" : ""}${analysisEdge.toFixed(1)}`}
+              hint={lineOverride != null && lineOverride !== market.line ? "vs adjusted line" : "vs platform line"}
+              lean={selectedSide}
             />
             <Metric
               label="Edge %"
-              value={`${market.edgePercent > 0 ? "+" : ""}${market.edgePercent.toFixed(1)}%`}
+              value={`${analysisEdgePercent > 0 ? "+" : ""}${analysisEdgePercent.toFixed(1)}%`}
               hint="edge / line"
-              lean={market.side}
+              lean={selectedSide}
             />
             <Metric label="Confidence" value={`${market.confidence}%`} hint="model certainty" />
             <Metric label="Research Score" value={`${market.researchScore}`} hint="checklist-backed" />
@@ -779,7 +845,7 @@ export default function PlayerPage() {
               label="Model EV"
               value={`+${market.evPercent.toFixed(1)}%`}
               hint="vs comparison odds"
-              lean={market.side}
+              lean={selectedSide}
             />
           </div>
 
@@ -861,9 +927,13 @@ export default function PlayerPage() {
               </div>
             </div>
             <p className="mt-3 text-center text-xs text-neutral-400">
-              Model lean{" "}
-              <span className={cn("font-semibold", leanTextClass(market.side))}>
-                {market.side} {market.line}
+              Analysis{" "}
+              <span className={cn("font-semibold", leanTextClass(selectedSide))}>
+                {selectedSide} {analysisLine}
+              </span>
+              <span className="mt-0.5 block tabular-nums text-neutral-500">
+                proj {market.projectedValue.toFixed(1)} · {analysisEdge > 0 ? "+" : ""}
+                {analysisEdge.toFixed(1)} vs line
               </span>
             </p>
           </div>
