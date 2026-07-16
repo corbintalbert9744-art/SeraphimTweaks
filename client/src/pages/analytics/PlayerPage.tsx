@@ -858,8 +858,8 @@ export default function PlayerPage() {
             </div>
             <p className="mt-3 text-center text-xs text-neutral-400">
               Model lean{" "}
-              <span className={cn("font-semibold", leanTextClass(market.side))}>
-                {market.side} {market.line}
+              <span className={cn("font-semibold", leanTextClass(selectedSide))}>
+                {selectedSide} {market.line}
               </span>
             </p>
           </div>

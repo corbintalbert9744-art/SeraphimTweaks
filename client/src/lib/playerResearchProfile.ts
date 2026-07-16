@@ -50,17 +50,105 @@ export function normalizePropLine(line: number): number {
   return Math.max(PROP_LINE_STEP, Math.round(line * 2) / 2);
 }
 
-/** Recompute edge / hit rates / chart hits for a user-adjusted research line. */
+/** Abramowitz–Stegun erf — matches data-platform ``math.erf`` closely enough for lean %. */
+function erf(x: number): number {
+  const sign = x < 0 ? -1 : 1;
+  const ax = Math.abs(x);
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+  const t = 1 / (1 + p * ax);
+  const y =
+    1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-ax * ax);
+  return sign * y;
+}
+
+function normalCdf(x: number): number {
+  return 0.5 * (1 + erf(x / Math.SQRT2));
+}
+
+function invNormalCdf(p: number): number {
+  const target = Math.min(0.999999, Math.max(1e-6, p));
+  let lo = -8;
+  let hi = 8;
+  for (let i = 0; i < 56; i++) {
+    const mid = (lo + hi) / 2;
+    if (normalCdf(mid) < target) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/** Mirror data-platform ``estimate_side_probabilities``. */
+export function estimateSideProbabilities(
+  projected: number,
+  line: number,
+  sigma: number,
+): { over: number; under: number } {
+  const sig = Math.max(sigma, 0.5);
+  const z = (line - projected) / sig;
+  let under = normalCdf(z);
+  let over = 1 - under;
+  over = Math.min(0.92, Math.max(0.08, over));
+  under = 1 - over;
+  return { over, under };
+}
+
+/**
+ * Residual σ for desk line nudges.
+ * Prefer σ calibrated so P(Over) at the board line matches the model’s
+ * published probability — then lowering the line raises lean as expected.
+ */
+export function residualSigmaForMarket(market: PlayerMarket): number {
+  const projected = market.projectedValue;
+  const platform = market.platformLine ?? market.line;
+  const boardOver = market.overProbability;
+
+  if (
+    boardOver != null &&
+    boardOver > 0.08 &&
+    boardOver < 0.92 &&
+    Number.isFinite(platform) &&
+    Number.isFinite(projected) &&
+    Math.abs(platform - projected) > 1e-6
+  ) {
+    const z = invNormalCdf(1 - boardOver);
+    if (Math.abs(z) > 1e-6) {
+      const calibrated = Math.abs((platform - projected) / z);
+      if (calibrated >= 0.5) return Math.max(0.75, calibrated);
+    }
+  }
+
+  const values = market.chartGames
+    .map((g) => g.value)
+    .filter((v) => Number.isFinite(v));
+  if (values.length >= 3) {
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length;
+    const stdev = Math.sqrt(variance);
+    if (stdev >= 0.5) return Math.max(0.75, stdev);
+  }
+
+  return Math.max(0.75, Math.abs(projected || 10) * 0.2);
+}
+
+/** Recompute edge / lean probs / hit rates / chart hits for a user-adjusted research line. */
 export function applyLineOverride(market: PlayerMarket, line: number): PlayerMarket {
   const platformLine = market.platformLine ?? market.line;
   const next = normalizePropLine(line);
-  const side = market.side === "Under" ? "Under" : "Over";
+  const sigma = residualSigmaForMarket({ ...market, platformLine });
+  const { over, under } = estimateSideProbabilities(market.projectedValue, next, sigma);
+  // Lean side follows the stronger model side at the adjusted line.
+  const leanSide: "Over" | "Under" = over >= under ? "Over" : "Under";
   const edgeVsLine =
-    side === "Over" ? market.projectedValue - next : next - market.projectedValue;
+    leanSide === "Over" ? market.projectedValue - next : next - market.projectedValue;
   const edgePercent = next ? (edgeVsLine / next) * 100 : 0;
   const chartGames = market.chartGames.map((g) => ({
     ...g,
-    hit: side === "Over" ? g.value > next : g.value < next,
+    hit: leanSide === "Over" ? g.value > next : g.value < next,
   }));
 
   const hitWindows = market.hitWindows.map((w) => {
@@ -70,7 +158,9 @@ export function applyLineOverride(market: PlayerMarket, line: number): PlayerMar
     if (!slice.length) {
       return { ...w };
     }
-    const hits = slice.filter((g) => (side === "Over" ? g.value > next : g.value < next)).length;
+    const hits = slice.filter((g) =>
+      leanSide === "Over" ? g.value > next : g.value < next,
+    ).length;
     const average =
       w.key === "matchup" && w.average == null
         ? null
@@ -90,8 +180,11 @@ export function applyLineOverride(market: PlayerMarket, line: number): PlayerMar
     ...market,
     platformLine,
     line: next,
+    side: leanSide,
     edgeVsLine: Number(edgeVsLine.toFixed(2)),
     edgePercent: Number(edgePercent.toFixed(1)),
+    overProbability: Number(over.toFixed(4)),
+    underProbability: Number(under.toFixed(4)),
     chartGames,
     hitWindows,
   };
