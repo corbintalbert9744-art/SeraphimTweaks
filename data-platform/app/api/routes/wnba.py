@@ -88,6 +88,6 @@ def wnba_players(db: Session = Depends(get_db)):
 def wnba_player_detail(player_id: str, db: Session = Depends(get_db)):
     ensure_wnba_board(db, force=False)
     profile = get_wnba_player_profile(db, player_id)
-    if not profile:
+    if not profile or not (profile.get("markets") or []):
         raise HTTPException(status_code=404, detail="Player not found")
     return {"ok": True, "player": profile, "live": True}

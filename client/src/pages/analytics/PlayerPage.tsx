@@ -126,18 +126,38 @@ export default function PlayerPage() {
     queryKey: ["live-player", playerId],
     enabled: Boolean(playerId),
     queryFn: async () => {
-      const nbaRes = await fetch(`/api/nba/players/${encodeURIComponent(playerId)}`);
-      if (nbaRes.ok) {
-        const data = await nbaRes.json();
+      async function tryLeague(
+        path: string,
+        league: string,
+        boardHref: string,
+      ): Promise<PlayerResearchProfile | null> {
+        const res = await fetch(path);
+        if (!res.ok) return null;
+        const data = await res.json();
         const raw = (data.player ?? data) as PlayerResearchProfile;
-        return asLivePlayerResearch({ ...raw, boardHref: raw.boardHref || "/nba" });
+        if (!raw?.markets?.length) return null;
+        return asLivePlayerResearch({
+          ...raw,
+          league: raw.league || league,
+          boardHref: raw.boardHref || boardHref,
+        });
       }
-      const wnbaRes = await fetch(`/api/wnba/players/${encodeURIComponent(playerId)}`);
-      if (wnbaRes.ok) {
-        const data = await wnbaRes.json();
-        const raw = (data.player ?? data) as PlayerResearchProfile;
-        return asLivePlayerResearch({ ...raw, league: "WNBA", boardHref: raw.boardHref || "/wnba" });
-      }
+
+      // Prefer league-specific endpoints; never accept an empty-market hit.
+      const wnba = await tryLeague(
+        `/api/wnba/players/${encodeURIComponent(playerId)}`,
+        "WNBA",
+        "/wnba",
+      );
+      if (wnba) return wnba;
+
+      const nba = await tryLeague(
+        `/api/nba/players/${encodeURIComponent(playerId)}`,
+        "NBA",
+        "/nba",
+      );
+      if (nba) return nba;
+
       // NFL players: build a minimal research profile from board props
       const nflRes = await fetch("/api/nfl/props");
       if (!nflRes.ok) throw new Error("player");

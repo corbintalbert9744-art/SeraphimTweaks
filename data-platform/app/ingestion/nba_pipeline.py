@@ -96,11 +96,37 @@ def import_nba_injuries_for_open_games(db: Session) -> dict[str, Any]:
 
 
 def _market_values(logs: list[PlayerGameLog], market: str) -> list[float]:
+    if market in ("PRA", "Pts+Rebs+Asts"):
+        vals = []
+        for row in logs:
+            if row.points is None and row.rebounds is None and row.assists is None:
+                continue
+            vals.append(float(row.points or 0) + float(row.rebounds or 0) + float(row.assists or 0))
+        return vals
+    if market in ("PR", "Pts+Rebs"):
+        return [
+            float(row.points or 0) + float(row.rebounds or 0)
+            for row in logs
+            if row.points is not None or row.rebounds is not None
+        ]
+    if market in ("PA", "Pts+Asts"):
+        return [
+            float(row.points or 0) + float(row.assists or 0)
+            for row in logs
+            if row.points is not None or row.assists is not None
+        ]
+    if market in ("RA", "Rebs+Asts"):
+        return [
+            float(row.rebounds or 0) + float(row.assists or 0)
+            for row in logs
+            if row.rebounds is not None or row.assists is not None
+        ]
     key = {
         "Points": "points",
         "Rebounds": "rebounds",
         "Assists": "assists",
         "Threes": "threes",
+        "3-PT Made": "threes",
         "Steals": "steals",
         "Blocks": "blocks",
     }.get(market, "points")

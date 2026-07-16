@@ -35,7 +35,16 @@ from app.providers.registry import get_wnba_providers
 
 log = logging.getLogger(__name__)
 
-MARKETS_FOR_BOARD = ("Points", "Rebounds", "Assists")
+MARKETS_FOR_BOARD = (
+    "Points",
+    "Rebounds",
+    "Assists",
+    "Threes",
+    "PRA",
+    "Pts+Rebs",
+    "Pts+Asts",
+    "Rebs+Asts",
+)
 
 
 def _team_abbr(db: Session, team_id: Optional[str]) -> str:
@@ -270,10 +279,11 @@ def import_wnba_slate(
     date: Optional[str] = None,
     max_games: int = 4,
     per_team: int = 2,
-    markets: tuple[str, ...] = ("Points", "Rebounds", "Assists"),
+    markets: tuple[str, ...] = MARKETS_FOR_BOARD,
 ) -> dict[str, Any]:
     """Full WNBA slate: schedule → teams/players → gamelogs → injuries → props.
     Comparison lines include PrizePicks placeholders for pick'em vs our projection.
+    Markets mirror common PrizePicks / sportsbook player props.
     """
     providers = get_wnba_providers()
     assert providers.schedule and providers.featured
@@ -578,15 +588,9 @@ def get_wnba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
         )
 
     market = str(base.get("market") or "Points")
-    market_key = {
-        "Points": "points",
-        "Rebounds": "rebounds",
-        "Assists": "assists",
-    }.get(market, "points")
 
     def _stat(r: PlayerGameLog) -> Optional[float]:
-        v = getattr(r, market_key, None)
-        return float(v) if v is not None else None
+        return _stat_from_log(r, market)
 
     values = [v for v in (_stat(r) for r in logs) if v is not None]
     home_vals = [float(_stat(r) or 0) for r in logs if r.home and _stat(r) is not None]
@@ -839,18 +843,30 @@ def _market_attr(market: str) -> str:
         "Rebounds": "rebounds",
         "Assists": "assists",
         "Threes": "threes",
+        "3-PT Made": "threes",
         "Steals": "steals",
         "Blocks": "blocks",
     }.get(market, "points")
 
 
 def _stat_from_log(r: PlayerGameLog, market: str) -> Optional[float]:
-    attr = _market_attr(market)
-    if market == "PRA":
-        vals = [r.points, r.rebounds, r.assists]
-        if any(v is None for v in vals):
+    if market in ("PRA", "Pts+Rebs+Asts"):
+        if r.points is None and r.rebounds is None and r.assists is None:
             return None
         return float(r.points or 0) + float(r.rebounds or 0) + float(r.assists or 0)
+    if market in ("PR", "Pts+Rebs"):
+        if r.points is None and r.rebounds is None:
+            return None
+        return float(r.points or 0) + float(r.rebounds or 0)
+    if market in ("PA", "Pts+Asts"):
+        if r.points is None and r.assists is None:
+            return None
+        return float(r.points or 0) + float(r.assists or 0)
+    if market in ("RA", "Rebs+Asts"):
+        if r.rebounds is None and r.assists is None:
+            return None
+        return float(r.rebounds or 0) + float(r.assists or 0)
+    attr = _market_attr(market)
     v = getattr(r, attr, None)
     return float(v) if v is not None else None
 
@@ -1003,9 +1019,12 @@ def get_wnba_player_profile(db: Session, player_key: str) -> Optional[dict[str, 
     """Accept ESPN external id or warehouse id. Rich payload for player research UI."""
     player = db.execute(
         select(Player).where(
-            (Player.external_id == player_key)
-            | (Player.id == player_key)
-            | (Player.id == f"wnba:player:{player_key}")
+            Player.league == "WNBA",
+            (
+                (Player.external_id == player_key)
+                | (Player.id == player_key)
+                | (Player.id == f"wnba:player:{player_key}")
+            ),
         )
     ).scalar_one_or_none()
 
@@ -1196,7 +1215,10 @@ def get_wnba_player_profile(db: Session, player_key: str) -> Optional[dict[str, 
 def ensure_wnba_board(db: Session, force: bool = False) -> dict[str, Any]:
     """Return warehouse board; ingest slate if empty or force=True."""
     existing = list_wnba_props_from_warehouse(db)
-    if existing and not force:
+    markets_present = {str(p.get("market")) for p in existing}
+    # Expand when older ingest only had Points/Reb/Ast (PrizePicks-style combos missing).
+    needs_expand = bool(existing) and not ({"PRA", "Threes", "Pts+Rebs"} & markets_present)
+    if existing and not force and not needs_expand:
         return {
             "ok": True,
             "source": "warehouse",
@@ -1204,7 +1226,7 @@ def ensure_wnba_board(db: Session, force: bool = False) -> dict[str, Any]:
             "players": list_wnba_player_cards(db),
             "count": len(existing),
         }
-    result = import_wnba_slate(db, max_games=6, per_team=3, markets=("Points", "Rebounds", "Assists"))
+    result = import_wnba_slate(db, max_games=6, per_team=3, markets=MARKETS_FOR_BOARD)
     props = list_wnba_props_from_warehouse(db) or result.get("board") or []
     return {
         "ok": True,

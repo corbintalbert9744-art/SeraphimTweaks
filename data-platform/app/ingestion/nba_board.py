@@ -1001,9 +1001,12 @@ def get_nba_player_profile(db: Session, player_key: str) -> Optional[dict[str, A
     """Accept ESPN external id or warehouse id. Rich payload for player research UI."""
     player = db.execute(
         select(Player).where(
-            (Player.external_id == player_key)
-            | (Player.id == player_key)
-            | (Player.id == f"nba:player:{player_key}")
+            Player.league == "NBA",
+            (
+                (Player.external_id == player_key)
+                | (Player.id == player_key)
+                | (Player.id == f"nba:player:{player_key}")
+            ),
         )
     ).scalar_one_or_none()
 

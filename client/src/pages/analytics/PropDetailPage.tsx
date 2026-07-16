@@ -185,6 +185,30 @@ export default function PropDetailPage() {
     queryKey: ["live-prop", propId],
     enabled: Boolean(propId),
     queryFn: async () => {
+      if (propId.startsWith("wnba:")) {
+        const wnbaRes = await fetch(`/api/wnba/props/${encodeURIComponent(propId)}`);
+        if (wnbaRes.ok) {
+          const data = await wnbaRes.json();
+          const detail = asPropDetailFromApi({
+            ...((data.prop ?? data) as Record<string, unknown>),
+            league: "WNBA",
+          });
+          cacheNbaPropDetail(detail);
+          return detail;
+        }
+      }
+      if (propId.startsWith("nfl:")) {
+        const nflBoard = await fetch("/api/nfl/props");
+        if (nflBoard.ok) {
+          const data = (await nflBoard.json()) as { props: Record<string, unknown>[] };
+          const row = data.props.find((p) => String(p.id) === propId);
+          if (row) {
+            const detail = asPropDetailFromApi({ ...row, league: "NFL" });
+            cacheNbaPropDetail(detail);
+            return detail;
+          }
+        }
+      }
       const nbaRes = await fetch(`/api/nba/props/${encodeURIComponent(propId)}`);
       if (nbaRes.ok) {
         const data = await nbaRes.json();
