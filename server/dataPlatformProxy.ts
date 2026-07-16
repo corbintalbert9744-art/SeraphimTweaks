@@ -78,9 +78,14 @@ export function registerDataPlatformProxy(
   });
 
   app.get("/api/nfl/props", async (req, res) => {
-    const refresh = req.query.refresh === "1" || req.query.refresh === "true" ? "?refresh=true" : "";
+    const qs = new URLSearchParams();
+    if (req.query.refresh === "1" || req.query.refresh === "true") qs.set("refresh", "true");
+    if (typeof req.query.platform === "string" && req.query.platform) {
+      qs.set("platform", req.query.platform);
+    }
+    const suffix = qs.toString() ? `?${qs}` : "";
     await proxyGet(
-      `/api/v1/nfl/props${refresh}`,
+      `/api/v1/nfl/props${suffix}`,
       res,
       async () => {
         res.status(503).json({
@@ -102,10 +107,15 @@ export function registerDataPlatformProxy(
 
   // NBA board / players / prop detail — data platform warehouse
   app.get("/api/nba/props", async (req, res) => {
-    const refresh = req.query.refresh === "1" || req.query.refresh === "true" ? "?refresh=true" : "";
+    const qs = new URLSearchParams();
+    if (req.query.refresh === "1" || req.query.refresh === "true") qs.set("refresh", "true");
+    if (typeof req.query.platform === "string" && req.query.platform) {
+      qs.set("platform", req.query.platform);
+    }
+    const suffix = qs.toString() ? `?${qs}` : "";
     // First slate ingest can take a while (ESPN gamelogs × players)
     await proxyGet(
-      `/api/v1/nba/props${refresh}`,
+      `/api/v1/nba/props${suffix}`,
       res,
       async () => {
         res.status(503).json({
@@ -146,9 +156,14 @@ export function registerDataPlatformProxy(
   });
 
   app.get("/api/wnba/props", async (req, res) => {
-    const refresh = req.query.refresh === "1" || req.query.refresh === "true" ? "?refresh=true" : "";
+    const qs = new URLSearchParams();
+    if (req.query.refresh === "1" || req.query.refresh === "true") qs.set("refresh", "true");
+    if (typeof req.query.platform === "string" && req.query.platform) {
+      qs.set("platform", req.query.platform);
+    }
+    const suffix = qs.toString() ? `?${qs}` : "";
     await proxyGet(
-      `/api/v1/wnba/props${refresh}`,
+      `/api/v1/wnba/props${suffix}`,
       res,
       async () => {
         res.status(503).json({

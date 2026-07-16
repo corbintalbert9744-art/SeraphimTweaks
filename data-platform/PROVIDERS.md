@@ -53,6 +53,16 @@ Behavior:
 5. Persist to `odds` + `line_snapshots` with `captured_at` + `source` / `provider`
 6. Scheduler job `refresh_odds` (default every 15 min) — pages read Postgres only
 
+### Pick'em app boards
+
+Research dashboards require the user to pick a pick'em app first (PrizePicks,
+Underdog Fantasy, Sleeper, or Other). Selection persists in `localStorage`.
+
+Board endpoints accept `?platform=prizepicks|underdog|sleeper|other` and return
+**only** props that have a warehouse Odds row for that app's sportsbook slug.
+The platform line replaces the generic consensus line; edge % is vs that line.
+Players not on the selected app are excluded — no cross-app inventing.
+
 Manual sync: `POST /api/v1/jobs/sync-lines`  
 Status: `GET /api/v1/lines/providers`
 

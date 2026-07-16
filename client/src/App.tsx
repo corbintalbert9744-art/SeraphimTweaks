@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import { ParlayDraftProvider } from "@/components/parlay/ParlayDraftContext";
 import { MembershipProvider, useMembership } from "@/context/MembershipContext";
+import { PickemAppProvider } from "@/context/PickemAppContext";
 import DashboardPage from "@/pages/analytics/DashboardPage";
 import CommandCenterPage from "@/pages/analytics/CommandCenterPage";
 import NbaPage from "@/pages/analytics/NbaPage";
@@ -60,29 +61,31 @@ function MembersApp() {
   return (
     <RequireMember>
       <ParlayDraftProvider>
-        <AppShell>
-          <Switch>
-            <Route path="/dashboard" component={DashboardPage} />
-            <Route path="/nba" component={NbaPage} />
-            <Route path="/nfl" component={NflPage} />
-            <Route path="/mlb" component={MlbPage} />
-            <Route path="/nhl" component={NhlPage} />
-            <Route path="/soccer" component={SoccerPage} />
-            <Route path="/players" component={PlayersHubPage} />
-            <Route path="/research" component={ResearchHubPage} />
-            <Route path="/tennis">{() => <TennisPage />}</Route>
-            <Route path="/atp">{() => <TennisPage tour="ATP" />}</Route>
-            <Route path="/wta">{() => <TennisPage tour="WTA" />}</Route>
-            <Route path="/wnba" component={WnbaPage} />
-            <Route path="/player/:id" component={PlayerPage} />
-            <Route path="/prop/:id" component={PropDetailPage} />
-            <Route path="/parlay-builder" component={ParlayBuilderPage} />
-            <Route path="/alerts" component={AlertsPage} />
-            <Route path="/settings" component={SettingsPage} />
-            <Route path="/" component={CommandCenterPage} />
-            <Route component={NotFound} />
-          </Switch>
-        </AppShell>
+        <PickemAppProvider>
+          <AppShell>
+            <Switch>
+              <Route path="/dashboard" component={DashboardPage} />
+              <Route path="/nba" component={NbaPage} />
+              <Route path="/nfl" component={NflPage} />
+              <Route path="/mlb" component={MlbPage} />
+              <Route path="/nhl" component={NhlPage} />
+              <Route path="/soccer" component={SoccerPage} />
+              <Route path="/players" component={PlayersHubPage} />
+              <Route path="/research" component={ResearchHubPage} />
+              <Route path="/tennis">{() => <TennisPage />}</Route>
+              <Route path="/atp">{() => <TennisPage tour="ATP" />}</Route>
+              <Route path="/wta">{() => <TennisPage tour="WTA" />}</Route>
+              <Route path="/wnba" component={WnbaPage} />
+              <Route path="/player/:id" component={PlayerPage} />
+              <Route path="/prop/:id" component={PropDetailPage} />
+              <Route path="/parlay-builder" component={ParlayBuilderPage} />
+              <Route path="/alerts" component={AlertsPage} />
+              <Route path="/settings" component={SettingsPage} />
+              <Route path="/" component={CommandCenterPage} />
+              <Route component={NotFound} />
+            </Switch>
+          </AppShell>
+        </PickemAppProvider>
       </ParlayDraftProvider>
     </RequireMember>
   );

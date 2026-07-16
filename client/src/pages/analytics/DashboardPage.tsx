@@ -6,14 +6,19 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { TopPropsTable } from "@/components/dashboard/TopPropsTable";
 import { HighestEvSection } from "@/components/dashboard/HighestEvSection";
 import { RecentUpdatesFeed } from "@/components/dashboard/RecentUpdatesFeed";
+import { PickemAppGate, PickemAppSwitcher } from "@/components/shared/PickemAppGate";
+import { usePickemApp } from "@/context/PickemAppContext";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { asNbaPropFromApi, cacheNbaBoardProps } from "@/lib/nbaLiveCache";
 import type { EvLeader, FeedItem, PropRow, StatCardData } from "@/data/mock";
 
 export default function DashboardPage() {
+  const { appId, app, ready } = usePickemApp();
+
   const cc = useQuery({
     queryKey: ["command-center"],
+    enabled: Boolean(ready && appId),
     queryFn: async () => {
       const res = await fetch("/api/command-center");
       if (!res.ok) throw new Error("cc");
@@ -23,11 +28,17 @@ export default function DashboardPage() {
   });
 
   const board = useQuery({
-    queryKey: ["nba-board"],
+    queryKey: ["nba-board", appId],
+    enabled: Boolean(ready && appId),
     queryFn: async () => {
-      const res = await fetch("/api/nba/props");
+      const res = await fetch(`/api/nba/props?platform=${encodeURIComponent(appId!)}`);
       if (!res.ok) throw new Error("board");
-      return res.json() as Promise<{ props: Record<string, unknown>[]; count?: number }>;
+      return res.json() as Promise<{
+        props: Record<string, unknown>[];
+        count?: number;
+        note?: string | null;
+        platformLabel?: string | null;
+      }>;
     },
     staleTime: 120_000,
   });
@@ -46,7 +57,7 @@ export default function DashboardPage() {
     market: p.market,
     line: `${p.side} ${p.line}`,
     odds: p.americanOdds > 0 ? `+${p.americanOdds}` : String(p.americanOdds),
-    evPercent: p.evPercent,
+    evPercent: p.edgePercent ?? p.evPercent,
     researchScore: p.researchScore ?? p.confidence,
     dqs: 70,
     l10: p.l10,
@@ -61,14 +72,14 @@ export default function DashboardPage() {
 
   const evLeaders: EvLeader[] = liveProps
     .slice()
-    .sort((a, b) => b.evPercent - a.evPercent)
+    .sort((a, b) => (b.edgePercent ?? b.evPercent) - (a.edgePercent ?? a.evPercent))
     .slice(0, 5)
     .map((p) => ({
       id: p.id,
       player: p.player,
       market: p.market,
       league: "NBA",
-      evPercent: p.evPercent,
+      evPercent: p.edgePercent ?? p.evPercent,
       researchScore: p.researchScore ?? p.confidence,
       odds: p.americanOdds > 0 ? `+${p.americanOdds}` : String(p.americanOdds),
     }));
@@ -101,37 +112,68 @@ export default function DashboardPage() {
     })),
   ];
 
-  const avgEv =
+  const avgEdge =
     liveProps.length === 0
       ? 0
-      : liveProps.reduce((s, p) => s + p.evPercent, 0) / liveProps.length;
+      : liveProps.reduce(
+          (s, p) =>
+            s +
+            (p.edgePercent ??
+              (p.projectedValue != null && p.line
+                ? ((p.projectedValue - p.line) / p.line) * 100
+                : 0)),
+          0,
+        ) / liveProps.length;
   const avgRs =
     liveProps.length === 0
       ? 0
       : liveProps.reduce((s, p) => s + (p.researchScore ?? p.confidence), 0) / liveProps.length;
 
+  if (!ready) {
+    return (
+      <div className="mt-6">
+        <CardSkeleton rows={3} />
+      </div>
+    );
+  }
+
+  if (!appId) {
+    return (
+      <div>
+        <PageHeader
+          eyebrow="Seraphim Analytics"
+          title="Research Dashboard"
+          description="Choose your pick'em app first — the dashboard only loads that platform's available lines."
+        />
+        <div className="mt-8">
+          <PickemAppGate />
+        </div>
+      </div>
+    );
+  }
+
   const statCards: StatCardData[] = [
     {
       id: "props",
-      label: "Live NBA props",
+      label: `${app?.shortName ?? "App"} props`,
       value: String(liveProps.length),
-      delta: board.data?.count ? `${board.data.count} warehouse` : "ESPN + model",
+      delta: board.data?.platformLabel || "Platform board",
       deltaTone: "neutral",
-      hint: "From data platform",
+      hint: "Only lines on selected app",
     },
     {
       id: "ev",
-      label: "Avg model EV",
-      value: `+${avgEv.toFixed(1)}%`,
-      delta: "vs comparison line",
-      deltaTone: "up",
+      label: "Avg edge %",
+      value: `${avgEdge >= 0 ? "+" : ""}${avgEdge.toFixed(1)}%`,
+      delta: "vs platform line",
+      deltaTone: avgEdge >= 0 ? "up" : "down",
       hint: "Seraphim estimate",
     },
     {
       id: "rs",
-      label: "Avg Research Score",
+      label: "Avg confidence",
       value: String(Math.round(avgRs)),
-      delta: "checklist-backed",
+      delta: "model score",
       deltaTone: "neutral",
       hint: "Not a win probability",
     },
@@ -146,17 +188,18 @@ export default function DashboardPage() {
   ];
 
   const loading = board.isLoading && liveProps.length === 0;
+  const note = board.data?.note;
 
   return (
     <div>
       <PageHeader
         eyebrow="Seraphim Analytics"
         title="Research Dashboard"
-        description="Live warehouse board — projections, Research Score, and EV from the data platform."
+        description={`${app?.name ?? "Pick'em"} board — player, stat, line, projection, edge %, confidence.`}
         actions={
           <div className="flex items-center gap-2">
             <span className="rounded-full border border-[#1a1a1a] bg-[#111] px-3 py-1.5 text-xs text-neutral-400">
-              {board.isFetching ? "Refreshing…" : "Live backend"}
+              {board.isFetching ? "Refreshing…" : app?.shortName ?? "Live"}
             </span>
             <Link
               href="/nba"
@@ -168,6 +211,16 @@ export default function DashboardPage() {
         }
       />
 
+      <div className="mt-4">
+        <PickemAppSwitcher />
+      </div>
+
+      {note && (
+        <p className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-200/90">
+          {note}
+        </p>
+      )}
+
       {loading ? (
         <CardSkeleton rows={3} />
       ) : board.isError ? (
@@ -177,7 +230,7 @@ export default function DashboardPage() {
         />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {statCards.map((card) => (
               <StatCard key={card.id} card={card} />
             ))}
@@ -188,7 +241,10 @@ export default function DashboardPage() {
               {topProps.length ? (
                 <TopPropsTable rows={topProps} />
               ) : (
-                <EmptyState title="No live props yet" description="Run an NBA sync or open the NBA board." />
+                <EmptyState
+                  title={`No ${app?.name ?? "platform"} props yet`}
+                  description="Sync market lines for this app, then refresh. We do not invent boards from another database."
+                />
               )}
             </div>
             <div className="space-y-6">

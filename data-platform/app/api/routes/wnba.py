@@ -54,17 +54,34 @@ def wnba_games(dates: Optional[str] = Query(None), db: Session = Depends(get_db)
 @router.get("/props")
 def wnba_props(
     refresh: bool = Query(False, description="Force re-ingest slate"),
+    platform: Optional[str] = Query(
+        None,
+        description="Pick'em app id: prizepicks | underdog | sleeper | other",
+    ),
     db: Session = Depends(get_db),
 ):
-    """Live WNBA research board — ESPN + Seraphim projection; PrizePicks in Line Comparison."""
+    """Live WNBA research board — scoped to the selected pick'em platform when set."""
+    from app.ingestion.platform_board import apply_pickem_platform_filter, normalize_pickem_app
+
     payload = ensure_wnba_board(db, force=refresh)
-    teams = sorted({p["team"] for p in payload["props"] if p.get("team")})
+    props = payload.get("props") or []
+    players = payload.get("players") or []
+    if platform and normalize_pickem_app(platform):
+        scoped = apply_pickem_platform_filter(db, props, platform, players=players)
+        props = scoped["props"]
+        players = scoped["players"]
+        payload = {**payload, **scoped, "props": props, "players": players}
+    teams = sorted({p["team"] for p in props if p.get("team")})
+    markets = sorted({p["market"] for p in props if p.get("market")})
     return {
         **payload,
+        "props": props,
+        "players": players,
+        "count": len(props),
         "teams": ["All", *teams],
+        "markets": ["All", *markets],
         "live": True,
-        "comparisonNote": "PrizePicks appears in Line Comparison (placeholder until live pick'em adapter).",
-        "disclaimer": "Projections are Seraphim model estimates — not PrizePicks or sportsbook copies.",
+        "disclaimer": "Projections are Seraphim model estimates — only lines on the selected pick'em app are shown.",
     }
 
 

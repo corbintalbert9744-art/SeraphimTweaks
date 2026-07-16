@@ -36,6 +36,11 @@ export interface NbaProp {
   researchScore?: number;
   projectedValue?: number;
   edgeVsLine?: number | null;
+  /** Edge as % of the platform line ((proj − line) / line × 100). */
+  edgePercent?: number | null;
+  platform?: string | null;
+  platformName?: string | null;
+  platformSlug?: string | null;
   l5: string;
   l10: string;
   l20: string;

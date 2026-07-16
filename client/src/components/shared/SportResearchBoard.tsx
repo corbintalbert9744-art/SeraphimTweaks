@@ -6,6 +6,8 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { NbaFiltersBar, type NbaBoardFilters } from "@/components/nba/NbaFiltersBar";
 import { NbaPropTable } from "@/components/nba/NbaPropTable";
 import { NbaPlayerCards } from "@/components/nba/NbaPlayerCards";
+import { PickemAppGate, PickemAppSwitcher } from "@/components/shared/PickemAppGate";
+import { usePickemApp } from "@/context/PickemAppContext";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CardSkeleton } from "@/components/shared/Skeleton";
@@ -27,7 +29,11 @@ function sortProps(rows: NbaProp[], filters: NbaBoardFilters): NbaProp[] {
   return [...rows].sort((a, b) => {
     switch (filters.sortKey) {
       case "edge":
-        return ((a.edgeVsLine ?? 0) - (b.edgeVsLine ?? 0)) * dir;
+      case "bestValue": {
+        const ae = a.edgePercent ?? a.edgeVsLine ?? 0;
+        const be = b.edgePercent ?? b.edgeVsLine ?? 0;
+        return (ae - be) * dir;
+      }
       case "ev":
         return (a.evPercent - b.evPercent) * dir;
       case "confidence":
@@ -36,12 +42,6 @@ function sortProps(rows: NbaProp[], filters: NbaBoardFilters): NbaProp[] {
         return ((a.researchScore ?? a.confidence) - (b.researchScore ?? b.confidence)) * dir;
       case "projection":
         return ((a.projectedValue ?? a.line) - (b.projectedValue ?? b.line)) * dir;
-      case "bestValue": {
-        // Prefer larger positive edge (model projection vs market line)
-        const ae = a.edgeVsLine ?? 0;
-        const be = b.edgeVsLine ?? 0;
-        return (ae - be) * dir;
-      }
       case "noVig":
         return (a.noVigProb - b.noVigProb) * dir;
       case "l10":
@@ -66,7 +66,7 @@ export type SportResearchBoardProps = {
   headerExtra?: ReactNode;
 };
 
-/** Shared premium research board — same layout for WNBA, MLB, NHL, Soccer, Tennis. */
+/** Shared premium research board — gated by pick'em app selection. */
 export function SportResearchBoard({
   league,
   title,
@@ -78,11 +78,20 @@ export function SportResearchBoard({
 }: SportResearchBoardProps) {
   const [filters, setFilters] = useState<NbaBoardFilters>(defaultFilters);
   const { legs } = useParlayDraft();
+  const { appId, app, ready } = usePickemApp();
+
+  const boardUrl = useMemo(() => {
+    if (!appId) return null;
+    const url = new URL(propsPath, "http://local");
+    url.searchParams.set("platform", appId);
+    return `${url.pathname}${url.search}`;
+  }, [propsPath, appId]);
 
   const board = useQuery({
-    queryKey: [queryKey],
+    queryKey: [queryKey, appId],
+    enabled: Boolean(ready && appId && boardUrl),
     queryFn: async () => {
-      const res = await fetch(propsPath);
+      const res = await fetch(boardUrl!);
       if (!res.ok) throw new Error("board");
       return res.json() as Promise<{
         props: Record<string, unknown>[];
@@ -91,6 +100,7 @@ export function SportResearchBoard({
         source?: string;
         count?: number;
         note?: string | null;
+        platformLabel?: string | null;
         requiresApiKey?: boolean;
         requiresConfiguration?: boolean;
         error?: string;
@@ -143,24 +153,51 @@ export function SportResearchBoard({
     return sortProps(rows, filters);
   }, [filters, liveProps]);
 
-  const avgEv =
+  const avgEdgePct =
     filtered.length === 0
       ? 0
-      : filtered.reduce((sum, p) => sum + p.evPercent, 0) / filtered.length;
+      : filtered.reduce((sum, p) => {
+          const pct =
+            p.edgePercent ??
+            (p.projectedValue != null && p.line
+              ? ((p.projectedValue - p.line) / p.line) * 100
+              : 0);
+          return sum + pct;
+        }, 0) / filtered.length;
   const overCount = filtered.filter((p) => p.side === "Over").length;
   const underCount = filtered.filter((p) => p.side === "Under").length;
+
+  if (!ready) {
+    return (
+      <div className="mt-6">
+        <CardSkeleton rows={3} />
+      </div>
+    );
+  }
+
+  if (!appId) {
+    return (
+      <div>
+        <PageHeader eyebrow={league} title={title} description={description} />
+        <div className="mt-8">
+          <PickemAppGate />
+        </div>
+      </div>
+    );
+  }
 
   const loading = board.isLoading && liveProps.length === 0;
   const needsConfig =
     (board.data?.requiresApiKey || board.data?.requiresConfiguration) && liveProps.length === 0;
   const note = board.data?.note ?? board.data?.error;
+  const platformLabel = board.data?.platformLabel ?? app?.name ?? null;
 
   return (
     <div>
       <PageHeader
         eyebrow={league}
         title={title}
-        description={description}
+        description={`${description} Showing ${app?.name ?? "selected app"} only.`}
         actions={
           <div className="flex flex-wrap items-center gap-3">
             {headerExtra}
@@ -173,6 +210,10 @@ export function SportResearchBoard({
           </div>
         }
       />
+
+      <div className="mt-4">
+        <PickemAppSwitcher />
+      </div>
 
       {note && (
         <p className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-200/90">
@@ -208,20 +249,20 @@ export function SportResearchBoard({
             <StatCard
               card={{
                 id: `${league}-props`,
-                label: "Props on board",
+                label: `${app?.shortName ?? "App"} props`,
                 value: String(filtered.length),
-                delta: board.isFetching ? "Refreshing…" : `${liveProps.length} live`,
+                delta: board.isFetching ? "Refreshing…" : `${liveProps.length} on platform`,
                 deltaTone: "neutral",
-                hint: "Warehouse + model",
+                hint: platformLabel || "Platform board",
               }}
             />
             <StatCard
               card={{
-                id: `${league}-ev`,
-                label: "Avg EV (filtered)",
-                value: `+${avgEv.toFixed(1)}%`,
-                delta: "vs comparison line",
-                deltaTone: "up",
+                id: `${league}-edge`,
+                label: "Avg edge %",
+                value: `${avgEdgePct >= 0 ? "+" : ""}${avgEdgePct.toFixed(1)}%`,
+                delta: "vs platform line",
+                deltaTone: avgEdgePct >= 0 ? "up" : "down",
                 hint: "Seraphim estimate",
               }}
             />
@@ -250,10 +291,11 @@ export function SportResearchBoard({
           {liveProps.length === 0 ? (
             <div className="mt-6">
               <EmptyState
-                title={`No ${league} props yet`}
+                title={`No ${app?.name ?? "platform"} lines yet`}
                 description={
+                  note ||
                   emptyHint ||
-                  `No slate with enough gamelog history right now — sync the warehouse or check back when providers have a card.`
+                  `Sync market lines for ${app?.name ?? "this app"}, then refresh. We only show players available on that platform.`
                 }
               />
             </div>
@@ -278,8 +320,9 @@ export function SportResearchBoard({
               <div className="mt-6">
                 <NbaPropTable
                   rows={filtered}
-                  title={`${league} Prop Board`}
-                  subtitle="Green OVER · red UNDER · open any row for Line Comparison (PrizePicks, FanDuel, DraftKings, …)"
+                  title={`${league} · ${app?.shortName ?? "App"} board`}
+                  subtitle="Player · stat · line · projection · edge % · confidence"
+                  platformLabel={platformLabel}
                 />
               </div>
             </>

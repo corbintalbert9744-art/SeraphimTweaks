@@ -29,6 +29,9 @@ export interface NflProp {
   noVigProb: number;
   evPercent: number;
   confidence: number;
+  projectedValue?: number;
+  edgeVsLine?: number | null;
+  edgePercent?: number | null;
   l5: string;
   l10: string;
   l20: string;
