@@ -95,7 +95,7 @@ export function SportsbookAppSwitcher({
               onClick={() => onSelectBook(b.book)}
               title={pending ? b.integrationNote || "Unavailable" : b.book}
               className={cn(
-                "group flex items-center gap-3 rounded-2xl border px-4 py-3 transition",
+                "group flex items-center gap-2 rounded-xl border px-2.5 py-1.5 transition",
                 active
                   ? "border-white/20 bg-white/[0.08] shadow-[0_0_0_1px_rgba(255,255,255,0.06)]"
                   : "border-transparent bg-white/[0.03] hover:border-white/10 hover:bg-white/[0.05]",
@@ -103,16 +103,16 @@ export function SportsbookAppSwitcher({
               )}
             >
               <span
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[11px] font-bold tracking-wide text-black"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold tracking-wide text-black"
                 style={{ backgroundColor: accent }}
               >
                 {spec?.mark ?? b.book.slice(0, 2).toUpperCase()}
               </span>
               <span className="text-left">
-                <span className={cn("block text-sm font-semibold", active ? "text-white" : "text-neutral-300")}>
+                <span className={cn("block text-xs font-semibold", active ? "text-white" : "text-neutral-300")}>
                   {b.book}
                 </span>
-                <span className="mt-0.5 block text-[11px] tabular-nums text-neutral-500">
+                <span className="mt-0.5 block text-[10px] tabular-nums text-neutral-500">
                   {pending ? "Unavailable" : `Line ${b.line}`}
                 </span>
               </span>
@@ -163,29 +163,25 @@ export function LineComparison({
 
   return (
     <section
-      className="rounded-3xl border border-white/[0.06] bg-[#0d0d0d] p-6 sm:p-8"
+      className="rounded-xl border border-white/[0.06] bg-[#0d0d0d] p-3 sm:p-4"
       data-feature="line-comparison"
     >
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold text-white">Market comparison</h2>
-          <p className="mt-1 text-sm text-neutral-500">
-            Lines from every connected provider vs our projection ({projected.toFixed(1)}). Best value
-            highlighted.
+          <h2 className="text-sm font-semibold text-white">Market comparison</h2>
+          <p className="mt-0.5 text-[11px] text-neutral-500">
+            Proj {projected.toFixed(1)} · lean{" "}
+            <span className={modelSide === "Over" ? "text-emerald-400" : "text-red-400"}>{modelSide}</span>
           </p>
         </div>
-        <p className="text-xs text-neutral-600">
-          Lean{" "}
-          <span className={modelSide === "Over" ? "text-emerald-400" : "text-red-400"}>{modelSide}</span>
-        </p>
       </div>
 
       <SportsbookAppSwitcher rows={rows} selectedBook={selectedBook} onSelectBook={onSelectBook} />
 
       {/* Full comparison table — source attributed per row */}
-      <div className="mt-8 overflow-x-auto rounded-2xl border border-white/[0.06]">
-        <table className="min-w-[720px] w-full text-left text-sm">
-          <thead className="bg-white/[0.02] text-[11px] uppercase tracking-wider text-neutral-500">
+      <div className="mt-3 max-h-40 overflow-auto rounded-xl border border-white/[0.06]">
+        <table className="min-w-[640px] w-full text-left text-xs">
+          <thead className="sticky top-0 bg-[#111] text-[10px] uppercase tracking-wider text-neutral-500">
             <tr>
               <th className="px-4 py-3 font-medium">Operator</th>
               <th className="px-4 py-3 font-medium">Line</th>

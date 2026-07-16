@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import { ArrowLeft, Plus, Check } from "lucide-react";
-import { PageHeader } from "@/components/shared/PageHeader";
 import { LeagueBadge } from "@/components/shared/LeagueBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
@@ -25,7 +24,6 @@ import { CardSkeleton } from "@/components/shared/Skeleton";
 import { LineComparison } from "@/components/shared/LineComparison";
 import {
   HitRateBars,
-  HitRateChips,
   HitRateSummaryBoxes,
   LineMovementChart,
   NoVigOddsCard,
@@ -243,199 +241,147 @@ export default function PropDetailPage() {
                 ? "/tennis"
                 : "/nba";
 
-  const panel = "rounded-3xl border border-white/[0.06] bg-[#0d0d0d]";
+  const panel = "rounded-xl border border-white/[0.06] bg-[#0d0d0d]";
 
   return (
-    <div className="space-y-10">
-      <div>
-        <div className="mb-5 flex flex-wrap items-center gap-3 text-sm">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
           <Link
             href="/research"
-            className="inline-flex items-center gap-2 text-neutral-400 transition hover:text-yellow-400"
+            className="inline-flex items-center gap-1.5 text-neutral-400 transition hover:text-yellow-400"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Research Reports
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Reports
           </Link>
           <span className="text-neutral-700">·</span>
           <Link href={boardHref} className="text-neutral-500 hover:text-yellow-400">
-            {prop.league} board
+            {prop.league}
           </Link>
-        </div>
-
-        <PageHeader
-          eyebrow="Independent model research"
-          title={`${prop.player} · ${prop.market}`}
-          description={`${prop.team} vs ${prop.opponent} · ${prop.position} · Our projection vs operator lines — not a sportsbook copy.`}
-          actions={
-            <button
-              type="button"
-              disabled={added}
-              onClick={handleAdd}
-              className={cn(
-                "btn-3d inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold",
-                added
-                  ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
-                  : "bg-gradient-to-b from-yellow-400 to-amber-500 text-black",
-              )}
-            >
-              {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {added ? "In Builder" : "Add to Builder"}
-            </button>
-          }
-        />
-
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <span className="text-neutral-700">·</span>
           <LeagueBadge league={prop.league} />
           <Link
             href={playerProfilePath(prop.playerId)}
-            className="text-sm font-medium text-yellow-400 hover:underline"
+            className="font-medium text-yellow-400 hover:underline"
           >
-            Open Player Profile
+            {prop.player}
           </Link>
-          {prop.linesAreMock && (
-            <span className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[10px] uppercase tracking-wider text-amber-200">
-              Some lines · require integration
-            </span>
-          )}
+          <span className="truncate text-neutral-500">
+            {prop.market} · {prop.team} vs {prop.opponent}
+          </span>
         </div>
+        <button
+          type="button"
+          disabled={added}
+          onClick={handleAdd}
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold",
+            added
+              ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+              : "bg-yellow-400 text-black hover:bg-yellow-300",
+          )}
+        >
+          {added ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+          {added ? "In Builder" : "Add"}
+        </button>
       </div>
 
-      {/* Hero: projection + Over/Under — one composition */}
-      <section className={cn(panel, "p-6 sm:p-8")}>
-        <div className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-yellow-500/90">
-              Seraphim projection
-            </p>
-            <p className="mt-4 text-sm text-neutral-500">{prop.market}</p>
-            <p
-              className={cn(
-                "mt-1 text-6xl font-semibold tabular-nums tracking-tight sm:text-7xl",
-                recommendation === "Over" ? "text-emerald-400" : "text-red-400",
-              )}
-            >
-              {projected.toFixed(1)}
-            </p>
-            <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-500">{prop.why}</p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <span
-                className={cn(
-                  "rounded-xl border px-4 py-2 text-sm font-semibold",
-                  recommendation === "Over"
-                    ? "border-emerald-500/35 bg-emerald-500/12 text-emerald-300"
-                    : "border-red-500/35 bg-red-500/12 text-red-300",
-                )}
-              >
-                Lean {recommendation}
-              </span>
-              {prop.edgeVsLine != null && (
-                <span className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm tabular-nums text-neutral-200">
-                  Edge {prop.edgeVsLine > 0 ? "+" : ""}
-                  {prop.edgeVsLine.toFixed(1)} vs consensus
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(["Over", "Under"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSide(s)}
-                className={cn(
-                  "rounded-2xl border px-5 py-5 text-left transition",
-                  selectedSide === s
-                    ? s === "Over"
-                      ? "border-emerald-500/40 bg-emerald-500/[0.1]"
-                      : "border-red-500/40 bg-red-500/[0.1]"
-                    : "border-white/[0.06] bg-white/[0.02] hover:border-white/15",
-                )}
-              >
-                <p
-                  className={cn(
-                    "text-[11px] font-semibold uppercase tracking-wider",
-                    s === "Over" ? "text-emerald-400" : "text-red-400",
-                  )}
-                >
-                  {s}
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="space-y-3">
+          <section className={cn(panel, "p-3 sm:p-4")}>
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-yellow-500/90">
+                  Seraphim projection · {prop.market}
                 </p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums text-white">
-                  {formatAmericanOdds(
-                    s === "Over"
-                      ? bestBookForSide(prop, "Over").over
-                      : bestBookForSide(prop, "Under").under,
-                  )}
-                </p>
-                {s === recommendation && (
+                <div className="mt-1 flex flex-wrap items-end gap-3">
                   <p
                     className={cn(
-                      "mt-2 text-[10px] uppercase tracking-wider",
-                      s === "Over" ? "text-emerald-400" : "text-red-400",
+                      "text-3xl font-semibold tabular-nums tracking-tight sm:text-4xl",
+                      recommendation === "Over" ? "text-emerald-400" : "text-red-400",
                     )}
                   >
-                    Model lean
+                    {projected.toFixed(1)}
                   </p>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
+                  <span
+                    className={cn(
+                      "rounded-md border px-2 py-0.5 text-[11px] font-semibold",
+                      recommendation === "Over"
+                        ? "border-emerald-500/35 bg-emerald-500/12 text-emerald-300"
+                        : "border-red-500/35 bg-red-500/12 text-red-300",
+                    )}
+                  >
+                    Lean {recommendation}
+                  </span>
+                  {prop.edgeVsLine != null && (
+                    <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[11px] tabular-nums text-neutral-300">
+                      Edge {prop.edgeVsLine > 0 ? "+" : ""}
+                      {prop.edgeVsLine.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 line-clamp-1 text-[11px] text-neutral-500">{prop.why}</p>
+              </div>
 
-      {/* Main research composition: chart + sidebar */}
-      <div className="grid gap-8 xl:grid-cols-[1.4fr_0.85fr]">
-        <div className="space-y-8">
-          <section className={cn(panel, "p-6 sm:p-8")} data-feature="hit-history">
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+              <div className="grid grid-cols-2 gap-1.5">
+                {(["Over", "Under"] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSide(s)}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-left transition",
+                      selectedSide === s
+                        ? s === "Over"
+                          ? "border-emerald-500/40 bg-emerald-500/[0.1]"
+                          : "border-red-500/40 bg-red-500/[0.1]"
+                        : "border-white/[0.06] bg-white/[0.02] hover:border-white/15",
+                    )}
+                  >
+                    <p
+                      className={cn(
+                        "text-[10px] font-semibold uppercase tracking-wider",
+                        s === "Over" ? "text-emerald-400" : "text-red-400",
+                      )}
+                    >
+                      {s}
+                      {s === recommendation ? " · lean" : ""}
+                    </p>
+                    <p className="mt-0.5 text-base font-semibold tabular-nums text-white">
+                      {formatAmericanOdds(
+                        s === "Over"
+                          ? bestBookForSide(prop, "Over").over
+                          : bestBookForSide(prop, "Under").under,
+                      )}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className={cn(panel, "p-3 sm:p-4")} data-feature="hit-history">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="text-lg font-semibold text-white">Game log vs line</h2>
-                <p className="mt-1 text-sm text-neutral-500">
-                  Green cleared {prop.line} · red missed · lean {recommendation}
+                <h2 className="text-sm font-semibold text-white">Game log vs line</h2>
+                <p className="text-[11px] text-neutral-500">
+                  Green cleared {prop.line} · red missed
                 </p>
               </div>
-              <HitRateChips
-                rates={{ l5: prop.l5, l10: prop.l10, l20: prop.l20, season: prop.season }}
-                active={hitWindow}
-                onSelect={setHitWindow}
+              <HitRateSummaryBoxes
+                compact
+                windows={[
+                  { key: "L5", label: "L5", hitPct: parseHitRate(prop.l5).pct, average: null, hits: prop.l5 },
+                  { key: "L10", label: "L10", hitPct: parseHitRate(prop.l10).pct, average: null, hits: prop.l10 },
+                  { key: "L20", label: "L20", hitPct: parseHitRate(prop.l20).pct, average: null, hits: prop.l20 },
+                  { key: "Season", label: "Szn", hitPct: parseHitRate(prop.season).pct, average: null, hits: prop.season },
+                ]}
+                activeKey={hitWindow}
+                onSelect={(k) => setHitWindow(k as HitWindow)}
               />
             </div>
-            <HitRateSummaryBoxes
-              className="mb-5"
-              windows={[
-                {
-                  key: "L5",
-                  label: "L5",
-                  hitPct: parseHitRate(prop.l5).pct,
-                  average: null,
-                  hits: prop.l5,
-                },
-                {
-                  key: "L10",
-                  label: "L10",
-                  hitPct: parseHitRate(prop.l10).pct,
-                  average: null,
-                  hits: prop.l10,
-                },
-                {
-                  key: "L20",
-                  label: "L20",
-                  hitPct: parseHitRate(prop.l20).pct,
-                  average: null,
-                  hits: prop.l20,
-                },
-                {
-                  key: "Season",
-                  label: "Season",
-                  hitPct: parseHitRate(prop.season).pct,
-                  average: null,
-                  hits: prop.season,
-                },
-              ]}
-              activeKey={hitWindow}
-              onSelect={(k) => setHitWindow(k as HitWindow)}
-            />
             <HitRateBars
+              compact
               history={prop.hitHistory ?? []}
               line={prop.line}
               window={hitWindow}
@@ -452,283 +398,156 @@ export default function PropDetailPage() {
             selectedBook={selectedBook}
             onSelectBook={setSelectedBook}
           />
-
-          <section className={cn(panel, "p-6 sm:p-8")}>
-            <div className="grid gap-10 sm:grid-cols-2">
-              <div>
-                <h2 className="text-base font-semibold text-white">Home vs Away</h2>
-                <div className="mt-6 grid grid-cols-2 gap-4">
-                  {(["home", "away"] as const).map((key) => {
-                    const split = prop.homeAway?.[key];
-                    return (
-                      <div key={key} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-5">
-                        <p className="text-[10px] uppercase tracking-wider text-neutral-500">{key}</p>
-                        <p className="mt-2 text-3xl font-semibold tabular-nums text-white">
-                          {split?.average != null ? split.average.toFixed(1) : "—"}
-                        </p>
-                        <p className="mt-2 text-xs text-neutral-500">{split?.samples ?? 0} samples</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-white">Opponent history</h2>
-                <p className="mt-3 text-sm text-yellow-400/90">
-                  vs {prop.opponentHistory?.opponent ?? prop.opponent}
-                  {prop.opponentHistory?.average != null
-                    ? ` · avg ${prop.opponentHistory.average.toFixed(1)}`
-                    : ""}
-                </p>
-                <p className="mt-1 text-xs text-neutral-500">
-                  {prop.opponentHistory?.meetings ?? 0} meetings in warehouse gamelogs
-                </p>
-                <ul className="mt-5 space-y-3">
-                  {(prop.opponentHistory?.recent ?? []).slice(0, 4).map((m) => (
-                    <li key={`${m.date}-${m.value}`} className="flex justify-between text-sm text-neutral-400">
-                      <span>{m.date}</span>
-                      <span className="tabular-nums text-neutral-200">{m.value ?? "—"}</span>
-                    </li>
-                  ))}
-                  {(prop.opponentHistory?.recent ?? []).length === 0 && (
-                    <li className="text-sm text-neutral-600">No H2H logs vs this opponent yet.</li>
-                  )}
-                </ul>
-              </div>
-            </div>
-          </section>
-
-          <section className={cn(panel, "p-6 sm:p-8")} data-feature="game-logs">
-            <h2 className="text-base font-semibold text-white">Recent game logs</h2>
-            <p className="mt-1 text-sm text-neutral-500">{prop.market} from warehouse</p>
-            {(prop.recentGameLogs ?? []).length === 0 ? (
-              <p className="mt-6 text-sm text-neutral-500">Game logs appear after sync.</p>
-            ) : (
-              <div className="mt-6 overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-[11px] uppercase tracking-wider text-neutral-500">
-                    <tr>
-                      <th className="pb-3 pr-4 font-medium">Date</th>
-                      <th className="pb-3 pr-4 font-medium">Opp</th>
-                      <th className="pb-3 pr-4 font-medium">Min</th>
-                      <th className="pb-3 font-medium tabular-nums">{prop.market}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/[0.05]">
-                    {(prop.recentGameLogs ?? []).map((g) => (
-                      <tr key={`${g.date}-${g.opponent}`}>
-                        <td className="py-3.5 pr-4 text-neutral-400">{g.date}</td>
-                        <td className="py-3.5 pr-4 text-neutral-300">
-                          {g.home ? "vs" : "@"} {g.opponent}
-                        </td>
-                        <td className="py-3.5 pr-4 tabular-nums text-neutral-400">{g.minutes ?? "—"}</td>
-                        <td className="py-3.5 tabular-nums font-medium text-neutral-100">
-                          {g.value != null ? g.value : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-
-          <section className={cn(panel, "p-6 sm:p-8")} data-feature="line-movement">
-            <h2 className="text-base font-semibold text-white">Line movement</h2>
-            <p className="mt-1 text-sm text-neutral-500">
-              {prop.movement.length
-                ? "Open → current (warehouse ticks when available)"
-                : "Snapshots wire as providers land"}
-            </p>
-            <div className="mt-6">
-              <LineMovementChart points={prop.movement} />
-            </div>
-          </section>
-
-          <ProOnly
-            title="AI explanation"
-            description="Standard keeps projection, hit rates, and line comparison. Upgrade to Pro for the AI writeup."
-            ctaLabel="Upgrade to Pro"
-          >
-            <section className={cn(panel, "p-6 sm:p-8")} data-feature="ai-analysis">
-              <h2 className="text-base font-semibold text-white">AI explanation</h2>
-              <ul className="mt-5 space-y-3">
-                {(prop.analysis.length ? prop.analysis : [prop.why]).map((line) => (
-                  <li key={line} className="text-sm leading-relaxed text-neutral-400">
-                    <span className="mr-2 text-yellow-500">•</span>
-                    {line}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </ProOnly>
-
-          {similar.length > 0 && (
-            <section className={cn(panel, "p-6 sm:p-8")}>
-              <h2 className="text-base font-semibold text-white">Similar props</h2>
-              <ul className="mt-6 space-y-3">
-                {similar.map((s) => (
-                  <li
-                    key={s.id}
-                    className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-4"
-                  >
-                    <div>
-                      <Link
-                        href={propResearchPath(s.id)}
-                        className="text-sm font-medium text-neutral-100 hover:text-yellow-400"
-                      >
-                        {s.player} · {s.market} {s.recommendation ?? s.side}{" "}
-                        {Number(s.projectedValue ?? s.line).toFixed(1)}
-                      </Link>
-                      <p className="mt-1 text-xs text-neutral-500">
-                        EV +{s.evPercent.toFixed(1)}% · Conf {s.confidence}
-                      </p>
-                    </div>
-                    <ResearchScoreBadge score={s.researchScore} size="sm" />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
         </div>
 
-        {/* Roomier right rail */}
-        <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+        <aside className="space-y-2 xl:sticky xl:top-20 xl:self-start">
           <NoVigOddsCard
-            overPct={Math.round(prop.noVigProb * 1000) / 10}
+            compact
+            overPct={Math.round((selectedNoVig || prop.noVigProb) * 1000) / 10}
             vigPct={5.2}
             side={selectedSide}
           />
-          <section className={cn(panel, "p-6 sm:p-8")} data-feature="metrics-row">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
-              Selected book
+          <section className={cn(panel, "p-3")} data-feature="metrics-row">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+              {activeBook?.book ?? resolvedBest.book}
             </p>
-            <p className="mt-3 text-lg font-semibold text-white">{activeBook?.book ?? resolvedBest.book}</p>
-            <div className="mt-8 space-y-6">
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <SidebarStat compact label="Line" value={`${activeBook?.line ?? resolvedBest.line}`} sub={`proj ${projected.toFixed(1)}`} />
               <SidebarStat
-                label="Line"
-                value={`${activeBook?.line ?? resolvedBest.line}`}
-                sub={`vs projection ${projected.toFixed(1)}`}
-              />
-              <SidebarStat
+                compact
                 label="Edge"
                 value={`${(activeBook?.edgeVsProjection ?? 0) > 0 ? "+" : ""}${(activeBook?.edgeVsProjection ?? 0).toFixed(1)}`}
                 accent="emerald"
               />
-              <SidebarStat
-                label={`${hitWindow} hit rate`}
-                value={`${windowRate.pct}%`}
-                sub={`${windowRate.hits}/${windowRate.samples}`}
-              />
-              <SidebarStat label="No-vig" value={`${(selectedNoVig * 100).toFixed(1)}%`} dataFeature="no-vig" />
-              <SidebarStat label="Model EV" value={`+${selectedEv.toFixed(1)}%`} accent="emerald" />
+              <SidebarStat compact label={`${hitWindow}`} value={`${windowRate.pct}%`} sub={`${windowRate.hits}/${windowRate.samples}`} />
+              <SidebarStat compact label="EV" value={`+${selectedEv.toFixed(1)}%`} accent="emerald" />
             </div>
           </section>
 
           <section
             data-feature="research-score"
-            className={cn(panel, "border-yellow-500/15 bg-gradient-to-br from-yellow-500/[0.06] to-[#0d0d0d] p-6 sm:p-8")}
+            className={cn(panel, "border-yellow-500/15 bg-gradient-to-br from-yellow-500/[0.06] to-[#0d0d0d] p-3")}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-yellow-500/90">
-                  Research Score
-                </p>
-                <h2 className="mt-3 text-5xl font-semibold tabular-nums text-white">{prop.researchScore}</h2>
-                <p className="mt-2 text-xs text-neutral-500">Checklist-backed · not win probability</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-yellow-500/90">Research</p>
+                <p className="mt-0.5 text-2xl font-semibold tabular-nums text-white">{prop.researchScore}</p>
               </div>
-              <ResearchScoreBadge score={prop.researchScore} />
+              <ResearchScoreBadge score={prop.researchScore} size="sm" />
             </div>
-            <ul className="mt-8 space-y-2.5">
+            <ul className="mt-2 max-h-24 space-y-1 overflow-y-auto">
               {prop.checks.length === 0 && (
-                <li className="rounded-xl border border-white/[0.06] bg-black/20 px-4 py-3 text-sm text-neutral-400">
-                  Influential factors: {prop.analysis.slice(0, 2).join(" · ") || prop.why}
-                </li>
+                <li className="text-[11px] text-neutral-500">Checklist fills with warehouse factors.</li>
               )}
-              {prop.checks.map((check) => (
-                <li
-                  key={check.code}
-                  className={cn(
-                    "flex items-start gap-2 rounded-xl border px-4 py-3 text-sm",
-                    check.status === "pass" && "border-emerald-500/20 bg-black/20 text-emerald-200",
-                    check.status === "warn" && "border-amber-500/20 bg-black/20 text-amber-200",
-                    check.status === "fail" && "border-red-500/20 bg-black/20 text-red-200",
-                    check.status === "unknown" && "border-neutral-700 bg-black/20 text-neutral-400",
-                  )}
-                >
-                  <span className="w-4 shrink-0 text-center">
-                    {check.status === "pass" ? "✓" : check.status === "fail" ? "✗" : "~"}
+              {prop.checks.slice(0, 4).map((c) => (
+                <li key={c.code} className="flex items-center justify-between gap-2 text-[11px]">
+                  <span className="truncate text-neutral-400">{c.label}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 font-medium",
+                      c.status === "pass" ? "text-emerald-400" : c.status === "warn" ? "text-amber-300" : "text-red-300",
+                    )}
+                  >
+                    {c.status}
                   </span>
-                  {check.label}
                 </li>
               ))}
             </ul>
           </section>
 
-          <section className={cn(panel, "p-6 sm:p-8")}>
-            <h2 className="text-base font-semibold text-white">Confidence</h2>
-            <p className="mt-3 text-4xl font-semibold tabular-nums text-yellow-400">{prop.confidence}%</p>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-500">
-              Model certainty in the projection — separate from Research Score and EV.
-            </p>
-            <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-white/5">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-amber-600 to-yellow-400"
-                style={{ width: `${prop.confidence}%` }}
-              />
-            </div>
-            <div className="mt-8 grid grid-cols-2 gap-4 border-t border-white/[0.06] pt-8">
-              <div>
-                <p className="text-[11px] uppercase tracking-wider text-neutral-500">Over</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
-                  {((prop.overProbability ?? prop.noVigProb) * 100).toFixed(0)}%
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-wider text-neutral-500">Under</p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
-                  {((prop.underProbability ?? prop.noVigOpposite) * 100).toFixed(0)}%
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className={cn(panel, "p-6 sm:p-8")}>
-            <h2 className="text-base font-semibold text-white">Injury</h2>
+          <section className={cn(panel, "p-3")}>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">Injury</p>
             <p
               className={cn(
-                "mt-3 text-base font-medium",
-                prop.injuryImpact?.status === "None" || !prop.injuryImpact
-                  ? "text-emerald-300"
-                  : "text-amber-300",
+                "mt-1 text-sm font-medium",
+                prop.injuryImpact?.status === "None" || !prop.injuryImpact ? "text-emerald-300" : "text-amber-300",
               )}
             >
               {prop.injuryImpact?.status ?? "None"}
             </p>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-500">
-              {prop.injuryImpact?.detail ?? "No active injury designation in warehouse."}
-            </p>
-          </section>
-
-          <section className={cn(panel, "p-6 sm:p-8")}>
-            <h2 className="text-base font-semibold text-white">Opponent defense</h2>
-            <p className="mt-3 text-sm text-yellow-400/90">
-              #{prop.opponentDefense.rank} of {prop.opponentDefense.of} · {prop.opponentDefense.label}
-            </p>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-400">{prop.opponentDefense.note}</p>
-          </section>
-
-          <section className={cn(panel, "p-6 sm:p-8")}>
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-white">Data quality</h2>
-              <span className="text-3xl font-semibold tabular-nums text-yellow-400">{prop.dqs}</span>
-            </div>
-            <p className="mt-3 text-sm text-neutral-500">
-              Trust in inputs (freshness, injuries, book agreement).
-            </p>
           </section>
         </aside>
       </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <section className={cn(panel, "p-3 sm:p-4")}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Home vs Away</h2>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {(["home", "away"] as const).map((key) => {
+                  const split = prop.homeAway?.[key];
+                  return (
+                    <div key={key} className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
+                      <p className="text-[10px] uppercase tracking-wider text-neutral-500">{key}</p>
+                      <p className="mt-0.5 text-lg font-semibold tabular-nums text-white">
+                        {split?.average != null ? split.average.toFixed(1) : "—"}
+                      </p>
+                      <p className="text-[10px] text-neutral-500">{split?.samples ?? 0} samples</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-white">Opponent</h2>
+              <p className="mt-2 text-xs text-yellow-400/90">
+                vs {prop.opponentHistory?.opponent ?? prop.opponent}
+                {prop.opponentHistory?.average != null ? ` · avg ${prop.opponentHistory.average.toFixed(1)}` : ""}
+              </p>
+              <p className="mt-1 text-[11px] text-neutral-500">{prop.opponentDefense.note}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className={cn(panel, "p-3 sm:p-4")} data-feature="line-movement">
+          <h2 className="text-sm font-semibold text-white">Line movement</h2>
+          <div className="mt-2">
+            <LineMovementChart points={prop.movement} />
+          </div>
+        </section>
+      </div>
+
+      <ProOnly
+        title="AI explanation"
+        description="Standard keeps projection, hit rates, and line comparison. Upgrade to Pro for the AI writeup."
+        ctaLabel="Upgrade to Pro"
+      >
+        <section className={cn(panel, "p-3 sm:p-4")} data-feature="ai-analysis">
+          <h2 className="text-sm font-semibold text-white">AI explanation</h2>
+          <ul className="mt-2 space-y-1.5">
+            {(prop.analysis.length ? prop.analysis : [prop.why]).map((line) => (
+              <li key={line} className="text-xs leading-relaxed text-neutral-400">
+                <span className="mr-2 text-yellow-500">•</span>
+                {line}
+              </li>
+            ))}
+          </ul>
+        </section>
+      </ProOnly>
+
+      {similar.length > 0 && (
+        <section className={cn(panel, "p-3 sm:p-4")}>
+          <h2 className="text-sm font-semibold text-white">Similar props</h2>
+          <ul className="mt-2 space-y-1.5">
+            {similar.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2"
+              >
+                <Link
+                  href={propResearchPath(s.id)}
+                  className="truncate text-xs font-medium text-neutral-100 hover:text-yellow-400"
+                >
+                  {s.player} · {s.market} {s.recommendation ?? s.side}{" "}
+                  {Number(s.projectedValue ?? s.line).toFixed(1)}
+                </Link>
+                <ResearchScoreBadge score={s.researchScore} size="sm" />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
@@ -739,19 +558,22 @@ function SidebarStat({
   sub,
   accent,
   dataFeature,
+  compact,
 }: {
   label: string;
   value: string;
   sub?: string;
   accent?: "emerald" | "gold";
   dataFeature?: string;
+  compact?: boolean;
 }) {
   return (
     <div data-feature={dataFeature}>
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{label}</p>
       <p
         className={cn(
-          "mt-1.5 text-3xl font-semibold tabular-nums",
+          "font-semibold tabular-nums",
+          compact ? "mt-0.5 text-lg" : "mt-1.5 text-3xl",
           accent === "emerald" && "text-emerald-300",
           accent === "gold" && "text-yellow-400",
           !accent && "text-white",
@@ -759,7 +581,7 @@ function SidebarStat({
       >
         {value}
       </p>
-      {sub && <p className="mt-1 text-xs text-neutral-500">{sub}</p>}
+      {sub && <p className="mt-0.5 text-[10px] text-neutral-500">{sub}</p>}
     </div>
   );
 }

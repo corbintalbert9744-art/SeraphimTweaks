@@ -71,6 +71,7 @@ export function HitRateSummaryBoxes({
   activeKey,
   onSelect,
   className,
+  compact = false,
 }: {
   windows: Array<{
     key: string;
@@ -82,9 +83,10 @@ export function HitRateSummaryBoxes({
   activeKey?: string;
   onSelect?: (key: string) => void;
   className?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className={cn("flex gap-2 overflow-x-auto pb-0.5", className)} data-feature="hit-rate-summary">
+    <div className={cn("flex gap-1.5 overflow-x-auto pb-0.5", className)} data-feature="hit-rate-summary">
       {windows.map((w) => {
         const active = activeKey === w.key;
         return (
@@ -93,21 +95,24 @@ export function HitRateSummaryBoxes({
             type="button"
             onClick={() => onSelect?.(w.key)}
             className={cn(
-              "min-w-[5.5rem] shrink-0 rounded-xl border px-3 py-2.5 text-left transition",
+              "shrink-0 rounded-lg border text-left transition",
+              compact ? "min-w-[4.25rem] px-2 py-1.5" : "min-w-[5.5rem] rounded-xl px-3 py-2.5",
               active
                 ? "border-emerald-500/40 bg-emerald-500/[0.08]"
                 : "border-[#222] bg-[#0c0c0c] hover:border-[#333]",
             )}
           >
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-neutral-500">
               {w.label}
             </p>
-            <p className={cn("mt-1 text-sm font-semibold tabular-nums", hitToneClass(w.hitPct))}>
+            <p className={cn("font-semibold tabular-nums", compact ? "mt-0.5 text-xs" : "mt-1 text-sm", hitToneClass(w.hitPct))}>
               HR {w.hitPct}%
             </p>
-            <p className="mt-0.5 text-[11px] tabular-nums text-neutral-400">
-              Avg {w.average != null ? w.average.toFixed(1) : "—"}
-            </p>
+            {!compact && (
+              <p className="mt-0.5 text-[11px] tabular-nums text-neutral-400">
+                Avg {w.average != null ? w.average.toFixed(1) : "—"}
+              </p>
+            )}
           </button>
         );
       })}
@@ -168,17 +173,23 @@ export function NoVigOddsCard({
   vigPct = 5,
   side = "Over",
   className,
+  compact = false,
 }: {
   overPct: number;
   vigPct?: number;
   side?: "Over" | "Under";
   className?: string;
+  compact?: boolean;
 }) {
   const lean = side === "Under" ? 100 - overPct : overPct;
   const label = side === "Under" ? "UNDER" : "OVER";
   return (
     <div
-      className={cn("rounded-xl border border-[#222] bg-[#0c0c0c] p-4", className)}
+      className={cn(
+        "rounded-xl border border-[#222] bg-[#0c0c0c]",
+        compact ? "p-2.5" : "p-4",
+        className,
+      )}
       data-feature="novig-odds-card"
     >
       <div className="flex items-center justify-between gap-2">
@@ -189,7 +200,8 @@ export function NoVigOddsCard({
       </div>
       <div
         className={cn(
-          "mt-3 rounded-lg border px-3 py-3 text-center",
+          "rounded-lg border text-center",
+          compact ? "mt-1.5 px-2 py-1.5" : "mt-3 px-3 py-3",
           lean >= 52
             ? "border-emerald-500/35 bg-emerald-500/10"
             : lean <= 48
@@ -199,13 +211,14 @@ export function NoVigOddsCard({
       >
         <p
           className={cn(
-            "text-lg font-semibold tabular-nums",
+            "font-semibold tabular-nums",
+            compact ? "text-sm" : "text-lg",
             lean >= 52 ? "text-emerald-300" : lean <= 48 ? "text-red-300" : "text-white",
           )}
         >
           {label} {lean.toFixed(1)}%
         </p>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/40">
+        <div className={cn("overflow-hidden rounded-full bg-black/40", compact ? "mt-1 h-1" : "mt-2 h-1.5")}>
           <div
             className={cn(
               "h-full rounded-full",
