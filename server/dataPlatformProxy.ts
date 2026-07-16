@@ -24,6 +24,12 @@ async function proxyGet(
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!upstream.ok) {
+      // Forward real 404s (player/prop missing) — do not mask as "platform down"
+      if (upstream.status === 404) {
+        const data = await upstream.json().catch(() => ({ detail: "Not found" }));
+        res.status(404).json(data);
+        return;
+      }
       await fallback();
       return;
     }
@@ -288,6 +294,40 @@ export function registerDataPlatformProxy(
   proxyLeagueGet("/api/tennis/games", "/api/v1/tennis/games");
   proxyLeagueGet("/api/tennis/props", "/api/v1/tennis/props", 180_000);
   proxyLeagueGet("/api/tennis/players", "/api/v1/tennis/players", 180_000);
+
+  // Player detail — Express does not match /players/:id against /players list routes
+  const proxyPlayerDetail = (mount: string, upstream: string) => {
+    app.get(`${mount}/:id`, async (req, res) => {
+      try {
+        const up = await fetch(`${BASE}${upstream}/${encodeURIComponent(req.params.id)}`, {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(60_000),
+        });
+        const data = await up.json().catch(() => ({ detail: "Not found" }));
+        // Normalize bare profile payloads to { ok, player } for the research UI
+        if (up.ok && data && typeof data === "object" && !("player" in data) && data.markets) {
+          res.status(up.status).json({ ok: true, player: data, _source: "data-platform" });
+          return;
+        }
+        res.status(up.status).json(
+          up.ok && data && typeof data === "object"
+            ? { ...data, _source: "data-platform" }
+            : data,
+        );
+      } catch {
+        res.status(503).json({
+          error: "Data platform unavailable",
+          hint: "Start with: npm run data-platform",
+        });
+      }
+    });
+  };
+  proxyPlayerDetail("/api/mlb/players", "/api/v1/mlb/players");
+  proxyPlayerDetail("/api/nhl/players", "/api/v1/nhl/players");
+  proxyPlayerDetail("/api/soccer/players", "/api/v1/soccer/players");
+  proxyPlayerDetail("/api/tennis/players", "/api/v1/tennis/players");
+  proxyPlayerDetail("/api/nfl/players", "/api/v1/nfl/players");
+
   // prop detail proxies
   app.get("/api/mlb/props/:id", async (req, res) => {
     try {

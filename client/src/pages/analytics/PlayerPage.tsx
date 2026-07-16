@@ -145,6 +145,8 @@ export default function PlayerPage() {
       ): Promise<PlayerResearchProfile | null> {
         const res = await fetch(path);
         if (!res.ok) return null;
+        const ct = res.headers.get("content-type") || "";
+        if (!ct.includes("application/json")) return null;
         const data = await res.json();
         const raw = (data.player ?? data) as PlayerResearchProfile;
         if (!raw?.markets?.length) return null;
