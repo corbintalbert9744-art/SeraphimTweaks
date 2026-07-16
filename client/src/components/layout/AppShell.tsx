@@ -20,7 +20,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <SportTabs />
         <main
           className={cn(
-            "relative z-10 px-4 py-6 sm:px-6 lg:px-8 lg:transition-[margin] lg:duration-300",
+            "relative z-10 px-4 py-3 sm:px-6 lg:px-6 lg:transition-[margin] lg:duration-300",
             collapsed ? "lg:ml-[76px]" : "lg:ml-[248px]",
           )}
         >

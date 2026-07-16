@@ -183,12 +183,12 @@ export function LineComparison({
         <table className="min-w-[640px] w-full text-left text-xs">
           <thead className="sticky top-0 bg-[#111] text-[10px] uppercase tracking-wider text-neutral-500">
             <tr>
-              <th className="px-4 py-3 font-medium">Operator</th>
-              <th className="px-4 py-3 font-medium">Line</th>
-              <th className="px-4 py-3 font-medium">Over</th>
-              <th className="px-4 py-3 font-medium">Under</th>
-              <th className="px-4 py-3 font-medium">Edge</th>
-              <th className="px-4 py-3 font-medium">Source</th>
+              <th className="px-2.5 py-1.5 font-medium">Operator</th>
+              <th className="px-2.5 py-1.5 font-medium">Line</th>
+              <th className="px-2.5 py-1.5 font-medium">Over</th>
+              <th className="px-2.5 py-1.5 font-medium">Under</th>
+              <th className="px-2.5 py-1.5 font-medium">Edge</th>
+              <th className="px-2.5 py-1.5 font-medium">Source</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.04]">
@@ -204,7 +204,7 @@ export function LineComparison({
                     activeName === row.book && !isBest && "bg-white/[0.02]",
                   )}
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-2.5 py-1.5">
                     <button
                       type="button"
                       className="text-left font-medium text-neutral-100 hover:text-yellow-400"
@@ -218,18 +218,18 @@ export function LineComparison({
                       )}
                     </button>
                   </td>
-                  <td className="px-4 py-3 tabular-nums text-neutral-200">
+                  <td className="px-2.5 py-1.5 tabular-nums text-neutral-200">
                     {unavailable ? "—" : row.line}
                   </td>
-                  <td className="px-4 py-3 tabular-nums text-neutral-400">
+                  <td className="px-2.5 py-1.5 tabular-nums text-neutral-400">
                     {unavailable || row.kind === "pickem" ? "—" : formatAmericanOdds(row.over)}
                   </td>
-                  <td className="px-4 py-3 tabular-nums text-neutral-400">
+                  <td className="px-2.5 py-1.5 tabular-nums text-neutral-400">
                     {unavailable || row.kind === "pickem" ? "—" : formatAmericanOdds(row.under)}
                   </td>
                   <td
                     className={cn(
-                      "px-4 py-3 tabular-nums font-semibold",
+                      "px-2.5 py-1.5 tabular-nums font-semibold",
                       unavailable
                         ? "text-neutral-600"
                         : (row.edgeVsProjection ?? 0) >= 0
