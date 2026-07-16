@@ -5,8 +5,12 @@ import { mockTennisProps, tennisToBuilderLeg } from "@/data/tennisMock";
 import { mockWnbaProps, wnbaToBuilderLeg } from "@/data/wnbaMock";
 import { mockMlbProps, mlbToBuilderLeg } from "@/data/mlbMock";
 import { nbaToBuilderLeg, nflToBuilderLeg } from "@/lib/builderMappers";
+import { getCachedNbaProp } from "@/lib/nbaLiveCache";
 
 export function propIdToBuilderLeg(propId: string): BuilderLeg | null {
+  const liveNba = getCachedNbaProp(propId);
+  if (liveNba) return nbaToBuilderLeg(liveNba);
+
   const nba = mockNbaProps.find((p) => p.id === propId);
   if (nba) return nbaToBuilderLeg(nba);
   const nfl = mockNflProps.find((p) => p.id === propId);

@@ -1,15 +1,112 @@
 import { Lock } from "lucide-react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { LeagueBadge } from "@/components/shared/LeagueBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
-import { listPlayerProfiles } from "@/data/playersMock";
+import { listPlayerProfiles, type PlayerProfile } from "@/data/playersMock";
 import { useIsPro } from "@/components/membership/ProOnly";
 import { cn } from "@/lib/utils";
+import { CardSkeleton } from "@/components/shared/Skeleton";
+
+type HubCard = {
+  id: string;
+  name: string;
+  league: PlayerProfile["league"];
+  team: string;
+  opponent: string;
+  position: string;
+  initials: string;
+  injury: string;
+  tipTime: string;
+  researchScore: number;
+  aiExplain: { headline: string };
+  live?: boolean;
+};
 
 export default function PlayersHubPage() {
-  const players = listPlayerProfiles().sort((a, b) => b.researchScore - a.researchScore);
   const isPro = useIsPro();
+
+  const live = useQuery({
+    queryKey: ["nba-players-hub"],
+    queryFn: async () => {
+      const res = await fetch("/api/nba/players");
+      if (!res.ok) throw new Error("players");
+      return res.json() as Promise<{
+        players: Array<{
+          id: string;
+          name: string;
+          team: string;
+          opponent: string;
+          position: string;
+          headshotInitials: string;
+          confidence: number;
+          matchupNote: string;
+        }>;
+        live?: boolean;
+      }>;
+    },
+    staleTime: 120_000,
+  });
+
+  const mockOthers = listPlayerProfiles()
+    .filter((p) => p.league !== "NBA")
+    .map(
+      (p): HubCard => ({
+        id: p.id,
+        name: p.name,
+        league: p.league,
+        team: p.team,
+        opponent: p.opponent,
+        position: p.position,
+        initials: p.initials,
+        injury: p.injury,
+        tipTime: p.tipTime,
+        researchScore: p.researchScore,
+        aiExplain: { headline: p.aiExplain.headline },
+      }),
+    );
+
+  const liveNba: HubCard[] = (live.data?.players ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    league: "NBA",
+    team: p.team,
+    opponent: p.opponent,
+    position: p.position,
+    initials: p.headshotInitials,
+    injury: "None",
+    tipTime: "Tonight",
+    researchScore: p.confidence,
+    aiExplain: { headline: p.matchupNote || "Live Seraphim profile" },
+    live: true,
+  }));
+
+  // Prefer live NBA; fall back to mock NBA only if live unavailable
+  const mockNbaFallback =
+    liveNba.length === 0 && !live.isLoading
+      ? listPlayerProfiles()
+          .filter((p) => p.league === "NBA")
+          .map(
+            (p): HubCard => ({
+              id: p.id,
+              name: p.name,
+              league: p.league,
+              team: p.team,
+              opponent: p.opponent,
+              position: p.position,
+              initials: p.initials,
+              injury: p.injury,
+              tipTime: p.tipTime,
+              researchScore: p.researchScore,
+              aiExplain: { headline: p.aiExplain.headline },
+            }),
+          )
+      : [];
+
+  const players = [...liveNba, ...mockNbaFallback, ...mockOthers].sort(
+    (a, b) => b.researchScore - a.researchScore,
+  );
 
   return (
     <div>
@@ -19,10 +116,12 @@ export default function PlayersHubPage() {
         description="Season averages, hit rates, splits, streaks, matchup context, and recommended props — open a profile to research before building."
       />
 
+      {live.isLoading && liveNba.length === 0 && <CardSkeleton rows={3} />}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {players.map((player, i) => (
           <Link
-            key={player.id}
+            key={`${player.league}-${player.id}`}
             href={`/player/${player.id}`}
             className="card-3d group rounded-2xl border border-[#1a1a1a] p-5 transition duration-300 hover:border-yellow-500/30"
             style={{ animationDelay: `${i * 40}ms` }}
@@ -43,6 +142,11 @@ export default function PlayersHubPage() {
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <LeagueBadge league={player.league} />
+              {player.live && (
+                <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-300">
+                  Live
+                </span>
+              )}
               <span className="text-[11px] text-neutral-500">{player.tipTime}</span>
               <span
                 className={

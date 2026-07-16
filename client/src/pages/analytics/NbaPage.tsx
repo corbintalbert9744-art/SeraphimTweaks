@@ -10,19 +10,15 @@ import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { PropOfTheDayCard } from "@/components/command/PropOfTheDayCard";
-import {
-  mockNbaPlayerCards,
-  mockNbaProps,
-  parseHitRate,
-  type NbaProp,
-} from "@/data/nbaMock";
+import { parseHitRate, type NbaPlayerCard, type NbaProp } from "@/data/nbaMock";
+import { asNbaPropFromApi, cacheNbaBoardProps } from "@/lib/nbaLiveCache";
 
 const defaultFilters: NbaBoardFilters = {
   query: "",
   market: "All",
   team: "All",
   side: "All",
-  minConfidence: 60,
+  minConfidence: 50,
   sortKey: "ev",
   sortDir: "desc",
 };
@@ -68,9 +64,32 @@ export default function NbaPage() {
     staleTime: 60_000,
   });
 
+  const board = useQuery({
+    queryKey: ["nba-board"],
+    queryFn: async () => {
+      const res = await fetch("/api/nba/props");
+      if (!res.ok) throw new Error("board");
+      return res.json() as Promise<{
+        props: Record<string, unknown>[];
+        players: NbaPlayerCard[];
+        live?: boolean;
+        source?: string;
+        count?: number;
+      }>;
+    },
+    staleTime: 120_000,
+  });
+
+  const liveProps = useMemo(() => {
+    const rows = (board.data?.props ?? []).map(asNbaPropFromApi);
+    if (rows.length) cacheNbaBoardProps(rows);
+    return rows;
+  }, [board.data?.props]);
+  const livePlayers = board.data?.players ?? [];
+
   const filtered = useMemo(() => {
     const q = filters.query.trim().toLowerCase();
-    const rows = mockNbaProps.filter((prop) => {
+    const rows = liveProps.filter((prop) => {
       if (filters.market !== "All" && prop.market !== filters.market) return false;
       if (filters.team !== "All" && prop.team !== filters.team) return false;
       if (filters.side !== "All" && prop.side !== filters.side) return false;
@@ -84,14 +103,14 @@ export default function NbaPage() {
       );
     });
     return sortProps(rows, filters);
-  }, [filters]);
+  }, [filters, liveProps]);
 
   const avgEv =
     filtered.length === 0
       ? 0
       : filtered.reduce((sum, p) => sum + p.evPercent, 0) / filtered.length;
 
-  const visiblePlayers = mockNbaPlayerCards.filter((card) =>
+  const visiblePlayers = livePlayers.filter((card) =>
     filtered.some((p) => p.playerId === card.id),
   );
 
@@ -100,7 +119,7 @@ export default function NbaPage() {
       <PageHeader
         eyebrow="NBA"
         title="NBA Research Board"
-        description="Live ESPN games + one featured player prop from real gamelogs. Full board below still uses research mock props until the odds warehouse is filled."
+        description="Live ESPN schedule, gamelogs, and Seraphim model projections. Compare our projected values to lines you see elsewhere."
         actions={
           <Link
             href="/parlay-builder"
@@ -131,21 +150,30 @@ export default function NbaPage() {
         )}
         {live.data && live.data.games.games.length > 0 && (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {live.data.games.games.map((g: { id: string; shortName: string; statusDetail: string; tipoffAt: string; home: { score?: number }; away: { score?: number } }) => (
-              <div
-                key={g.id}
-                className="rounded-2xl border border-[#1a1a1a] bg-[#0c0c0c] p-4 transition duration-300 hover:-translate-y-0.5 hover:border-yellow-500/25"
-              >
-                <p className="text-sm font-semibold text-white">{g.shortName}</p>
-                <p className="mt-1 text-xs text-neutral-500">
-                  {g.statusDetail}
-                  {g.home.score != null ? ` · ${g.away.score}-${g.home.score}` : ""}
-                </p>
-                <p className="mt-2 text-[11px] text-neutral-600">
-                  {new Date(g.tipoffAt).toLocaleString()}
-                </p>
-              </div>
-            ))}
+            {live.data.games.games.map(
+              (g: {
+                id: string;
+                shortName: string;
+                statusDetail: string;
+                tipoffAt: string;
+                home: { score?: number };
+                away: { score?: number };
+              }) => (
+                <div
+                  key={g.id}
+                  className="rounded-2xl border border-[#1a1a1a] bg-[#0c0c0c] p-4 transition duration-300 hover:-translate-y-0.5 hover:border-yellow-500/25"
+                >
+                  <p className="text-sm font-semibold text-white">{g.shortName}</p>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {g.statusDetail}
+                    {g.home.score != null ? ` · ${g.away.score}-${g.home.score}` : ""}
+                  </p>
+                  <p className="mt-2 text-[11px] text-neutral-600">
+                    {new Date(g.tipoffAt).toLocaleString()}
+                  </p>
+                </div>
+              ),
+            )}
           </div>
         )}
 
@@ -160,19 +188,19 @@ export default function NbaPage() {
             id: "nba-props",
             label: "Props on board",
             value: String(filtered.length),
-            delta: `${mockNbaProps.length} mock research rows`,
-            deltaTone: "neutral",
+            delta: board.data?.live ? "Live warehouse" : "Loading…",
+            deltaTone: board.data?.live ? "up" : "neutral",
             hint: "After current filters",
           }}
         />
         <StatCard
           card={{
             id: "nba-ev",
-            label: "Avg EV (filtered)",
+            label: "Avg model EV",
             value: `+${avgEv.toFixed(1)}%`,
-            delta: "vs no-vig",
+            delta: "vs comparison line",
             deltaTone: "up",
-            hint: "Mock fair reference",
+            hint: "Seraphim model estimate",
           }}
         />
         <StatCard
@@ -191,13 +219,43 @@ export default function NbaPage() {
         <NbaFiltersBar filters={filters} onChange={setFilters} resultCount={filtered.length} />
       </div>
 
-      <div className="mt-6">
-        <NbaPlayerCards players={visiblePlayers.length ? visiblePlayers : mockNbaPlayerCards} />
-      </div>
+      {board.isLoading && (
+        <div className="mt-6">
+          <CardSkeleton rows={4} />
+          <p className="mt-3 text-center text-xs text-neutral-500">
+            Building live NBA board from ESPN gamelogs (first load can take a minute)…
+          </p>
+        </div>
+      )}
+      {board.isError && (
+        <div className="mt-6">
+          <EmptyState
+            title="Live board unavailable"
+            description="Start the data platform (`npm run data-platform`) and refresh."
+          />
+        </div>
+      )}
 
-      <div className="mt-6">
-        <NbaPropTable rows={filtered} />
-      </div>
+      {!board.isLoading && !board.isError && (
+        <>
+          <div className="mt-6">
+            <NbaPlayerCards
+              players={visiblePlayers.length ? visiblePlayers : livePlayers}
+              props={liveProps}
+            />
+          </div>
+          <div className="mt-6">
+            {filtered.length === 0 ? (
+              <EmptyState
+                title="No props match filters"
+                description="Lower min confidence or clear team/market filters."
+              />
+            ) : (
+              <NbaPropTable rows={filtered} />
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

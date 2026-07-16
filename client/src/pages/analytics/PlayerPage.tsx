@@ -1,15 +1,24 @@
 import { Link, useRoute } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Plus, Check, Flame, Snowflake, Minus } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { LeagueBadge } from "@/components/shared/LeagueBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { getPlayerProfile, type PlayerProfile, type PlayerStreak } from "@/data/playersMock";
-import { getPropsForPlayer, formatAmericanOdds } from "@/data/propsCatalog";
+import { getPropsForPlayer, formatAmericanOdds, type PropDetail } from "@/data/propsCatalog";
 import "@/data/registerLeagueProps";
 import { propIdToBuilderLeg } from "@/lib/addPropToBuilder";
+import {
+  cacheNbaBoardProps,
+  getCachedNbaProp,
+  asNbaPropFromApi,
+  propDetailFromNbaProp,
+} from "@/lib/nbaLiveCache";
 import { cn } from "@/lib/utils";
 import { ProOnly } from "@/components/membership/ProOnly";
+import { CardSkeleton } from "@/components/shared/Skeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 function PerformanceChart({
   logs,
@@ -120,30 +129,156 @@ function ResearchChecklist({ profile }: { profile: PlayerProfile }) {
   );
 }
 
+function asPlayerProfile(row: Record<string, unknown>): PlayerProfile {
+  const seasonAverages = (row.seasonAverages as Record<string, number>) ?? {};
+  const home = (row.homeSplit as PlayerProfile["homeSplit"]) ?? {
+    label: "Home",
+    samples: 0,
+    averages: {},
+  };
+  const away = (row.awaySplit as PlayerProfile["awaySplit"]) ?? {
+    label: "Away",
+    samples: 0,
+    averages: {},
+  };
+  const ai = (row.aiExplain as PlayerProfile["aiExplain"]) ?? {
+    verdict: "neutral" as const,
+    headline: "Live profile",
+    body: "",
+  };
+  const verdict =
+    ai.verdict === "strong" || ai.verdict === "weak" || ai.verdict === "neutral"
+      ? ai.verdict
+      : "neutral";
+  const h2hRaw = (row.h2h as Record<string, unknown>) ?? {};
+  return {
+    id: String(row.id),
+    name: String(row.name ?? ""),
+    league: "NBA",
+    team: String(row.team ?? ""),
+    opponent: String(row.opponent ?? ""),
+    position: String(row.position ?? "G"),
+    initials: String(row.initials ?? "NB"),
+    injury: (row.injury as PlayerProfile["injury"]) || "None",
+    injuryNote: String(row.injuryNote ?? ""),
+    tipTime: String(row.tipTime ?? ""),
+    projectedWorkload: String(row.projectedWorkload ?? ""),
+    bio: String(row.bio ?? ""),
+    seasonAverages,
+    hitRates: Array.isArray(row.hitRates) ? (row.hitRates as PlayerProfile["hitRates"]) : [],
+    homeSplit: {
+      label: home.label || "Home",
+      samples: Number(home.samples ?? 0),
+      averages: home.averages ?? {},
+    },
+    awaySplit: {
+      label: away.label || "Away",
+      samples: Number(away.samples ?? 0),
+      averages: away.averages ?? {},
+    },
+    recentLogs: Array.isArray(row.recentLogs) ? (row.recentLogs as PlayerProfile["recentLogs"]) : [],
+    chartLine: typeof row.chartLine === "number" ? row.chartLine : Number(row.chartLine ?? 0),
+    chartStatLabel: String(row.chartStatLabel ?? "Points"),
+    streaks: Array.isArray(row.streaks) ? (row.streaks as PlayerProfile["streaks"]) : [],
+    h2h: {
+      record: String(h2hRaw.record ?? "—"),
+      note: String(h2hRaw.note ?? ""),
+      meetings: Array.isArray(h2hRaw.meetings)
+        ? (h2hRaw.meetings as PlayerProfile["h2h"]["meetings"])
+        : [],
+    },
+    matchup: (row.matchup as PlayerProfile["matchup"]) ?? {
+      title: "Matchup",
+      bullets: [],
+      defenseRank: "Pending",
+    },
+    researchScore: Number(row.researchScore ?? 50),
+    dataQualityScore: Number(row.dataQualityScore ?? 50),
+    aiExplain: { ...ai, verdict },
+    checks: Array.isArray(row.checks) ? (row.checks as PlayerProfile["checks"]) : [],
+    propIds: Array.isArray(row.propIds) ? (row.propIds as string[]) : [],
+    recommendedPropIds: Array.isArray(row.recommendedPropIds)
+      ? (row.recommendedPropIds as string[])
+      : [],
+  };
+}
+
 export default function PlayerPage() {
   const [, params] = useRoute("/player/:id");
   const playerId = params?.id ?? "";
-  const profile = getPlayerProfile(playerId);
+  const mockProfile = getPlayerProfile(playerId);
+  const looksLive = !mockProfile || /^\d+$/.test(playerId) || playerId.includes(":");
+
+  const live = useQuery({
+    queryKey: ["nba-player", playerId],
+    enabled: Boolean(playerId) && looksLive,
+    queryFn: async () => {
+      const res = await fetch(`/api/nba/players/${encodeURIComponent(playerId)}`);
+      if (!res.ok) throw new Error("player");
+      const data = await res.json();
+      return asPlayerProfile((data.player ?? data) as Record<string, unknown>);
+    },
+    staleTime: 120_000,
+  });
+
+  const boardProps = useQuery({
+    queryKey: ["nba-board"],
+    enabled: Boolean(live.data),
+    queryFn: async () => {
+      const res = await fetch("/api/nba/props");
+      if (!res.ok) throw new Error("board");
+      return res.json() as Promise<{ props: Record<string, unknown>[] }>;
+    },
+    staleTime: 120_000,
+  });
+
+  const profile = live.data ?? mockProfile;
   const { addLeg, hasLeg } = useParlayDraft();
-  const linkedProps = getPropsForPlayer(playerId);
+
+  const linkedProps: PropDetail[] = (() => {
+    if (!profile) return [];
+    if (live.data && boardProps.data?.props?.length) {
+      const rows = boardProps.data.props
+        .map(asNbaPropFromApi)
+        .filter((p) => p.playerId === profile.id || profile.propIds.includes(p.id));
+      cacheNbaBoardProps(rows);
+      return rows.map((p) => propDetailFromNbaProp(p));
+    }
+    return getPropsForPlayer(playerId);
+  })();
+
+  if (live.isLoading && !profile) {
+    return <CardSkeleton rows={5} />;
+  }
 
   if (!profile) {
     return (
-      <div className="card-3d rounded-2xl border border-[#1a1a1a] p-10 text-center">
-        <h1 className="text-xl font-semibold text-white">Player not found</h1>
-        <p className="mt-2 text-sm text-neutral-400">Mock profile missing for “{playerId}”.</p>
-        <Link href="/players" className="mt-6 inline-block text-sm text-yellow-400 hover:underline">
-          Back to Player Profiles
-        </Link>
+      <div className="mt-6">
+        <EmptyState
+          title="Player not found"
+          description={`No live or mock profile for “${playerId}”. Open the NBA board and pick a featured player.`}
+        />
+        <div className="mt-4 text-center">
+          <Link href="/nba" className="text-sm text-yellow-400 hover:underline">
+            Back to NBA board
+          </Link>
+        </div>
       </div>
     );
   }
 
   const avgKeys = Object.keys(profile.seasonAverages);
-  const recommended = profile.recommendedPropIds;
-  const allRecommendedAdded = recommended.every((id) => hasLeg(id));
+  const recommended = profile.recommendedPropIds.length
+    ? profile.recommendedPropIds
+    : linkedProps.slice(0, 2).map((p) => p.id);
+  const allRecommendedAdded = recommended.length > 0 && recommended.every((id) => hasLeg(id));
 
   function addProp(propId: string) {
+    const cached = getCachedNbaProp(propId);
+    if (cached) {
+      addLeg(propIdToBuilderLeg(propId)!);
+      return;
+    }
     const leg = propIdToBuilderLeg(propId);
     if (leg) addLeg(leg);
   }

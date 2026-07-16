@@ -27,10 +27,10 @@ class EspnNbaProvider:
     meta = ProviderMeta(
         name="espn-nba",
         leagues=["NBA"],
-        capabilities=["schedule", "gamelog", "injuries", "featured"],
+        capabilities=["schedule", "gamelog", "injuries", "featured", "roster"],
         requires_api_key=False,
         is_mock=False,
-        notes="Live ESPN public endpoints for NBA scoreboard, gamelogs, and injury snippets.",
+        notes="Live ESPN public endpoints for NBA scoreboard, gamelogs, injuries, and rosters.",
     )
 
     def __init__(self, user_agent: str = "SeraphimAnalytics/1.0") -> None:
@@ -196,4 +196,91 @@ class EspnNbaProvider:
                     else None,
                     team_external_id=str(team.get("id") or ""),
                 )
-        return None
+        # Upcoming / empty leaders — roster fallback
+        athletes = self.pick_slate_athletes(game_external_id, per_team=1)
+        return athletes[0] if athletes else None
+
+    def fetch_team_roster(self, team_external_id: str) -> list[NormalizedPlayer]:
+        data = self._get(f"{ESPN_SITE}/teams/{team_external_id}/roster")
+        out: list[NormalizedPlayer] = []
+        for group in data.get("athletes") or []:
+            for a in group.get("items") or []:
+                if not a.get("id"):
+                    continue
+                pos = a.get("position") or {}
+                out.append(
+                    NormalizedPlayer(
+                        external_id=str(a["id"]),
+                        league="NBA",
+                        full_name=a.get("displayName") or a.get("fullName") or "Player",
+                        short_name=a.get("shortName") or a.get("displayName"),
+                        position=pos.get("abbreviation") if isinstance(pos, dict) else None,
+                        jersey=str(a.get("jersey") or "") or None,
+                        headshot_url=(a.get("headshot") or {}).get("href")
+                        if isinstance(a.get("headshot"), dict)
+                        else None,
+                        team_external_id=str(team_external_id),
+                    )
+                )
+        return out
+
+    def pick_slate_athletes(self, game_external_id: str, per_team: int = 2) -> list[NormalizedPlayer]:
+        """Leaders when available; otherwise skill-position roster sample for upcoming games."""
+        data = self._get(f"{ESPN_SITE}/summary?event={game_external_id}")
+        picked: list[NormalizedPlayer] = []
+        seen: set[str] = set()
+
+        for team_block in data.get("leaders") or []:
+            team = team_block.get("team") or {}
+            for cat_name in ("points", "rebounds", "assists"):
+                cat = next((l for l in (team_block.get("leaders") or []) if l.get("name") == cat_name), None)
+                for leader in (cat or {}).get("leaders") or []:
+                    ath = leader.get("athlete") or {}
+                    eid = str(ath.get("id") or "")
+                    if not eid or eid in seen:
+                        continue
+                    seen.add(eid)
+                    picked.append(
+                        NormalizedPlayer(
+                            external_id=eid,
+                            league="NBA",
+                            full_name=ath.get("displayName") or ath.get("fullName") or "Player",
+                            short_name=ath.get("shortName") or ath.get("displayName"),
+                            position=(ath.get("position") or {}).get("abbreviation")
+                            if isinstance(ath.get("position"), dict)
+                            else None,
+                            headshot_url=(ath.get("headshot") or {}).get("href")
+                            if isinstance(ath.get("headshot"), dict)
+                            else None,
+                            team_external_id=str(team.get("id") or ""),
+                        )
+                    )
+                    if sum(1 for p in picked if p.team_external_id == str(team.get("id") or "")) >= per_team:
+                        break
+                if sum(1 for p in picked if p.team_external_id == str(team.get("id") or "")) >= per_team:
+                    break
+
+        if len(picked) >= per_team * 2:
+            return picked[: per_team * 2]
+
+        # Roster fallback for both teams from header
+        header = data.get("header") or {}
+        competitions = header.get("competitions") or []
+        team_ids: list[str] = []
+        if competitions:
+            for c in competitions[0].get("competitors") or []:
+                tid = str((c.get("team") or {}).get("id") or "")
+                if tid:
+                    if c.get("homeAway") == "home":
+                        team_ids.insert(0, tid)
+                    else:
+                        team_ids.append(tid)
+        skill = {"PG", "SG", "SF", "PF", "C", "G", "F"}
+        for tid in team_ids:
+            roster = self.fetch_team_roster(tid)
+            candidates = [p for p in roster if (p.position or "").upper() in skill] or roster
+            for p in candidates[:per_team]:
+                if p.external_id not in seen:
+                    seen.add(p.external_id)
+                    picked.append(p)
+        return picked

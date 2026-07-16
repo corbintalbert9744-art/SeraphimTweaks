@@ -1,12 +1,39 @@
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { LeagueBadge } from "@/components/shared/LeagueBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
-import { listPropDetails, formatAmericanOdds } from "@/data/propsCatalog";
+import { listPropDetails, formatAmericanOdds, type PropDetail } from "@/data/propsCatalog";
 import "@/data/registerLeagueProps";
+import { asNbaPropFromApi, cacheNbaBoardProps, propDetailFromNbaProp } from "@/lib/nbaLiveCache";
+import { CardSkeleton } from "@/components/shared/Skeleton";
 
 export default function ResearchHubPage() {
-  const props = listPropDetails();
+  const live = useQuery({
+    queryKey: ["nba-board"],
+    queryFn: async () => {
+      const res = await fetch("/api/nba/props");
+      if (!res.ok) throw new Error("board");
+      return res.json() as Promise<{ props: Record<string, unknown>[]; live?: boolean }>;
+    },
+    staleTime: 120_000,
+  });
+
+  const liveNba: PropDetail[] = (() => {
+    const rows = (live.data?.props ?? []).map(asNbaPropFromApi);
+    if (rows.length) cacheNbaBoardProps(rows);
+    return rows.map((p) => propDetailFromNbaProp(p));
+  })();
+
+  const otherLeagues = listPropDetails().filter((p) => p.league !== "NBA");
+  const mockNbaFallback =
+    liveNba.length === 0 && !live.isLoading
+      ? listPropDetails().filter((p) => p.league === "NBA")
+      : [];
+
+  const props = [...liveNba, ...mockNbaFallback, ...otherLeagues].sort(
+    (a, b) => b.researchScore - a.researchScore,
+  );
 
   return (
     <div>
@@ -23,6 +50,8 @@ export default function ResearchHubPage() {
           </Link>
         }
       />
+
+      {live.isLoading && liveNba.length === 0 && <CardSkeleton rows={3} />}
 
       <div className="card-3d overflow-hidden rounded-2xl border border-[#1a1a1a]">
         <div className="overflow-x-auto">

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import { ArrowLeft, Plus, Check } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -13,9 +14,15 @@ import {
 } from "@/data/propsCatalog";
 import "@/data/registerLeagueProps";
 import { propIdToBuilderLeg } from "@/lib/addPropToBuilder";
+import {
+  asPropDetailFromApi,
+  cacheNbaPropDetail,
+  getCachedNbaPropDetail,
+} from "@/lib/nbaLiveCache";
 import { recomputeLegSide } from "@/lib/legStats";
 import { cn } from "@/lib/utils";
 import { ProOnly } from "@/components/membership/ProOnly";
+import { CardSkeleton } from "@/components/shared/Skeleton";
 
 function MovementChart({
   points,
@@ -97,23 +104,47 @@ function HitRateBars({ prop }: { prop: PropDetail }) {
 export default function PropDetailPage() {
   const [, params] = useRoute("/prop/:id");
   const propId = params?.id ?? "";
-  const prop = getPropDetail(propId);
+  const mockProp = getPropDetail(propId);
+  const cached = getCachedNbaPropDetail(propId);
+  const looksNbaLive = propId.startsWith("nba:prop:") || (!mockProp && Boolean(propId));
+
+  const live = useQuery({
+    queryKey: ["nba-prop", propId],
+    enabled: Boolean(propId) && looksNbaLive,
+    queryFn: async () => {
+      const res = await fetch(`/api/nba/props/${encodeURIComponent(propId)}`);
+      if (!res.ok) throw new Error("prop");
+      const data = await res.json();
+      const detail = asPropDetailFromApi((data.prop ?? data) as Record<string, unknown>);
+      cacheNbaPropDetail(detail);
+      return detail;
+    },
+    staleTime: 120_000,
+  });
+
+  const prop = live.data ?? cached ?? mockProp;
   const { addLeg, hasLeg } = useParlayDraft();
   const [side, setSide] = useState<"Over" | "Under" | null>(null);
 
   const selectedSide = side ?? prop?.side ?? "Over";
   const best = useMemo(
-    () => (prop ? bestBookForSide(prop, selectedSide) : null),
+    () => (prop && prop.books.length ? bestBookForSide(prop, selectedSide) : null),
     [prop, selectedSide],
   );
+
+  if (live.isLoading && !prop) {
+    return <CardSkeleton rows={4} />;
+  }
 
   if (!prop || !best) {
     return (
       <div className="card-3d rounded-2xl border border-[#1a1a1a] p-10 text-center">
         <h1 className="text-xl font-semibold text-white">Report not found</h1>
-        <p className="mt-2 text-sm text-neutral-400">No mock Research Report for “{propId}”.</p>
-        <Link href="/research" className="mt-6 inline-block text-sm text-yellow-400 hover:underline">
-          Back to Research Reports
+        <p className="mt-2 text-sm text-neutral-400">
+          No Research Report for “{propId}”. Start the data platform for live NBA props.
+        </p>
+        <Link href="/nba" className="mt-6 inline-block text-sm text-yellow-400 hover:underline">
+          Back to NBA board
         </Link>
       </div>
     );
@@ -126,11 +157,12 @@ export default function PropDetailPage() {
   const added = hasLeg(prop.id);
 
   const similar = prop.similarPropIds
-    .map((id) => getPropDetail(id))
+    .map((id) => getCachedNbaPropDetail(id) ?? getPropDetail(id))
     .filter((p): p is PropDetail => Boolean(p));
 
   const currentPropId = prop.id;
   function handleAdd() {
+    cacheNbaPropDetail(prop as PropDetail);
     const leg = propIdToBuilderLeg(currentPropId);
     if (leg) addLeg(recomputeLegSide(leg, selectedSide));
   }

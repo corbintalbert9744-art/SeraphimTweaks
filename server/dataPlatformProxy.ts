@@ -8,7 +8,12 @@ import type { Express, Request, Response } from "express";
 const BASE = process.env.DATA_PLATFORM_URL || "http://127.0.0.1:8000";
 const ENABLED = process.env.DATA_PLATFORM_PROXY !== "0";
 
-async function proxyGet(path: string, res: Response, fallback: () => Promise<void>) {
+async function proxyGet(
+  path: string,
+  res: Response,
+  fallback: () => Promise<void>,
+  timeoutMs = 25_000,
+) {
   if (!ENABLED) {
     await fallback();
     return;
@@ -16,7 +21,7 @@ async function proxyGet(path: string, res: Response, fallback: () => Promise<voi
   try {
     const upstream = await fetch(`${BASE}${path}`, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(25_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!upstream.ok) {
       await fallback();
@@ -69,6 +74,43 @@ export function registerDataPlatformProxy(
         error: "NFL featured prop requires the Python data platform",
         hint: "Start with: npm run data-platform",
       });
+    });
+  });
+
+  // NBA board / players / prop detail — data platform warehouse
+  app.get("/api/nba/props", async (req, res) => {
+    const refresh = req.query.refresh === "1" || req.query.refresh === "true" ? "?refresh=true" : "";
+    // First slate ingest can take a while (ESPN gamelogs × players)
+    await proxyGet(
+      `/api/v1/nba/props${refresh}`,
+      res,
+      async () => {
+        res.status(503).json({
+          error: "NBA board requires the Python data platform",
+          hint: "Start with: npm run data-platform",
+          props: [],
+          players: [],
+        });
+      },
+      180_000,
+    );
+  });
+
+  app.get("/api/nba/props/:id", async (req, res) => {
+    await proxyGet(`/api/v1/nba/props/${encodeURIComponent(req.params.id)}`, res, async () => {
+      res.status(503).json({ error: "NBA prop detail requires the data platform" });
+    });
+  });
+
+  app.get("/api/nba/players", async (_req, res) => {
+    await proxyGet(`/api/v1/nba/players`, res, async () => {
+      res.status(503).json({ error: "NBA players require the data platform", players: [] });
+    });
+  });
+
+  app.get("/api/nba/players/:id", async (req, res) => {
+    await proxyGet(`/api/v1/nba/players/${encodeURIComponent(req.params.id)}`, res, async () => {
+      res.status(503).json({ error: "NBA player profile requires the data platform" });
     });
   });
 

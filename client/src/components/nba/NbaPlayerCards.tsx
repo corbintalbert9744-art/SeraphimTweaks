@@ -2,11 +2,17 @@ import { Link } from "wouter";
 import { Plus, Check } from "lucide-react";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
-import { mockNbaProps, type NbaPlayerCard } from "@/data/nbaMock";
+import type { NbaPlayerCard, NbaProp } from "@/data/nbaMock";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
 import { cn } from "@/lib/utils";
 
-export function NbaPlayerCards({ players }: { players: NbaPlayerCard[] }) {
+export function NbaPlayerCards({
+  players,
+  props = [],
+}: {
+  players: NbaPlayerCard[];
+  props?: NbaProp[];
+}) {
   const { addLeg, hasLeg } = useParlayDraft();
 
   return (
@@ -20,7 +26,10 @@ export function NbaPlayerCards({ players }: { players: NbaPlayerCard[] }) {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {players.map((player) => {
-          const topProp = mockNbaProps.find((p) => p.id === player.topPropId);
+          const topProp =
+            props.find((p) => p.id === player.topPropId) ??
+            props.find((p) => p.playerId === player.id && p.market === "Points") ??
+            props.find((p) => p.playerId === player.id);
           const added = topProp ? hasLeg(topProp.id) : false;
 
           return (
@@ -91,7 +100,7 @@ export function NbaPlayerCards({ players }: { players: NbaPlayerCard[] }) {
       </div>
 
       <p className="mt-3 text-center text-[11px] text-neutral-600">
-        Player detail pages come next — cards are research shortcuts for now.{" "}
+        Open a player card for gamelogs and hit rates.{" "}
         <Link href="/parlay-builder" className="text-yellow-500/80 hover:text-yellow-400">
           Open Parlay Builder
         </Link>
