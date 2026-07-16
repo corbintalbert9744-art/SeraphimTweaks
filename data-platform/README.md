@@ -76,14 +76,21 @@ Disable with `ENABLE_SCHEDULER=false`.
 
 ## Analytics transparency
 
-Research Score, Confidence, EV, and no-vig are **Seraphim model estimates** built from evidence (hit rates, books, injuries, matchup, movement). They are **not** guaranteed or objective chances of winning a bet or parlay. The API returns `isModelEstimate: true` and a `disclaimer` on prop payloads. Do not invent a single “parlay win probability.”
+Research Score, Confidence, EV, and side probabilities are **Seraphim model estimates**
+from the rule-based factor engine (`PREDICTION.md`) — not sportsbook copies and not
+guaranteed win chances. Do not invent a single “parlay chance of winning.”
+
+## Prediction engine
+
+See `PREDICTION.md`. Featured props return `projectedValue`, `overProbability`,
+`underProbability`, and `influentialFactors`. Odds are `comparison-only`.
 
 ## Schema
 
 SQLAlchemy models in `app/db/models.py` align with `shared/schema.ts` and add:
 
 - `team_stats` — matchup rankings
-- `prop_analytics` — cached L5/L10/L20, splits, scores, explain
+- `prop_analytics` — cached L5/L10/L20, splits, scores, explain + model projection fields
 - `line_snapshots` — movement history
 - `provider_runs` — ingestion audit
 
@@ -92,7 +99,8 @@ SQLAlchemy models in `app/db/models.py` align with `shared/schema.ts` and add:
 1. ✅ Database schema  
 2. ✅ Provider adapter framework  
 3. ✅ NBA live data (ESPN)  
-4. ✅ NBA analytics engine  
+4. ✅ NBA analytics + **rule-based prediction engine**  
 5. ✅ FastAPI + scheduler  
-6. 🔄 Connect frontend (Express proxy)  
-7. ⏳ NFL → ATP → WTA → WNBA  
+6. ✅ Connect frontend (Express proxy)  
+7. ✅ NFL live  
+8. ⏳ WNBA → ATP → WTA  

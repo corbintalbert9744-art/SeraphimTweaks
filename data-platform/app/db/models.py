@@ -226,6 +226,17 @@ class PropAnalytics(Base):
     confidence_score: Mapped[Optional[int]] = mapped_column(Integer)
     data_quality_score: Mapped[Optional[int]] = mapped_column(Integer)
 
+    # Seraphim model-native prediction (rule-based v1) — not sportsbook-derived
+    projected_value: Mapped[Optional[float]] = mapped_column(Float)
+    over_probability: Mapped[Optional[float]] = mapped_column(Float)
+    under_probability: Mapped[Optional[float]] = mapped_column(Float)
+    comparison_line: Mapped[Optional[float]] = mapped_column(Float)
+    edge_vs_line: Mapped[Optional[float]] = mapped_column(Float)
+    residual_sigma: Mapped[Optional[float]] = mapped_column(Float)
+    model_version: Mapped[Optional[str]] = mapped_column(String(32))
+    factor_breakdown: Mapped[Optional[list]] = mapped_column(JSON)
+    influential_factors: Mapped[Optional[list]] = mapped_column(JSON)
+
     matchup_note: Mapped[Optional[str]] = mapped_column(Text)
     explain_bullets: Mapped[Optional[list]] = mapped_column(JSON)
     why_payload: Mapped[Optional[JsonDict]] = mapped_column(JSON)

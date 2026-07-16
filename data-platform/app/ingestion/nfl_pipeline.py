@@ -16,17 +16,14 @@ from app.analytics.engine import (
     build_prop_of_the_day_why,
     build_research_checks,
     checks_to_dicts,
-    confidence_score,
-    data_quality_score,
     expected_value,
-    explain_prop,
-    hit_rate,
     home_away_split,
     no_vig_pair,
-    research_score_from_checks,
     rest_days,
     streak,
 )
+from app.analytics.factors.base import PredictionContext
+from app.analytics.prediction import predict_prop
 from app.config import get_settings
 from app.db.models import Game, PlayerGameLog, PropAnalytics, ProviderRun, Team
 from app.ingestion.warehouse import (
@@ -192,9 +189,45 @@ def build_and_store_featured_nfl_prop(
         }
 
     avg = mean(values[: min(10, len(values))])
-    # NFL yard lines usually .5; receptions whole/half
-    line = round(avg * 2) / 2
-    side = "Over"
+    comparison_line = round(avg * 2) / 2
+
+    injuries = providers.injuries.fetch_injuries("NFL", game.external_id) if providers.injuries else []
+    for inj in injuries:
+        upsert_injury(db, inj)
+    injury_status = "None"
+    for inj in injuries:
+        if inj.player_external_id == athlete.external_id or (
+            inj.player_name and inj.player_name.lower() in player.full_name.lower()
+        ):
+            injury_status = inj.status
+            break
+
+    if athlete.team_external_id == game.home_team_external_id:
+        opp_abbr = game.away_abbr
+        matchup = f"vs {game.away_abbr} at home"
+        is_home = True
+    else:
+        opp_abbr = game.home_abbr
+        matchup = f"@ {game.home_abbr}"
+        is_home = False
+
+    homes = [bool(r.home) for r in logs[: len(values)]]
+    minutes = [r.minutes for r in logs[: len(values)]]
+    played_at = [r.played_at for r in logs[: len(values)]]
+    ctx = PredictionContext(
+        league="NFL",
+        market=market,
+        values=values,
+        homes=homes,
+        played_at=played_at,
+        minutes=minutes,
+        injury_status=injury_status,
+        is_home=is_home,
+        opponent_abbr=opp_abbr,
+    )
+    prediction = predict_prop(ctx, comparison_line=comparison_line)
+    side = "Over" if prediction.projected_value >= comparison_line else "Under"
+    line = comparison_line
 
     odds_provider = providers.odds
     odds_are_mock = True
@@ -217,6 +250,11 @@ def build_and_store_featured_nfl_prop(
                 if q.market.lower() in market.lower() and player.full_name.lower() in q.player_name.lower()
             ]
             odds_are_mock = False
+            if quotes and quotes[0].line is not None:
+                comparison_line = float(quotes[0].line)
+                prediction = predict_prop(ctx, comparison_line=comparison_line)
+                line = comparison_line
+                side = "Over" if prediction.projected_value >= comparison_line else "Under"
         except Exception as exc:  # noqa: BLE001
             log.warning("NFL live odds failed, mock fallback: %s", exc)
             quotes = []
@@ -248,37 +286,22 @@ def build_and_store_featured_nfl_prop(
 
     over_odds = next((q.american_odds for q in quotes if q.side == "Over"), -110)
     under_odds = next((q.american_odds for q in quotes if q.side == "Under"), -110)
+    model_side_prob = (
+        prediction.over_probability if side == "Over" else prediction.under_probability
+    )
+    ev = expected_value(model_side_prob, over_odds if side == "Over" else under_odds)
     no_vig_over, _ = no_vig_pair(over_odds, under_odds)
     no_vig = no_vig_over if side == "Over" else (1 - no_vig_over)
-    ev = expected_value(no_vig, over_odds if side == "Over" else under_odds)
 
-    l5 = hit_rate(values, line, side, 5)
-    l10 = hit_rate(values, line, side, 10)
-    l20 = hit_rate(values, line, side, 20)
-    season = hit_rate(values, line, side, len(values))
-    homes = [bool(r.home) for r in logs[: len(values)]]
+    l5, l10, l20, season = prediction.l5, prediction.l10, prediction.l20, prediction.season
+    assert l5 and l10 and l20 and season
     home_rate, away_rate = home_away_split(values, homes, line, side)
-    rest = rest_days([r.played_at for r in logs])
+    rest = rest_days(played_at)
     stk = streak(values, line, side)
-
-    injuries = providers.injuries.fetch_injuries("NFL", game.external_id) if providers.injuries else []
-    for inj in injuries:
-        upsert_injury(db, inj)
-    injury_status = "None"
-    for inj in injuries:
-        if inj.player_external_id == athlete.external_id or (
-            inj.player_name and inj.player_name.lower() in player.full_name.lower()
-        ):
-            injury_status = inj.status
-            break
-
-    if athlete.team_external_id == game.home_team_external_id:
-        opp_abbr = game.away_abbr
-        matchup = f"vs {game.away_abbr} at home"
-    else:
-        opp_abbr = game.home_abbr
-        matchup = f"@ {game.home_abbr}"
-
+    rs = prediction.research_score
+    conf = prediction.confidence_score
+    dqs = prediction.data_quality_score
+    bullets = prediction.explanation
     checks = build_research_checks(
         l10=l10,
         l5=l5,
@@ -287,37 +310,10 @@ def build_and_store_featured_nfl_prop(
         line_moved_favorably=None,
         minutes_ok=True,
     )
-    rs = research_score_from_checks(checks)
-    conf = confidence_score(
-        l10_rate=l10.rate,
-        samples=l10.samples,
-        ev_percent=ev,
-        injury_penalty=8 if injury_status.lower() not in ("none", "healthy", "active", "probable") else 0,
-    )
-    dqs = data_quality_score(
-        has_gamelog=True,
-        gamelog_count=len(values),
-        has_injury_feed=bool(injuries),
-        has_live_odds=not odds_are_mock,
-        freshness_minutes=5,
-    )
-    bullets = explain_prop(
-        player=player.full_name,
-        market=market,
-        side=side,
-        line=line,
-        l5=l5,
-        l10=l10,
-        l20=l20,
-        no_vig=no_vig,
-        ev_percent=ev,
-        research_score=rs,
-        matchup_note=matchup,
-    )
     why = build_prop_of_the_day_why(
         research_score=rs,
         checks=checks,
-        no_vig=no_vig,
+        no_vig=prediction.over_probability,
         ev_percent=ev,
         l5=l5,
         l10=l10,
@@ -330,6 +326,11 @@ def build_and_store_featured_nfl_prop(
         current_line=line,
         injury_status=injury_status,
     )
+    why["headline"] = (
+        f"Model projects {prediction.projected_value:.1f} {market} "
+        f"({side} lean vs comparison {line})."
+    )
+    why["influentialFactors"] = prediction.influential_factors
 
     existing = db.execute(select(PropAnalytics).where(PropAnalytics.prop_id == prop.id)).scalar_one_or_none()
     if not existing:
@@ -353,6 +354,15 @@ def build_and_store_featured_nfl_prop(
     existing.research_score = rs
     existing.confidence_score = conf
     existing.data_quality_score = dqs
+    existing.projected_value = prediction.projected_value
+    existing.over_probability = prediction.over_probability
+    existing.under_probability = prediction.under_probability
+    existing.comparison_line = comparison_line
+    existing.edge_vs_line = prediction.edge_vs_line
+    existing.residual_sigma = prediction.residual_sigma
+    existing.model_version = prediction.model_version
+    existing.factor_breakdown = prediction.to_api_dict()["factorBreakdown"]
+    existing.influential_factors = prediction.influential_factors
     existing.matchup_note = matchup
     existing.explain_bullets = bullets
     existing.why_payload = why
@@ -364,12 +374,12 @@ def build_and_store_featured_nfl_prop(
 
     _run_log(
         db,
-        provider="espn-nfl+odds",
+        provider="espn-nfl+model",
         job="featured_prop",
         status="ok",
         rows=1,
         is_mock=odds_are_mock,
-        message="odds mock" if odds_are_mock else "live odds",
+        message=f"{prediction.model_version}; odds={'mock' if odds_are_mock else 'live'}",
     )
     db.flush()
 
@@ -386,9 +396,12 @@ def build_and_store_featured_nfl_prop(
         "source": {
             "schedule": "espn",
             "gamelog": "espn",
+            "prediction": prediction.model_version,
             "odds": "mock" if odds_are_mock else "the-odds-api",
+            "oddsRole": "comparison-only",
         },
         "disclaimer": existing.disclaimer,
+        "prediction": prediction.to_api_dict(),
         "game": {
             "id": game.external_id,
             "shortName": f"{game.away_abbr} @ {game.home_abbr}",
@@ -421,6 +434,11 @@ def build_and_store_featured_nfl_prop(
             "market": market,
             "side": side,
             "line": line,
+            "comparisonLine": comparison_line,
+            "projectedValue": round(prediction.projected_value, 2),
+            "overProbability": round(prediction.over_probability, 4),
+            "underProbability": round(prediction.under_probability, 4),
+            "edgeVsLine": round(prediction.edge_vs_line, 2) if prediction.edge_vs_line is not None else None,
             "tipTime": game.tipoff_at.isoformat(),
             "gameLabel": f"{game.away_abbr} @ {game.home_abbr}",
             "americanOdds": over_odds if side == "Over" else under_odds,
@@ -439,9 +457,12 @@ def build_and_store_featured_nfl_prop(
             "streak": stk,
             "checks": checks_to_dicts(checks),
             "explanation": bullets,
+            "influentialFactors": prediction.influential_factors,
             "why": why,
             "oddsAreMock": odds_are_mock,
+            "oddsRole": "comparison-only",
             "isModelEstimate": True,
+            "modelVersion": prediction.model_version,
             "disclaimer": existing.disclaimer,
             "recent": [
                 {
@@ -460,6 +481,7 @@ def build_and_store_featured_nfl_prop(
                     "american": q.american_odds,
                     "line": q.line,
                     "isMock": q.is_mock,
+                    "role": "comparison-only",
                 }
                 for q in quotes
                 if q.side == side
