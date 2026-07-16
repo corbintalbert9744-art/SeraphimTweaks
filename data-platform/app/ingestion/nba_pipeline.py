@@ -94,6 +94,17 @@ def import_nba_injuries_for_open_games(db: Session) -> dict[str, Any]:
     return {"injuries": total}
 
 
+def _raw_stat(row: PlayerGameLog, *keys: str) -> Optional[float]:
+    raw = row.raw if isinstance(row.raw, dict) else {}
+    for key in keys:
+        if key in raw and raw[key] is not None:
+            try:
+                return float(raw[key])
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
 def _market_values(logs: list[PlayerGameLog], market: str) -> list[float]:
     if market in ("PRA", "Pts+Rebs+Asts"):
         vals = []
@@ -120,15 +131,73 @@ def _market_values(logs: list[PlayerGameLog], market: str) -> list[float]:
             for row in logs
             if row.rebounds is not None or row.assists is not None
         ]
+    if market in ("Steals+Blocks", "Stl+Blk"):
+        return [
+            float(row.steals or 0) + float(row.blocks or 0)
+            for row in logs
+            if row.steals is not None or row.blocks is not None
+        ]
+    if market in ("Blocks+Rebs", "Blk+Reb"):
+        return [
+            float(row.blocks or 0) + float(row.rebounds or 0)
+            for row in logs
+            if row.blocks is not None or row.rebounds is not None
+        ]
+    if market in ("Fantasy Score", "Fantasy Points"):
+        # PrizePicks-style fantasy approximation when box score has core counting stats.
+        vals = []
+        for row in logs:
+            if row.points is None and row.rebounds is None and row.assists is None:
+                continue
+            tos = _raw_stat(row, "turnovers", "tov", "TO", "turnovers") or 0.0
+            vals.append(
+                float(row.points or 0)
+                + float(row.rebounds or 0) * 1.2
+                + float(row.assists or 0) * 1.5
+                + float(row.steals or 0) * 3.0
+                + float(row.blocks or 0) * 3.0
+                - float(tos)
+            )
+        return vals
+    if market in ("Turnovers", "Asts+TOs"):
+        vals = []
+        for row in logs:
+            tos = _raw_stat(row, "turnovers", "tov", "TO")
+            if market == "Turnovers":
+                if tos is not None:
+                    vals.append(tos)
+                continue
+            if tos is None and row.assists is None:
+                continue
+            vals.append(float(row.assists or 0) + float(tos or 0))
+        return vals
+    if market in ("Double Double", "Triple Double"):
+        # Binary-ish counting from box score (not a line projection basis, but usable).
+        need = 2 if market == "Double Double" else 3
+        vals = []
+        for row in logs:
+            cats = [
+                float(row.points or 0) >= 10,
+                float(row.rebounds or 0) >= 10,
+                float(row.assists or 0) >= 10,
+                float(row.steals or 0) >= 10,
+                float(row.blocks or 0) >= 10,
+            ]
+            vals.append(1.0 if sum(1 for c in cats if c) >= need else 0.0)
+        return vals
     key = {
         "Points": "points",
         "Rebounds": "rebounds",
         "Assists": "assists",
         "Threes": "threes",
         "3-PT Made": "threes",
+        "3-Pointers Made": "threes",
         "Steals": "steals",
         "Blocks": "blocks",
-    }.get(market, "points")
+    }.get(market)
+    if key is None:
+        # Shooting % / FGM / FGA etc. need box-score fields we may not have yet.
+        return []
     vals = []
     for row in logs:
         v = getattr(row, key, None)

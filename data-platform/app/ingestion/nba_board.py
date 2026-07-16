@@ -37,7 +37,21 @@ from app.providers.registry import get_nba_providers
 
 log = logging.getLogger(__name__)
 
-MARKETS_FOR_BOARD = ("Points", "Rebounds", "Assists")
+MARKETS_FOR_BOARD = (
+    "Points",
+    "Rebounds",
+    "Assists",
+    "Threes",
+    "Steals",
+    "Blocks",
+    "Turnovers",
+    "PRA",
+    "Pts+Rebs",
+    "Pts+Asts",
+    "Rebs+Asts",
+    "Steals+Blocks",
+    "Fantasy Score",
+)
 
 
 def _team_abbr(db: Session, team_id: Optional[str]) -> str:

@@ -33,10 +33,17 @@ SPORT_KEYS = {
     "WTA": "tennis_wta_french_open",
 }
 
+_BASKETBALL_ODDS_MARKETS = (
+    "player_points,player_rebounds,player_assists,player_threes,"
+    "player_steals,player_blocks,player_turnovers,"
+    "player_points_rebounds,player_points_assists,player_rebounds_assists,"
+    "player_points_rebounds_assists,player_double_double"
+)
+
 PROP_MARKETS = {
-    "NBA": "player_points,player_rebounds,player_assists",
+    "NBA": _BASKETBALL_ODDS_MARKETS,
     "NFL": "player_pass_yds,player_rush_yds,player_reception_yds",
-    "WNBA": "player_points,player_rebounds,player_assists",
+    "WNBA": _BASKETBALL_ODDS_MARKETS,
     "MLB": "batter_hits,batter_home_runs,batter_total_bases",
     "NHL": "player_points,player_goals,player_assists,player_shots_on_goal",
     "Soccer": "player_goal_scorer_anytime",
@@ -49,6 +56,15 @@ MARKET_LABELS = {
     "player_points": "Points",
     "player_rebounds": "Rebounds",
     "player_assists": "Assists",
+    "player_threes": "Threes",
+    "player_steals": "Steals",
+    "player_blocks": "Blocks",
+    "player_turnovers": "Turnovers",
+    "player_points_rebounds": "Pts+Rebs",
+    "player_points_assists": "Pts+Asts",
+    "player_rebounds_assists": "Rebs+Asts",
+    "player_points_rebounds_assists": "PRA",
+    "player_double_double": "Double Double",
     "player_pass_yds": "Pass Yards",
     "player_rush_yds": "Rush Yards",
     "player_reception_yds": "Receiving Yards",

@@ -129,16 +129,36 @@ def nba_players(db: Session = Depends(get_db)):
 
 
 @router.get("/players/{player_id}")
-def nba_player_detail(player_id: str, db: Session = Depends(get_db)):
+def nba_player_detail(
+    player_id: str,
+    platform: Optional[str] = Query(
+        None,
+        description="Pick'em app id: prizepicks | underdog | sleeper — list every market that app has for this athlete",
+    ),
+    db: Session = Depends(get_db),
+):
+    from app.ingestion.multisport_player import get_multisport_player_profile
+    from app.ingestion.pickem_platform_sync import ensure_pickem_platform_board
+    from app.ingestion.platform_board import normalize_pickem_app
+
+    app = normalize_pickem_app(platform) if platform else None
+    if app:
+        ensure_pickem_platform_board(db, league="NBA", platform=app, refresh=False)
+        profile = get_multisport_player_profile(
+            db, league="NBA", player_key=player_id, platform=app
+        )
+        if profile and (profile.get("markets") or []):
+            return {"ok": True, "player": profile, "live": True, "platform": app}
+
     ensure_nba_board(db, force=False)
     profile = get_nba_player_profile(db, player_id)
     if not profile or not (profile.get("markets") or []):
-        from app.ingestion.multisport_player import get_multisport_player_profile
-
-        profile = get_multisport_player_profile(db, league="NBA", player_key=player_id)
+        profile = get_multisport_player_profile(
+            db, league="NBA", player_key=player_id, platform=app
+        )
     if not profile or not (profile.get("markets") or []):
         raise HTTPException(status_code=404, detail="Player not found")
-    return {"ok": True, "player": profile, "live": True}
+    return {"ok": True, "player": profile, "live": True, "platform": app}
 
 
 @router.get("/featured-prop")

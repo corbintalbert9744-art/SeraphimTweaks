@@ -169,22 +169,8 @@ export default function PlayerPage() {
       }
 
       const encoded = encodeURIComponent(playerId);
-      // Prefer league-specific endpoints; try encoded + raw variants.
-      const leagueTries: Array<{ path: string; league: string; href: string }> = [
-        { path: `/api/mlb/players/${encoded}`, league: "MLB", href: "/mlb" },
-        { path: `/api/wnba/players/${encoded}`, league: "WNBA", href: "/wnba" },
-        { path: `/api/nba/players/${encoded}`, league: "NBA", href: "/nba" },
-        { path: `/api/nhl/players/${encoded}`, league: "NHL", href: "/nhl" },
-        { path: `/api/nfl/players/${encoded}`, league: "NFL", href: "/nfl" },
-        { path: `/api/soccer/players/${encoded}`, league: "Soccer", href: "/soccer" },
-        { path: `/api/tennis/players/${encoded}`, league: "ATP", href: "/tennis" },
-      ];
-      for (const t of leagueTries) {
-        const hit = await tryLeague(t.path, t.league, t.href);
-        if (hit) return hit;
-      }
-
-      // Multi-sport boards: build a research profile from open props.
+      // Prefer the selected pick'em app so every market that app lists for the
+      // athlete (cores, combos, fantasy, …) appears as research tabs.
       let platformQs = "";
       try {
         const saved = localStorage.getItem("seraphim.pickemApp");
@@ -192,6 +178,23 @@ export default function PlayerPage() {
       } catch {
         /* ignore */
       }
+
+      // Prefer league-specific endpoints; try encoded + raw variants.
+      const leagueTries: Array<{ path: string; league: string; href: string }> = [
+        { path: `/api/mlb/players/${encoded}${platformQs}`, league: "MLB", href: "/mlb" },
+        { path: `/api/wnba/players/${encoded}${platformQs}`, league: "WNBA", href: "/wnba" },
+        { path: `/api/nba/players/${encoded}${platformQs}`, league: "NBA", href: "/nba" },
+        { path: `/api/nhl/players/${encoded}${platformQs}`, league: "NHL", href: "/nhl" },
+        { path: `/api/nfl/players/${encoded}${platformQs}`, league: "NFL", href: "/nfl" },
+        { path: `/api/soccer/players/${encoded}${platformQs}`, league: "Soccer", href: "/soccer" },
+        { path: `/api/tennis/players/${encoded}${platformQs}`, league: "ATP", href: "/tennis" },
+      ];
+      for (const t of leagueTries) {
+        const hit = await tryLeague(t.path, t.league, t.href);
+        if (hit) return hit;
+      }
+
+      // Multi-sport boards: build a research profile from open props.
       const boardSources: Array<{ path: string; league: string; boardHref: string }> = [
         { path: `/api/wnba/props${platformQs}`, league: "WNBA", boardHref: "/wnba" },
         { path: `/api/nba/props${platformQs}`, league: "NBA", boardHref: "/nba" },

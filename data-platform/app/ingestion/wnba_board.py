@@ -37,15 +37,20 @@ from app.providers.registry import get_wnba_providers
 
 log = logging.getLogger(__name__)
 
-MARKETS_FOR_BOARD = (
+MARKETS_FOR_BOARD = (  # ESPN research slate — pick'em sync may add still more per athlete
     "Points",
     "Rebounds",
     "Assists",
     "Threes",
+    "Steals",
+    "Blocks",
+    "Turnovers",
     "PRA",
     "Pts+Rebs",
     "Pts+Asts",
     "Rebs+Asts",
+    "Steals+Blocks",
+    "Fantasy Score",
 )
 
 
@@ -790,25 +795,10 @@ def _market_attr(market: str) -> str:
 
 
 def _stat_from_log(r: PlayerGameLog, market: str) -> Optional[float]:
-    if market in ("PRA", "Pts+Rebs+Asts"):
-        if r.points is None and r.rebounds is None and r.assists is None:
-            return None
-        return float(r.points or 0) + float(r.rebounds or 0) + float(r.assists or 0)
-    if market in ("PR", "Pts+Rebs"):
-        if r.points is None and r.rebounds is None:
-            return None
-        return float(r.points or 0) + float(r.rebounds or 0)
-    if market in ("PA", "Pts+Asts"):
-        if r.points is None and r.assists is None:
-            return None
-        return float(r.points or 0) + float(r.assists or 0)
-    if market in ("RA", "Rebs+Asts"):
-        if r.rebounds is None and r.assists is None:
-            return None
-        return float(r.rebounds or 0) + float(r.assists or 0)
-    attr = _market_attr(market)
-    v = getattr(r, attr, None)
-    return float(v) if v is not None else None
+    from app.ingestion.nba_pipeline import _market_values
+
+    vals = _market_values([r], market)
+    return vals[0] if vals else None
 
 
 def _parse_hit_label(label: str) -> tuple[int, int, float]:
