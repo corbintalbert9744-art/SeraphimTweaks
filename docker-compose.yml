@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: seraphim
+      POSTGRES_PASSWORD: seraphim
+      POSTGRES_DB: seraphim_analytics
+    ports:
+      - "5432:5432"
+    volumes:
+      - seraphim_pg:/var/lib/postgresql/data
+
+volumes:
+  seraphim_pg:
