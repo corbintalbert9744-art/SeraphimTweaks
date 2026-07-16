@@ -11,8 +11,11 @@ import {
   getCachedNbaProp,
 } from "@/lib/nbaLiveCache";
 import {
+  PROP_LINE_STEP,
+  applyLineOverride,
   asLivePlayerResearch,
   getPlayerResearchFromProps,
+  normalizePropLine,
   type ChartGame,
   type PlayerResearchProfile,
 } from "@/lib/playerResearchProfile";
@@ -282,16 +285,32 @@ export default function PlayerPage() {
   const [marketIdx, setMarketIdx] = useState(0);
   const [side, setSide] = useState<"Over" | "Under" | null>(null);
   const [windowKey, setWindowKey] = useState("l10");
+  /** Per-prop desk line overrides (shared player page — all leagues). */
+  const [lineOverrides, setLineOverrides] = useState<Record<string, number>>({});
 
   const markets = profile?.markets ?? [];
   useEffect(() => {
     setMarketIdx(0);
     setSide(null);
     setWindowKey("l10");
+    setLineOverrides({});
   }, [playerId]);
 
-  const market = markets[Math.min(marketIdx, Math.max(0, markets.length - 1))] ?? null;
+  const baseMarket = markets[Math.min(marketIdx, Math.max(0, markets.length - 1))] ?? null;
+  const market = useMemo(() => {
+    if (!baseMarket) return null;
+    const override = lineOverrides[baseMarket.propId];
+    if (override == null) return baseMarket;
+    return applyLineOverride(baseMarket, override);
+  }, [baseMarket, lineOverrides]);
   const selectedSide = (side ?? market?.side ?? "Over") as "Over" | "Under";
+
+  function nudgeLine(delta: number) {
+    if (!baseMarket) return;
+    const current = lineOverrides[baseMarket.propId] ?? baseMarket.line;
+    const next = normalizePropLine(current + delta);
+    setLineOverrides((prev) => ({ ...prev, [baseMarket.propId]: next }));
+  }
 
   useEffect(() => {
     if (boardProps.data?.props?.length) {
@@ -330,6 +349,7 @@ export default function PlayerPage() {
 
   function addCurrent(overrideSide?: "Over" | "Under") {
     const s = overrideSide ?? selectedSide;
+    const line = market!.line;
     let leg = propIdToBuilderLeg(market!.propId);
     if (!leg) {
       const cached = getCachedNbaProp(market!.propId);
@@ -344,7 +364,7 @@ export default function PlayerPage() {
           position: profile!.position,
           market: market!.market as NbaProp["market"],
           side: market!.side === "Under" ? "Under" : "Over",
-          line: market!.line,
+          line,
           americanOdds: market!.americanOdds,
           noVigProb: market!.overProbability ?? 0.5,
           evPercent: market!.evPercent,
@@ -357,9 +377,9 @@ export default function PlayerPage() {
           projectedMinutes: 32,
           injury: "None",
         } as NbaProp);
-      leg = nbaToBuilderLeg({ ...row, side: s });
+      leg = nbaToBuilderLeg({ ...row, side: s, line });
     } else {
-      leg = { ...leg, side: s };
+      leg = { ...leg, side: s, line };
     }
     addLeg(leg);
   }
@@ -473,7 +493,7 @@ export default function PlayerPage() {
           markets={markets.map((m) => ({
             id: m.propId,
             label: m.market,
-            line: m.line,
+            line: lineOverrides[m.propId] ?? m.line,
           }))}
           activeIndex={marketIdx}
           onSelect={(i) => {
@@ -492,21 +512,25 @@ export default function PlayerPage() {
               {market.market}
             </h2>
             <p className="mt-1 text-sm text-neutral-400">
-              {market.side} {market.line} · proj {market.projectedValue.toFixed(1)} ·{" "}
+              {selectedSide} {market.line} · proj {market.projectedValue.toFixed(1)} ·{" "}
               <span className={leanTextClass(market.side)}>
                 {market.edgeVsLine > 0 ? "+" : ""}
                 {market.edgeVsLine.toFixed(1)} vs line
               </span>
+              {market.platformLine != null && market.platformLine !== market.line ? (
+                <span className="ml-1.5 text-neutral-600">
+                  (board {market.platformLine})
+                </span>
+              ) : null}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 rounded-xl border border-[#222] bg-[#0c0c0c] px-2 py-1.5">
               <button
                 type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white"
-                onClick={() => {
-                  /* line is from market; UI affordance for desk parity */
-                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                onClick={() => nudgeLine(-PROP_LINE_STEP)}
+                disabled={market.line <= PROP_LINE_STEP}
                 aria-label="Lower line"
               >
                 −
@@ -516,7 +540,9 @@ export default function PlayerPage() {
               </span>
               <button
                 type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                onClick={() => nudgeLine(PROP_LINE_STEP)}
+                disabled={market.line >= 200}
                 aria-label="Higher line"
               >
                 +
@@ -660,7 +686,7 @@ export default function PlayerPage() {
                         className="min-w-0 flex-1 text-left"
                       >
                         <span className="block text-neutral-200">
-                          {m.market} · {m.side} {m.line}
+                          {m.market} · {m.side} {lineOverrides[m.propId] ?? m.line}
                         </span>
                         <span className={cn("mt-0.5 block text-xs tabular-nums", leanTextClass(m.side))}>
                           Proj {m.projectedValue.toFixed(1)} ·{" "}
@@ -878,7 +904,7 @@ export default function PlayerPage() {
                     )}
                   >
                     <span>{m.market}</span>
-                    <span className="tabular-nums">{m.line}</span>
+                    <span className="tabular-nums">{lineOverrides[m.propId] ?? m.line}</span>
                   </button>
                 </li>
               ))}

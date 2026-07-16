@@ -38,7 +38,64 @@ export type PlayerMarket = {
   why: string;
   hitWindows: HitWindow[];
   chartGames: ChartGame[];
+  /** Platform / board line before any desk stepper override. */
+  platformLine?: number;
 };
+
+/** Standard player-prop tick (14.5 → 14.0 → 13.5 …). */
+export const PROP_LINE_STEP = 0.5;
+
+export function normalizePropLine(line: number): number {
+  if (!Number.isFinite(line)) return PROP_LINE_STEP;
+  return Math.max(PROP_LINE_STEP, Math.round(line * 2) / 2);
+}
+
+/** Recompute edge / hit rates / chart hits for a user-adjusted research line. */
+export function applyLineOverride(market: PlayerMarket, line: number): PlayerMarket {
+  const platformLine = market.platformLine ?? market.line;
+  const next = normalizePropLine(line);
+  const side = market.side === "Under" ? "Under" : "Over";
+  const edgeVsLine =
+    side === "Over" ? market.projectedValue - next : next - market.projectedValue;
+  const edgePercent = next ? (edgeVsLine / next) * 100 : 0;
+  const chartGames = market.chartGames.map((g) => ({
+    ...g,
+    hit: side === "Over" ? g.value > next : g.value < next,
+  }));
+
+  const hitWindows = market.hitWindows.map((w) => {
+    const take =
+      w.key === "l5" ? 5 : w.key === "l10" ? 10 : w.key === "l20" ? 20 : chartGames.length;
+    const slice = chartGames.slice(0, Math.min(take, chartGames.length));
+    if (!slice.length) {
+      return { ...w };
+    }
+    const hits = slice.filter((g) => (side === "Over" ? g.value > next : g.value < next)).length;
+    const average =
+      w.key === "matchup" && w.average == null
+        ? null
+        : Number((slice.reduce((sum, g) => sum + g.value, 0) / slice.length).toFixed(1));
+    return {
+      ...w,
+      average: w.key === "matchup" && (w.average == null || !Number.isFinite(w.average))
+        ? w.average
+        : average,
+      hitRate: hits / slice.length,
+      hitPct: Math.round((hits / slice.length) * 100),
+      hits: `${hits}/${slice.length}`,
+    };
+  });
+
+  return {
+    ...market,
+    platformLine,
+    line: next,
+    edgeVsLine: Number(edgeVsLine.toFixed(2)),
+    edgePercent: Number(edgePercent.toFixed(1)),
+    chartGames,
+    hitWindows,
+  };
+}
 
 export type PlayerResearchProfile = {
   id: string;
@@ -202,6 +259,7 @@ function marketFromProp(prop: BoardProp, insight?: string): PlayerMarket {
     market: prop.market,
     side: prop.side,
     line: prop.line,
+    platformLine: prop.line,
     americanOdds: prop.americanOdds,
     projectedValue,
     edgeVsLine: Number(edgeVsLine.toFixed(2)),
@@ -320,6 +378,12 @@ export function asLivePlayerResearch(player: PlayerResearchProfile): PlayerResea
     ...player,
     live: true,
     boardHref: player.boardHref || "/nba",
+    markets: (player.markets ?? []).map((m) => ({
+      ...m,
+      platformLine: m.platformLine ?? m.line,
+      chartGames: Array.isArray(m.chartGames) ? m.chartGames : [],
+      hitWindows: Array.isArray(m.hitWindows) ? m.hitWindows : [],
+    })),
   };
 }
 
