@@ -18,6 +18,7 @@ import {
   getCachedNbaPropDetail,
 } from "@/lib/nbaLiveCache";
 import { recomputeLegSide } from "@/lib/legStats";
+import { playerProfilePath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
 import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
@@ -384,7 +385,7 @@ export default function PropDetailPage() {
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <LeagueBadge league={prop.league} />
           <Link
-            href={`/player/${prop.playerId}`}
+            href={playerProfilePath(prop.playerId)}
             className="text-sm font-medium text-yellow-400 hover:underline"
           >
             Open Player Profile

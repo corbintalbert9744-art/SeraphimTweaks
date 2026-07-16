@@ -387,6 +387,21 @@ def _group_platform_quotes(
     return list(buckets.values())
 
 
+def _board_player_ids(player: Optional[Player]) -> tuple[str, Optional[str], Optional[str]]:
+    """Return (linkId, externalId, warehouseId) for board cards / profile URLs.
+
+    Prefer a short ESPN/MLB provider id so client routes never need colon-heavy
+    warehouse keys like ``wnba:player:pickem:…``.
+    """
+    if player is None:
+        return ("", None, None)
+    warehouse = player.id
+    ext = str(player.external_id or "").strip() or None
+    if ext and not ext.startswith("pickem:"):
+        return (ext, ext, warehouse)
+    return (warehouse or ext or "", ext, warehouse)
+
+
 def _game_label(row: dict[str, Any]) -> str:
     home = row.get("home_team")
     away = row.get("away_team")
@@ -926,10 +941,9 @@ def sync_pickem_platform_board(
             board_rows.append(
                 {
                     "id": prop.id,
-                    # Warehouse id is stable for /player/:id profile lookups
-                    "playerId": player.id,
-                    "playerExternalId": player.external_id,
-                    "playerWarehouseId": player.id,
+                    "playerId": _board_player_ids(player)[0],
+                    "playerExternalId": _board_player_ids(player)[1],
+                    "playerWarehouseId": _board_player_ids(player)[2],
                     "player": player.full_name,
                     "team": team,
                     "opponent": opponent,
@@ -1235,7 +1249,12 @@ def _players_from_board(props: list[dict[str, Any]], label: str) -> list[dict[st
         ),
     )
     for p in ordered:
-        pid = str(p.get("playerWarehouseId") or p.get("playerId") or "")
+        pid = str(
+            p.get("playerId")
+            or p.get("playerExternalId")
+            or p.get("playerWarehouseId")
+            or ""
+        )
         if not pid or pid in seen:
             continue
         seen.add(pid)
@@ -1258,6 +1277,8 @@ def _players_from_board(props: list[dict[str, Any]], label: str) -> list[dict[st
                 "topSide": p.get("side"),
                 "topLine": p.get("line"),
                 "topLean": f"{p.get('side')} {p.get('line')}",
+                "playerWarehouseId": p.get("playerWarehouseId"),
+                "playerExternalId": p.get("playerExternalId"),
             }
         )
     return out
@@ -1505,10 +1526,9 @@ def _list_cached_platform_board(
         board.append(
             {
                 "id": prop.id,
-                "playerId": (player.id if player else "")
-                or (player.external_id if player else ""),
-                "playerExternalId": player.external_id if player else None,
-                "playerWarehouseId": player.id if player else None,
+                "playerId": _board_player_ids(player)[0],
+                "playerExternalId": _board_player_ids(player)[1],
+                "playerWarehouseId": _board_player_ids(player)[2],
                 "player": player.full_name if player else "Player",
                 "team": team,
                 "opponent": opponent,

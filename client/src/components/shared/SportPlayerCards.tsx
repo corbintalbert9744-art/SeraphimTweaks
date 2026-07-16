@@ -5,6 +5,7 @@ import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { propIdToBuilderLeg } from "@/lib/addPropToBuilder";
 import type { SportBoardCard } from "@/lib/playerResearchProfile";
 import { leanTextClass } from "@/lib/leanTheme";
+import { playerProfilePath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
 
 export function SportPlayerCards({
@@ -39,7 +40,7 @@ export function SportPlayerCards({
             >
               <div className="flex items-start gap-3">
                 <Link
-                  href={`/player/${player.id}`}
+                  href={playerProfilePath(player.id)}
                   className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-yellow-500/35 bg-gradient-to-br from-yellow-400/20 to-amber-700/10 text-sm font-semibold text-yellow-300 transition hover:scale-105"
                 >
                   {player.initials}
@@ -48,7 +49,7 @@ export function SportPlayerCards({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <h3 className="truncate font-semibold text-white">
-                        <Link href={`/player/${player.id}`} className="hover:text-yellow-400">
+                        <Link href={playerProfilePath(player.id)} className="hover:text-yellow-400">
                           {player.name}
                         </Link>
                       </h3>

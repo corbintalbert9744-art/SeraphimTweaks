@@ -4,6 +4,7 @@ import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import type { NflPlayerCard, NflProp } from "@/data/nflMock";
 import { nflToBuilderLeg } from "@/lib/builderMappers";
+import { playerProfilePath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
 
 export function NflPlayerCards({
@@ -44,7 +45,7 @@ export function NflPlayerCards({
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <h3 className="truncate font-semibold text-white">
-                        <Link href={`/player/${player.id}`} className="hover:text-yellow-400">
+                        <Link href={playerProfilePath(player.id)} className="hover:text-yellow-400">
                           {player.name}
                         </Link>
                       </h3>

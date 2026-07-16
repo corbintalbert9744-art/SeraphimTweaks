@@ -6,6 +6,7 @@ import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import type { LeagueCode } from "@/data/mock";
+import { playerProfilePath } from "@/lib/playerLinks";
 
 type HubCard = {
   id: string;
@@ -118,7 +119,7 @@ export default function PlayersHubPage() {
         {players.map((player) => (
           <Link
             key={`${player.league}-${player.id}`}
-            href={`/player/${player.id}`}
+            href={playerProfilePath(player.id)}
             className="card-3d rounded-2xl border border-[#1a1a1a] bg-[#0c0c0c]/80 p-5 transition hover:border-yellow-500/25"
           >
             <div className="flex items-start gap-3">

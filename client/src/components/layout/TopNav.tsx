@@ -5,11 +5,12 @@ import { Bell, LogOut, Menu, Search, Settings, User } from "lucide-react";
 import type { PlayerSearchResult } from "@/data/mock";
 import { useToast } from "@/hooks/use-toast";
 import { useMembership } from "@/context/MembershipContext";
+import { playerProfilePath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 
 function hrefForPlayer(player: PlayerSearchResult): string {
-  return `/player/${player.id}`;
+  return playerProfilePath(player.id);
 }
 
 async function fetchPlayers(path: string, league: string): Promise<PlayerSearchResult[]> {

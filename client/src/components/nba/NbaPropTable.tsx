@@ -6,6 +6,7 @@ import { LeanBadge } from "@/components/shared/LeanBadge";
 import { type NbaProp } from "@/data/nbaMock";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
 import { leanTextClass } from "@/lib/leanTheme";
+import { playerProfilePath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
 
 function edgePercentDisplay(row: NbaProp): number | null {
@@ -72,7 +73,7 @@ export function NbaPropTable({
                 <tr key={row.id} className="transition hover:bg-white/[0.02]">
                   <td className="px-4 py-4">
                     <Link
-                      href={`/player/${row.playerId}`}
+                      href={playerProfilePath(row.playerId)}
                       className="font-medium text-neutral-100 hover:text-yellow-400"
                     >
                       {row.player}
