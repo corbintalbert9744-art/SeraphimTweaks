@@ -76,6 +76,9 @@ export function asNbaPropFromApi(row: Record<string, unknown>): NbaProp {
     noVigProb: Number(row.noVigProb ?? 0.5),
     evPercent: Number(row.evPercent ?? 0),
     confidence: Number(row.confidence ?? 50),
+    researchScore: Number(row.researchScore ?? row.confidence ?? 50),
+    projectedValue: row.projectedValue != null ? Number(row.projectedValue) : undefined,
+    edgeVsLine: row.edgeVsLine != null ? Number(row.edgeVsLine) : null,
     l5: String(row.l5 ?? "0/0"),
     l10: String(row.l10 ?? "0/0"),
     l20: String(row.l20 ?? "0/0"),
@@ -89,6 +92,22 @@ export function asNbaPropFromApi(row: Record<string, unknown>): NbaProp {
 export function asPropDetailFromApi(row: Record<string, unknown>): PropDetail {
   const side = (row.side === "Under" ? "Under" : "Over") as "Over" | "Under";
   const noVig = Number(row.noVigProb ?? 0.5);
+  const booksRaw = Array.isArray(row.books)
+    ? (row.books as PropDetail["books"])
+    : Array.isArray(row.lines)
+      ? (row.lines as PropDetail["books"])
+      : [];
+  const books =
+    booksRaw.length > 0
+      ? booksRaw
+      : [
+          {
+            book: "DraftKings",
+            line: Number(row.line ?? 0),
+            over: Number(row.americanOdds ?? -110),
+            under: -110,
+          },
+        ];
   return {
     id: String(row.id),
     league: "NBA",
@@ -114,16 +133,7 @@ export function asPropDetailFromApi(row: Record<string, unknown>): PropDetail {
     tipTime: String(row.tipTime ?? ""),
     why: String(row.why ?? row.matchupNote ?? "Seraphim model estimate"),
     checks: Array.isArray(row.checks) ? (row.checks as PropDetail["checks"]) : [],
-    books: Array.isArray(row.books) && (row.books as PropDetail["books"]).length
-      ? (row.books as PropDetail["books"])
-      : [
-          {
-            book: "DraftKings",
-            line: Number(row.line ?? 0),
-            over: Number(row.americanOdds ?? -110),
-            under: -110,
-          },
-        ],
+    books,
     movement: Array.isArray(row.movement) ? (row.movement as PropDetail["movement"]) : [],
     analysis: Array.isArray(row.analysis)
       ? (row.analysis as string[])
@@ -137,5 +147,19 @@ export function asPropDetailFromApi(row: Record<string, unknown>): PropDetail {
       note: "Matchup rankings fill as team_stats land in the warehouse.",
     },
     similarPropIds: Array.isArray(row.similarPropIds) ? (row.similarPropIds as string[]) : [],
+    projectedValue: row.projectedValue != null ? Number(row.projectedValue) : undefined,
+    recommendation: (row.recommendation as "Over" | "Under") || side,
+    edgeVsLine: row.edgeVsLine != null ? Number(row.edgeVsLine) : null,
+    overProbability: row.overProbability != null ? Number(row.overProbability) : undefined,
+    underProbability: row.underProbability != null ? Number(row.underProbability) : undefined,
+    bestValueBook: row.bestValueBook != null ? String(row.bestValueBook) : books.find((b) => b.isBestValue)?.book,
+    linesAreMock: Boolean(row.linesAreMock ?? books.some((b) => b.isMock)),
+    homeAway: row.homeAway as PropDetail["homeAway"],
+    minutesTrend: row.minutesTrend as PropDetail["minutesTrend"],
+    projectedMinutes: row.projectedMinutes != null ? Number(row.projectedMinutes) : undefined,
+    usageRate: row.usageRate != null ? Number(row.usageRate) : undefined,
+    opponentHistory: row.opponentHistory as PropDetail["opponentHistory"],
+    injuryImpact: row.injuryImpact as PropDetail["injuryImpact"],
+    hitRates: row.hitRates as PropDetail["hitRates"],
   };
 }

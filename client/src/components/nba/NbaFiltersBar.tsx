@@ -83,8 +83,11 @@ export function NbaFiltersBar({
             label="Sort by"
             value={filters.sortKey}
             options={[
-              { value: "ev", label: "EV" },
+              { value: "edge", label: "Model edge" },
+              { value: "ev", label: "Expected value" },
               { value: "confidence", label: "Confidence" },
+              { value: "researchScore", label: "Research Score" },
+              { value: "projection", label: "Projection" },
               { value: "noVig", label: "No-Vig" },
               { value: "l10", label: "L10" },
               { value: "player", label: "Player" },
@@ -109,7 +112,7 @@ export function NbaFiltersBar({
 
       <div className="mt-4 flex items-center justify-between border-t border-[#151515] pt-3">
         <p className="text-xs text-neutral-500">
-          Showing <span className="text-neutral-300">{resultCount}</span> NBA props · mock slate
+          Showing <span className="text-neutral-300">{resultCount}</span> NBA props · live model board
         </p>
         <button
           type="button"
@@ -121,7 +124,7 @@ export function NbaFiltersBar({
               team: "All",
               side: "All",
               minConfidence: 60,
-              sortKey: "ev",
+              sortKey: "edge",
               sortDir: "desc",
             })
           }

@@ -14,6 +14,13 @@ export interface BookQuote {
   line: number;
   over: number;
   under: number;
+  kind?: "sportsbook" | "pickem";
+  slug?: string;
+  isMock?: boolean;
+  edgeVsProjection?: number;
+  isBestValue?: boolean;
+  projectedValue?: number;
+  modelSide?: "Over" | "Under";
 }
 
 export interface OpponentDefense {
@@ -57,6 +64,48 @@ export interface PropDetail {
   analysis: string[];
   opponentDefense: OpponentDefense;
   similarPropIds: string[];
+  /** Seraphim model projection — independent of sportsbook lines */
+  projectedValue?: number;
+  recommendation?: "Over" | "Under";
+  edgeVsLine?: number | null;
+  overProbability?: number;
+  underProbability?: number;
+  bestValueBook?: string;
+  linesAreMock?: boolean;
+  homeAway?: {
+    home: { samples: number; average: number | null; rate?: number | null };
+    away: { samples: number; average: number | null; rate?: number | null };
+  };
+  minutesTrend?: Array<{
+    date: string;
+    minutes: number;
+    value: number | null;
+    opponent: string;
+    home: boolean;
+  }>;
+  projectedMinutes?: number;
+  usageRate?: number;
+  opponentHistory?: {
+    opponent: string;
+    meetings: number;
+    average: number | null;
+    recent: Array<{ date: string; value: number | null; minutes?: number | null; home: boolean }>;
+  };
+  injuryImpact?: {
+    status: string;
+    detail: string;
+    affectsProjection: boolean;
+  };
+  hitRates?: {
+    l5?: string;
+    l10?: string;
+    l20?: string;
+    season?: string;
+    homeRate?: number | null;
+    awayRate?: number | null;
+    streak?: number | null;
+    restDays?: number | null;
+  };
 }
 
 function scoreFromChecks(checks: ResearchCheck[]): number {

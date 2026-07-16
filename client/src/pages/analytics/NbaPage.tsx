@@ -19,7 +19,7 @@ const defaultFilters: NbaBoardFilters = {
   team: "All",
   side: "All",
   minConfidence: 50,
-  sortKey: "ev",
+  sortKey: "edge",
   sortDir: "desc",
 };
 
@@ -27,10 +27,16 @@ function sortProps(rows: NbaProp[], filters: NbaBoardFilters): NbaProp[] {
   const dir = filters.sortDir === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => {
     switch (filters.sortKey) {
+      case "edge":
+        return ((a.edgeVsLine ?? 0) - (b.edgeVsLine ?? 0)) * dir;
       case "ev":
         return (a.evPercent - b.evPercent) * dir;
       case "confidence":
         return (a.confidence - b.confidence) * dir;
+      case "researchScore":
+        return ((a.researchScore ?? a.confidence) - (b.researchScore ?? b.confidence)) * dir;
+      case "projection":
+        return ((a.projectedValue ?? a.line) - (b.projectedValue ?? b.line)) * dir;
       case "noVig":
         return (a.noVigProb - b.noVigProb) * dir;
       case "l10":

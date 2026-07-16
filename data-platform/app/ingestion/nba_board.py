@@ -29,8 +29,8 @@ from app.ingestion.warehouse import (
     upsert_player,
     upsert_prop,
 )
+from app.providers.comparison_lines import edge_vs_projection, get_comparison_lines_provider
 from app.providers.base import NormalizedGame, NormalizedPlayer
-from app.providers.mock.odds import MockOddsProvider
 from app.providers.registry import get_nba_providers
 
 log = logging.getLogger(__name__)
@@ -112,12 +112,13 @@ def _build_one_prop(
     side = "Over" if prediction.projected_value >= comparison_line else "Under"
     line = comparison_line
 
-    quotes = MockOddsProvider().quote_for_prop(
+    quotes = get_comparison_lines_provider().to_odds_quotes(
         league="NBA",
         player_name=player.full_name,
         player_external_id=athlete.external_id,
         market=market,
-        line=line,
+        baseline_line=line,
+        projected_value=prediction.projected_value,
         game_external_id=game.external_id,
     )
     odds_are_mock = True
@@ -130,7 +131,9 @@ def _build_one_prop(
                 if q.market == market and player.full_name.lower() in q.player_name.lower()
             ]
             if live:
-                quotes = live
+                # Keep pick'em mocks for comparison UI; overlay live sportsbook quotes.
+                pickem = [q for q in quotes if q.sportsbook_slug in {"prizepicks", "underdog", "sleeper", "parlayplay"}]
+                quotes = live + pickem
                 odds_are_mock = False
                 comparison_line = float(live[0].line)
                 prediction = predict_prop(ctx, comparison_line=comparison_line)
@@ -436,48 +439,168 @@ def get_nba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
         return None
     analytics = db.execute(select(PropAnalytics).where(PropAnalytics.prop_id == prop_id)).scalar_one_or_none()
     odds = db.execute(select(Odds).where(Odds.prop_id == prop_id).order_by(Odds.captured_at.desc())).scalars().all()
+    projected = float(base.get("projectedValue") or (analytics.projected_value if analytics else 0) or 0)
+    model_side = str(base.get("side") or "Over")
+
+    pickem_slugs = {"prizepicks", "underdog", "sleeper", "parlayplay"}
     by_book: dict[str, dict] = {}
     for o in odds:
         book = db.get(Sportsbook, o.sportsbook_id)
         name = book.name if book else "Book"
+        slug = book.slug if book else name.lower().replace(" ", "")
+        kind = "pickem" if slug in pickem_slugs else "sportsbook"
         slot = by_book.setdefault(
             name,
-            {"book": name, "line": o.line, "over": -110, "under": -110, "isMock": o.is_mock},
+            {
+                "book": name,
+                "slug": slug,
+                "kind": kind,
+                "line": o.line,
+                "over": -110,
+                "under": -110,
+                "isMock": o.is_mock,
+            },
         )
-        # Odds rows are comparison quotes for the prop side; mirror for the opposite.
         american = o.american_odds if o.american_odds is not None else -110
-        if base.get("side") == "Under":
-            slot["under"] = american
-            slot["over"] = -110 if american <= -100 else -round(abs(american) * 0.92)
-        else:
-            slot["over"] = american
-            slot["under"] = -110 if american <= -100 else -round(abs(american) * 0.92)
+        # Odds rows may be Over or Under — infer from American pairing isn't stored; use latest line.
+        if abs(american) >= 100:
+            # Prefer assigning to Over first then Under if we see a second tick
+            if slot["over"] == -110 or american <= -100:
+                slot["over"] = american
+            else:
+                slot["under"] = american
         slot["line"] = o.line
         slot["isMock"] = o.is_mock
-    books = list(by_book.values()) or [
-        {
-            "book": "DraftKings",
-            "line": base["line"],
-            "over": base["americanOdds"] if base.get("side") == "Over" else -110,
-            "under": base["americanOdds"] if base.get("side") == "Under" else -110,
-            "isMock": True,
-        }
-    ]
 
-    line = base["line"]
+    # Always enrich with comparison-lines provider so pick'em operators appear even on old rows.
+    provider_lines = get_comparison_lines_provider().quote_lines(
+        league="NBA",
+        player_name=str(base.get("player") or ""),
+        player_external_id=str(base.get("playerId") or "") or None,
+        market=str(base.get("market") or "Points"),
+        baseline_line=float(base.get("line") or projected),
+        projected_value=projected or float(base.get("line") or 0),
+    )
+    for row in provider_lines:
+        if row.name in by_book and by_book[row.name].get("kind") == "sportsbook" and not by_book[row.name].get("isMock"):
+            continue  # keep live sportsbook quotes
+        by_book[row.name] = {
+            "book": row.name,
+            "slug": row.slug,
+            "kind": row.kind,
+            "line": row.line,
+            "over": row.over,
+            "under": row.under,
+            "isMock": row.is_mock,
+        }
+
+    books: list[dict[str, Any]] = []
+    for slot in by_book.values():
+        edge = edge_vs_projection(projected, float(slot["line"]), model_side)
+        books.append(
+            {
+                **slot,
+                "edgeVsProjection": edge,
+                "projectedValue": projected,
+                "modelSide": model_side,
+            }
+        )
+    books.sort(key=lambda b: b.get("edgeVsProjection") or 0, reverse=True)
+    if books:
+        books[0]["isBestValue"] = True
+        for b in books[1:]:
+            b["isBestValue"] = False
+
+    line = float(base["line"])
     movement = [
         {"label": "Open", "line": line + 0.5, "odds": -110},
         {"label": "AM", "line": line, "odds": -110},
         {"label": "Now", "line": line, "odds": base["americanOdds"]},
     ]
 
+    # Research context from warehouse gamelogs
+    player = None
+    if base.get("playerWarehouseId"):
+        player = db.get(Player, base["playerWarehouseId"])
+    if not player and base.get("playerId"):
+        player = db.execute(
+            select(Player).where(
+                (Player.external_id == str(base["playerId"]))
+                | (Player.id == f"nba:player:{base['playerId']}")
+            )
+        ).scalar_one_or_none()
+
+    logs: list[PlayerGameLog] = []
+    if player:
+        logs = (
+            db.execute(
+                select(PlayerGameLog)
+                .where(PlayerGameLog.player_id == player.id)
+                .order_by(PlayerGameLog.played_at.desc())
+                .limit(25)
+            )
+            .scalars()
+            .all()
+        )
+
+    market = str(base.get("market") or "Points")
+    market_key = {
+        "Points": "points",
+        "Rebounds": "rebounds",
+        "Assists": "assists",
+    }.get(market, "points")
+
+    def _stat(r: PlayerGameLog) -> Optional[float]:
+        v = getattr(r, market_key, None)
+        return float(v) if v is not None else None
+
+    values = [v for v in (_stat(r) for r in logs) if v is not None]
+    home_vals = [float(_stat(r) or 0) for r in logs if r.home and _stat(r) is not None]
+    away_vals = [float(_stat(r) or 0) for r in logs if not r.home and _stat(r) is not None]
+    minutes_series = [
+        {
+            "date": r.played_at.strftime("%m/%d"),
+            "minutes": float(r.minutes or 0),
+            "value": _stat(r),
+            "opponent": r.opponent or "OPP",
+            "home": bool(r.home),
+        }
+        for r in reversed(logs[:12])
+    ]
+    recent_minutes = [float(r.minutes) for r in logs[:8] if r.minutes is not None]
+    avg_min = mean(recent_minutes) if recent_minutes else float(base.get("projectedMinutes") or 32)
+    # Rough usage proxy: share of team minutes band (display-only until play-by-play lands)
+    usage_rate = round(min(40.0, max(12.0, (avg_min / 48.0) * 100 * 0.85)), 1)
+
+    opp = str(base.get("opponent") or "OPP")
+    opp_logs = [r for r in logs if (r.opponent or "").upper() == opp.upper()]
+    opp_vals = [float(_stat(r) or 0) for r in opp_logs if _stat(r) is not None]
+
+    inj = None
+    if player:
+        inj = (
+            db.execute(
+                select(Injury)
+                .where(Injury.player_id == player.id)
+                .order_by(Injury.reported_at.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+        )
+
+    home_avg = round(mean(home_vals), 1) if home_vals else None
+    away_avg = round(mean(away_vals), 1) if away_vals else None
+
     return {
         **base,
         "league": "NBA",
+        "projectedValue": projected,
+        "recommendation": model_side,
         "noVigOpposite": round(1 - float(base.get("noVigProb") or 0.5), 4),
         "why": (analytics.why_payload or {}).get("headline") if analytics else base.get("matchupNote"),
         "checks": analytics.checks if analytics and analytics.checks else [],
         "books": books,
+        "lines": books,  # alias for pick'em + sportsbook comparison UI
+        "bestValueBook": books[0]["book"] if books else None,
         "movement": movement,
         "analysis": analytics.explain_bullets if analytics else [],
         "opponentDefense": {
@@ -487,15 +610,55 @@ def get_nba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
             "note": base.get("matchupNote")
             or "Matchup rankings fill as team_stats land in the warehouse.",
         },
+        "homeAway": {
+            "home": {"samples": len(home_vals), "average": home_avg, "rate": analytics.home_rate if analytics else None},
+            "away": {"samples": len(away_vals), "average": away_avg, "rate": analytics.away_rate if analytics else None},
+        },
+        "minutesTrend": minutes_series,
+        "projectedMinutes": base.get("projectedMinutes") or round(avg_min, 1),
+        "usageRate": usage_rate,
+        "opponentHistory": {
+            "opponent": opp,
+            "meetings": len(opp_vals),
+            "average": round(mean(opp_vals), 1) if opp_vals else None,
+            "recent": [
+                {
+                    "date": r.played_at.strftime("%b %d"),
+                    "value": _stat(r),
+                    "minutes": r.minutes,
+                    "home": bool(r.home),
+                }
+                for r in opp_logs[:6]
+            ],
+        },
+        "injuryImpact": {
+            "status": _injury_bucket(inj.status) if inj else base.get("injury") or "None",
+            "detail": (inj.detail or inj.status) if inj else "No active injury designation in warehouse.",
+            "affectsProjection": bool(inj) and _injury_bucket(inj.status) != "None",
+        },
+        "hitRates": {
+            "l5": base.get("l5"),
+            "l10": base.get("l10"),
+            "l20": base.get("l20"),
+            "season": base.get("season"),
+            "homeRate": analytics.home_rate if analytics else None,
+            "awayRate": analytics.away_rate if analytics else None,
+            "streak": analytics.streak if analytics else None,
+            "restDays": analytics.rest_days if analytics else None,
+        },
         "similarPropIds": [p["id"] for p in board.values() if p["id"] != prop_id][:4],
         "prediction": {
-            "projectedValue": base.get("projectedValue"),
+            "projectedValue": projected,
+            "recommendation": model_side,
             "overProbability": base.get("overProbability"),
             "underProbability": base.get("underProbability"),
+            "edgeVsLine": base.get("edgeVsLine"),
             "influentialFactors": base.get("influentialFactors"),
             "modelVersion": base.get("modelVersion"),
             "disclaimer": analytics.disclaimer if analytics else get_settings().model_disclaimer,
         },
+        "oddsRole": "comparison-only",
+        "linesAreMock": any(b.get("isMock") for b in books),
     }
 
 

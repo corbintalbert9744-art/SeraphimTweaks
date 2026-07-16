@@ -66,6 +66,18 @@ def provider_status() -> list[dict]:
             ),
         },
         {
+            "name": "mock-comparison-lines",
+            "leagues": ["NBA", "NFL", "WNBA"],
+            "capabilities": ["odds", "props", "pickem"],
+            "requires_api_key": False,
+            "is_mock": True,
+            "configured": True,
+            "notes": (
+                "MOCK sportsbook + pick'em comparison lines (PrizePicks, Underdog, Sleeper, ParlayPlay). "
+                "Swap via ComparisonLinesProvider without UI changes."
+            ),
+        },
+        {
             "name": "espn-wnba",
             "leagues": ["WNBA"],
             "capabilities": ["schedule", "gamelog", "injuries"],

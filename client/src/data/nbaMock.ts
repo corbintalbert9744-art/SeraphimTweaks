@@ -8,12 +8,15 @@ export type NbaMarket =
   | "Blocks";
 
 export type NbaSortKey =
+  | "edge"
   | "ev"
   | "confidence"
+  | "researchScore"
   | "noVig"
   | "l10"
   | "player"
-  | "line";
+  | "line"
+  | "projection";
 
 export interface NbaProp {
   id: string;
@@ -29,6 +32,9 @@ export interface NbaProp {
   noVigProb: number;
   evPercent: number;
   confidence: number;
+  researchScore?: number;
+  projectedValue?: number;
+  edgeVsLine?: number | null;
   l5: string;
   l10: string;
   l20: string;
