@@ -7,12 +7,10 @@ import { LeagueBadge } from "@/components/shared/LeagueBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import {
-  getPropDetail,
   formatAmericanOdds,
   bestBookForSide,
   type PropDetail,
 } from "@/data/propsCatalog";
-import "@/data/registerLeagueProps";
 import { propIdToBuilderLeg } from "@/lib/addPropToBuilder";
 import {
   asPropDetailFromApi,
@@ -125,25 +123,37 @@ function MinutesTrend({ points }: { points: NonNullable<PropDetail["minutesTrend
 export default function PropDetailPage() {
   const [, params] = useRoute("/prop/:id");
   const propId = params?.id ?? "";
-  const mockProp = getPropDetail(propId);
   const cached = getCachedNbaPropDetail(propId);
-  const looksNbaLive = propId.startsWith("nba:prop:") || (!mockProp && Boolean(propId));
 
   const live = useQuery({
-    queryKey: ["nba-prop", propId],
-    enabled: Boolean(propId) && looksNbaLive,
+    queryKey: ["live-prop", propId],
+    enabled: Boolean(propId),
     queryFn: async () => {
-      const res = await fetch(`/api/nba/props/${encodeURIComponent(propId)}`);
-      if (!res.ok) throw new Error("prop");
-      const data = await res.json();
-      const detail = asPropDetailFromApi((data.prop ?? data) as Record<string, unknown>);
-      cacheNbaPropDetail(detail);
-      return detail;
+      // Prefer NBA detail endpoint; fall back to board cache registration
+      const nbaRes = await fetch(`/api/nba/props/${encodeURIComponent(propId)}`);
+      if (nbaRes.ok) {
+        const data = await nbaRes.json();
+        const detail = asPropDetailFromApi((data.prop ?? data) as Record<string, unknown>);
+        cacheNbaPropDetail(detail);
+        return detail;
+      }
+      // NFL props: synthesize report from board cache / list
+      const nflBoard = await fetch("/api/nfl/props");
+      if (nflBoard.ok) {
+        const data = (await nflBoard.json()) as { props: Record<string, unknown>[] };
+        const row = data.props.find((p) => String(p.id) === propId);
+        if (row) {
+          const detail = asPropDetailFromApi({ ...row, league: "NFL" });
+          cacheNbaPropDetail(detail);
+          return detail;
+        }
+      }
+      throw new Error("prop");
     },
     staleTime: 120_000,
   });
 
-  const prop = live.data ?? cached ?? mockProp;
+  const prop = live.data ?? cached;
   const { addLeg, hasLeg } = useParlayDraft();
   const [side, setSide] = useState<"Over" | "Under" | null>(null);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
@@ -171,7 +181,7 @@ export default function PropDetailPage() {
       <div className="card-3d rounded-2xl border border-[#1a1a1a] p-10 text-center">
         <h1 className="text-xl font-semibold text-white">Report not found</h1>
         <p className="mt-2 text-sm text-neutral-400">
-          No Research Report for “{propId}”. Start the data platform for live NBA props.
+          No live Research Report for “{propId}”. Open a board after starting the data platform.
         </p>
         <Link href="/nba" className="mt-6 inline-block text-sm text-yellow-400 hover:underline">
           Back to NBA board
@@ -192,7 +202,7 @@ export default function PropDetailPage() {
     rankedBooks[0];
 
   const similar = prop.similarPropIds
-    .map((id) => getCachedNbaPropDetail(id) ?? getPropDetail(id))
+    .map((id) => getCachedNbaPropDetail(id))
     .filter((p): p is PropDetail => Boolean(p));
 
   function handleAdd() {

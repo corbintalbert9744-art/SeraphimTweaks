@@ -8,7 +8,7 @@ export function HighestEvSection({ leaders }: { leaders: EvLeader[] }) {
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-white">Highest EV</h2>
-          <p className="text-xs text-neutral-500">vs no-vig consensus · mock snapshot</p>
+          <p className="text-xs text-neutral-500">vs comparison line · live warehouse</p>
         </div>
       </div>
       <ul className="space-y-2.5">

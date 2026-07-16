@@ -1,11 +1,5 @@
-import { registerPropDetails } from "@/data/propsCatalog";
-import { mockTennisProps, tennisToPropDetails } from "@/data/tennisMock";
-import { mockWnbaProps, wnbaToPropDetails } from "@/data/wnbaMock";
-import { mockMlbProps, mlbToPropDetails } from "@/data/mlbMock";
+/** League prop packs are registered from live APIs only — no mock seed. */
 
-/** Register non-NBA/NFL prop packs into the shared catalog (avoids circular imports). */
-registerPropDetails([
-  ...tennisToPropDetails(mockTennisProps),
-  ...wnbaToPropDetails(mockWnbaProps),
-  ...mlbToPropDetails(mockMlbProps),
-]);
+export function registerLeagueProps() {
+  // Intentionally empty: props come from /api/nba/props and /api/nfl/props.
+}

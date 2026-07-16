@@ -1,6 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { LeagueBadge } from "@/components/shared/LeagueBadge";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { CardSkeleton } from "@/components/shared/Skeleton";
 import type { LeagueCode } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
@@ -13,49 +16,6 @@ type AlertItem = {
   tone: "line" | "injury" | "research" | "system";
 };
 
-const mockAlerts: AlertItem[] = [
-  {
-    id: "a1",
-    title: "Line moved +1.5 on Tatum Points",
-    detail: "27.5 → 29.0 across sharp books. Re-check Research Score before locking.",
-    league: "NBA",
-    time: "4m ago",
-    tone: "line",
-  },
-  {
-    id: "a2",
-    title: "Injury flag: KC skill group",
-    detail: "Doubtful designation raised Data Quality penalty on correlated Chiefs props.",
-    league: "NFL",
-    time: "18m ago",
-    tone: "injury",
-  },
-  {
-    id: "a3",
-    title: "Research Score refreshed — Miami Open",
-    detail: "ATP adapter finished slate recalc. 6 props crossed RS ≥ 85.",
-    league: "ATP",
-    time: "42m ago",
-    tone: "research",
-  },
-  {
-    id: "a4",
-    title: "WNBA board heartbeat OK",
-    detail: "Collector cycle complete. No missing books in the last 15 minutes.",
-    league: "WNBA",
-    time: "1h ago",
-    tone: "system",
-  },
-  {
-    id: "a5",
-    title: "WTA total games steam",
-    detail: "Soft book lagged 8¢ vs consensus. EV window may be short-lived.",
-    league: "WTA",
-    time: "2h ago",
-    tone: "line",
-  },
-];
-
 const toneClass: Record<AlertItem["tone"], string> = {
   line: "border-yellow-500/25 bg-yellow-500/[0.06]",
   injury: "border-amber-500/25 bg-amber-500/[0.06]",
@@ -64,12 +24,54 @@ const toneClass: Record<AlertItem["tone"], string> = {
 };
 
 export default function AlertsPage() {
+  const cc = useQuery({
+    queryKey: ["command-center"],
+    queryFn: async () => {
+      const res = await fetch("/api/command-center");
+      if (!res.ok) throw new Error("cc");
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  const injuries = (cc.data?.injuryAlerts ?? cc.data?.injuries ?? []) as Array<{
+    player?: string;
+    team?: string;
+    status?: string;
+    detail?: string;
+  }>;
+
+  const alerts: AlertItem[] = [
+    ...(cc.data?.featured?.ok
+      ? [
+          {
+            id: "featured",
+            title: "Featured prop refreshed",
+            detail: cc.data.featured.prop?.player
+              ? `${cc.data.featured.prop.player} · ${cc.data.featured.prop.market ?? "lean"}`
+              : "Command Center featured prop is live",
+            league: "NBA" as const,
+            time: "Live",
+            tone: "research" as const,
+          },
+        ]
+      : []),
+    ...injuries.slice(0, 12).map((inj, i) => ({
+      id: `inj-${i}`,
+      title: inj.player ? `Injury · ${inj.player}` : "Injury update",
+      detail: `${inj.team ?? ""} ${inj.status ?? ""} ${inj.detail ?? ""}`.trim() || "Injury feed",
+      league: "NBA" as const,
+      time: "Live",
+      tone: "injury" as const,
+    })),
+  ];
+
   return (
     <div>
       <PageHeader
         eyebrow="Monitoring"
         title="Alerts"
-        description="Line moves, injury flags, and research refresh signals — mock feed until jobs are wired."
+        description="Live injury and featured-prop signals from the Command Center warehouse."
         actions={
           <Link
             href="/research"
@@ -80,22 +82,30 @@ export default function AlertsPage() {
         }
       />
 
-      <ul className="space-y-3">
-        {mockAlerts.map((alert) => (
+      {cc.isLoading && <CardSkeleton rows={3} />}
+
+      {!cc.isLoading && alerts.length === 0 && (
+        <EmptyState
+          title="No live alerts"
+          description="Start the data platform so Command Center injury and featured feeds can populate."
+        />
+      )}
+
+      <ul className="mt-6 space-y-3">
+        {alerts.map((alert) => (
           <li
             key={alert.id}
-            className={cn("card-3d rounded-2xl border p-4 transition hover:border-yellow-500/20", toneClass[alert.tone])}
+            className={cn("rounded-2xl border px-4 py-4 transition", toneClass[alert.tone])}
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
+              <div>
+                <div className="flex items-center gap-2">
                   <LeagueBadge league={alert.league} />
-                  <span className="text-[11px] uppercase tracking-wider text-neutral-500">{alert.tone}</span>
+                  <p className="font-medium text-neutral-100">{alert.title}</p>
                 </div>
-                <p className="mt-2 font-medium text-neutral-100">{alert.title}</p>
-                <p className="mt-1 text-sm leading-relaxed text-neutral-400">{alert.detail}</p>
+                <p className="mt-1 text-sm text-neutral-400">{alert.detail}</p>
               </div>
-              <span className="shrink-0 text-xs tabular-nums text-neutral-500">{alert.time}</span>
+              <span className="text-xs text-neutral-500">{alert.time}</span>
             </div>
           </li>
         ))}

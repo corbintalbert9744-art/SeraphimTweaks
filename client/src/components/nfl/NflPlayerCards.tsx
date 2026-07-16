@@ -2,11 +2,17 @@ import { Link } from "wouter";
 import { Plus, Check } from "lucide-react";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
-import { mockNflProps, type NflPlayerCard } from "@/data/nflMock";
+import type { NflPlayerCard, NflProp } from "@/data/nflMock";
 import { nflToBuilderLeg } from "@/lib/builderMappers";
 import { cn } from "@/lib/utils";
 
-export function NflPlayerCards({ players }: { players: NflPlayerCard[] }) {
+export function NflPlayerCards({
+  players,
+  props = [],
+}: {
+  players: NflPlayerCard[];
+  props?: NflProp[];
+}) {
   const { addLeg, hasLeg } = useParlayDraft();
 
   return (
@@ -14,13 +20,15 @@ export function NflPlayerCards({ players }: { players: NflPlayerCard[] }) {
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-white">Featured Players</h2>
-          <p className="text-xs text-neutral-500">Week 12 cards with usage + matchup context</p>
+          <p className="text-xs text-neutral-500">Live cards with usage + matchup context</p>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {players.map((player) => {
-          const topProp = mockNflProps.find((p) => p.id === player.topPropId);
+          const topProp =
+            props.find((p) => p.id === player.topPropId) ??
+            props.find((p) => p.playerId === player.id);
           const added = topProp ? hasLeg(topProp.id) : false;
 
           return (

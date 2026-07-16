@@ -77,6 +77,29 @@ export function registerDataPlatformProxy(
     });
   });
 
+  app.get("/api/nfl/props", async (req, res) => {
+    const refresh = req.query.refresh === "1" || req.query.refresh === "true" ? "?refresh=true" : "";
+    await proxyGet(
+      `/api/v1/nfl/props${refresh}`,
+      res,
+      async () => {
+        res.status(503).json({
+          error: "NFL board requires the Python data platform",
+          hint: "Start with: npm run data-platform",
+          props: [],
+          players: [],
+        });
+      },
+      180_000,
+    );
+  });
+
+  app.get("/api/nfl/players", async (_req, res) => {
+    await proxyGet(`/api/v1/nfl/players`, res, async () => {
+      res.status(503).json({ error: "NFL players require the data platform", players: [] });
+    });
+  });
+
   // NBA board / players / prop detail — data platform warehouse
   app.get("/api/nba/props", async (req, res) => {
     const refresh = req.query.refresh === "1" || req.query.refresh === "true" ? "?refresh=true" : "";

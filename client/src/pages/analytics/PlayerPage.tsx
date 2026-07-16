@@ -12,7 +12,6 @@ import {
 } from "@/lib/nbaLiveCache";
 import {
   asLivePlayerResearch,
-  getMockPlayerResearch,
   type ChartGame,
   type PlayerResearchProfile,
 } from "@/lib/playerResearchProfile";
@@ -122,18 +121,82 @@ function logStatKeys(profile: PlayerResearchProfile): string[] {
 export default function PlayerPage() {
   const [, params] = useRoute("/player/:id");
   const playerId = params?.id ?? "";
-  const mockProfile = useMemo(() => (playerId ? getMockPlayerResearch(playerId) : null), [playerId]);
-  const looksLive = !mockProfile || /^\d+$/.test(playerId) || playerId.includes(":");
 
   const live = useQuery({
-    queryKey: ["nba-player", playerId],
-    enabled: Boolean(playerId) && looksLive,
+    queryKey: ["live-player", playerId],
+    enabled: Boolean(playerId),
     queryFn: async () => {
-      const res = await fetch(`/api/nba/players/${encodeURIComponent(playerId)}`);
-      if (!res.ok) throw new Error("player");
-      const data = await res.json();
-      const raw = (data.player ?? data) as PlayerResearchProfile;
-      return asLivePlayerResearch(raw);
+      const nbaRes = await fetch(`/api/nba/players/${encodeURIComponent(playerId)}`);
+      if (nbaRes.ok) {
+        const data = await nbaRes.json();
+        const raw = (data.player ?? data) as PlayerResearchProfile;
+        return asLivePlayerResearch({ ...raw, boardHref: raw.boardHref || "/nba" });
+      }
+      // NFL players: build a minimal research profile from board props
+      const nflRes = await fetch("/api/nfl/props");
+      if (!nflRes.ok) throw new Error("player");
+      const board = (await nflRes.json()) as { props: Record<string, unknown>[] };
+      const mine = board.props.filter(
+        (p) => String(p.playerId) === playerId || String(p.playerWarehouseId) === playerId,
+      );
+      if (!mine.length) throw new Error("player");
+      const top = mine[0];
+      const markets = mine.map((p) => ({
+        propId: String(p.id),
+        market: String(p.market),
+        side: (p.side === "Under" ? "Under" : "Over") as "Over" | "Under",
+        line: Number(p.line),
+        americanOdds: Number(p.americanOdds ?? -110),
+        projectedValue: Number(p.projectedValue ?? p.line),
+        edgeVsLine: Number(p.edgeVsLine ?? 0),
+        edgePercent: Number(p.line) ? (Number(p.edgeVsLine ?? 0) / Number(p.line)) * 100 : 0,
+        researchScore: Number(p.researchScore ?? p.confidence ?? 50),
+        confidence: Number(p.confidence ?? 50),
+        evPercent: Number(p.evPercent ?? 0),
+        explanation: (p.explanation as string[]) || [],
+        why: `${p.side} ${p.line} ${p.market}`,
+        hitWindows: [
+          { key: "l5", label: "Last 5", average: null, hitRate: 0, hitPct: 0, hits: String(p.l5 ?? "0/0") },
+          { key: "l10", label: "Last 10", average: null, hitRate: 0, hitPct: 0, hits: String(p.l10 ?? "0/0") },
+          { key: "l20", label: "Last 20", average: null, hitRate: 0, hitPct: 0, hits: String(p.l20 ?? "0/0") },
+          { key: "all", label: "All", average: null, hitRate: 0, hitPct: 0, hits: String(p.season ?? "0/0") },
+          { key: "matchup", label: "Matchup", average: null, hitRate: 0, hitPct: 0, hits: String(p.l10 ?? "0/0") },
+        ],
+        chartGames: [] as ChartGame[],
+      }));
+      return asLivePlayerResearch({
+        id: playerId,
+        name: String(top.player),
+        league: "NFL",
+        team: String(top.team ?? ""),
+        opponent: String(top.opponent ?? ""),
+        position: String(top.position ?? ""),
+        initials: String(top.player)
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((s) => s[0] ?? "")
+          .join("")
+          .toUpperCase(),
+        injury: "None",
+        tipTime: String(top.tipTime ?? ""),
+        researchScore: Number(top.researchScore ?? top.confidence ?? 50),
+        dataQualityScore: 70,
+        aiExplain: {
+          verdict: "neutral",
+          headline: String((top.explanation as string[] | undefined)?.[0] ?? "Live NFL lean"),
+          body: "Built from live ESPN NFL warehouse props.",
+        },
+        matchup: {
+          title: `vs ${top.opponent}`,
+          defenseRank: "Live slate",
+          bullets: [`${top.market} ${top.side} ${top.line}`],
+        },
+        homeSplit: { label: "Home", samples: 0, averages: {} },
+        awaySplit: { label: "Away", samples: 0, averages: {} },
+        recentLogs: [],
+        markets,
+        boardHref: "/nfl",
+      });
     },
     staleTime: 120_000,
     retry: 1,
@@ -141,7 +204,7 @@ export default function PlayerPage() {
 
   const boardProps = useQuery({
     queryKey: ["nba-board"],
-    enabled: Boolean(live.data),
+    enabled: Boolean(live.data) && live.data?.league === "NBA",
     queryFn: async () => {
       const res = await fetch("/api/nba/props");
       if (!res.ok) throw new Error("board");
@@ -150,7 +213,7 @@ export default function PlayerPage() {
     staleTime: 120_000,
   });
 
-  const profile = live.data ?? mockProfile;
+  const profile = live.data;
   const { addLeg, hasLeg } = useParlayDraft();
   const [tab, setTab] = useState<Tab>("chart");
   const [marketIdx, setMarketIdx] = useState(0);
@@ -178,7 +241,7 @@ export default function PlayerPage() {
     [market, windowKey],
   );
 
-  if (live.isLoading && looksLive && !profile) {
+  if (live.isLoading && !profile) {
     return <CardSkeleton rows={5} />;
   }
 

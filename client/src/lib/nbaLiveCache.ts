@@ -42,6 +42,10 @@ export function getCachedNbaPropDetail(id: string): PropDetail | undefined {
   return detailsById.get(id);
 }
 
+export function getCachedPropDetail(id: string): PropDetail | undefined {
+  return detailsById.get(id);
+}
+
 export function propDetailFromNbaProp(p: NbaProp, extras?: Partial<PropDetail>): PropDetail {
   const detail = asPropDetailFromApi({
     ...p,

@@ -9,7 +9,7 @@ export function TopPropsTable({ rows }: { rows: PropRow[] }) {
       <div className="flex items-center justify-between border-b border-[#1a1a1a] px-5 py-4">
         <div>
           <h2 className="text-base font-semibold text-white">Top Props Today</h2>
-          <p className="text-xs text-neutral-500">Ranked by research case quality + edge (mock)</p>
+          <p className="text-xs text-neutral-500">Ranked by research case quality + edge (live)</p>
         </div>
         <span className="rounded-full border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-1 text-[11px] font-medium text-yellow-400">
           {rows.length} shown

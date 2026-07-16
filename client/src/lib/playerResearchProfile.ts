@@ -1,9 +1,3 @@
-import { getPlayerProfile, type PlayerProfile } from "@/data/playersMock";
-import { mockNbaPlayerCards, mockNbaProps, type NbaProp } from "@/data/nbaMock";
-import { mockNflPlayerCards, mockNflProps, type NflProp } from "@/data/nflMock";
-import { mockWnbaPlayerCards, mockWnbaProps, type WnbaProp } from "@/data/wnbaMock";
-import { mockMlbPlayerCards, mockMlbProps, type MlbProp } from "@/data/mlbMock";
-import { mockTennisPlayerCards, mockTennisProps, type TennisProp } from "@/data/tennisMock";
 import { getCachedNbaProp } from "@/lib/nbaLiveCache";
 
 export type HitWindow = {
@@ -246,185 +240,12 @@ function boardHrefFor(league: string): string {
   return "/players";
 }
 
-function fromPlayerProfile(profile: PlayerProfile): PlayerResearchProfile {
-  const catalog: BoardProp[] = [
-    ...mockNbaProps.map((p) => ({ ...p, league: "NBA" })),
-    ...mockNflProps.map((p) => ({ ...p, league: "NFL" })),
-    ...mockWnbaProps.map((p) => ({ ...p, league: "WNBA" })),
-    ...mockMlbProps.map((p) => ({ ...p, league: "MLB" })),
-    ...mockTennisProps.map((p) => ({
-      id: p.id,
-      playerId: p.playerId,
-      player: p.player,
-      team: p.country ?? p.league,
-      opponent: p.opponent,
-      position: `#${p.ranking}`,
-      market: p.market,
-      side: p.side,
-      line: p.line,
-      americanOdds: p.americanOdds,
-      noVigProb: p.noVigProb,
-      evPercent: p.evPercent,
-      confidence: p.confidence,
-      l5: p.l5,
-      l10: p.l10,
-      l20: p.l20,
-      season: p.season,
-      tipTime: p.tipTime,
-      league: p.league,
-    })),
-  ];
-
-  const props = catalog.filter(
-    (p) => profile.propIds.includes(p.id) || p.playerId === profile.id,
-  );
-  const ordered = [
-    ...props.filter((p) => profile.recommendedPropIds.includes(p.id)),
-    ...props.filter((p) => !profile.recommendedPropIds.includes(p.id)),
-  ];
-  const unique = ordered.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i);
-  const markets = unique.map((p) =>
-    marketFromProp(p, profile.matchup.bullets[0] ?? profile.aiExplain.headline),
-  );
-
-  // Prefer chart from real logs when present
-  if (markets[0] && profile.recentLogs.length) {
-    markets[0] = {
-      ...markets[0],
-      chartGames: profile.recentLogs.slice(0, 10).map((log) => ({
-        date: log.date,
-        label: `${log.date} ${log.home ? "" : "@"}${log.opponent}`,
-        opponent: log.opponent,
-        home: log.home,
-        value: log.primary,
-        minutes: log.minutesOrSnaps,
-        hit:
-          markets[0].side === "Over"
-            ? log.primary > markets[0].line
-            : log.primary < markets[0].line,
-      })),
-    };
-  }
-
-  return {
-    id: profile.id,
-    name: profile.name,
-    league: profile.league,
-    team: profile.team,
-    opponent: profile.opponent,
-    position: profile.position,
-    initials: profile.initials,
-    injury: profile.injury,
-    tipTime: profile.tipTime,
-    researchScore: profile.researchScore,
-    dataQualityScore: profile.dataQualityScore,
-    aiExplain: profile.aiExplain,
-    matchup: profile.matchup,
-    homeSplit: profile.homeSplit,
-    awaySplit: profile.awaySplit,
-    recentLogs: profile.recentLogs,
-    markets:
-      markets.length > 0
-        ? markets
-        : [
-            marketFromProp({
-              id: `${profile.id}-primary`,
-              playerId: profile.id,
-              player: profile.name,
-              team: profile.team,
-              opponent: profile.opponent,
-              position: profile.position,
-              market: profile.chartStatLabel,
-              side: "Over",
-              line: profile.chartLine,
-              americanOdds: -110,
-              noVigProb: 0.54,
-              evPercent: 3.5,
-              confidence: profile.researchScore,
-              l5: "4/5",
-              l10: "7/10",
-              l20: "13/20",
-              season: "40/60",
-              tipTime: profile.tipTime,
-              league: profile.league,
-            }),
-          ],
-    boardHref: boardHrefFor(profile.league),
-  };
-}
-
-function collectBoardProps(): BoardProp[] {
-  const liveCached = Object.values(
-    // pull any cached NBA props by scanning known mock + live ids is hard; callers pass live separately
-    {},
-  ) as BoardProp[];
-  void liveCached;
-  return [
-    ...mockNbaProps.map((p: NbaProp) => ({ ...p, league: "NBA" as const })),
-    ...mockNflProps.map((p: NflProp) => ({ ...p, league: "NFL" as const })),
-    ...mockWnbaProps.map((p: WnbaProp) => ({ ...p, league: "WNBA" as const })),
-    ...mockMlbProps.map((p: MlbProp) => ({ ...p, league: "MLB" as const })),
-    ...mockTennisProps.map((p: TennisProp) => ({
-      id: p.id,
-      playerId: p.playerId,
-      player: p.player,
-      team: p.country || p.league,
-      opponent: p.opponent,
-      position: `#${p.ranking}`,
-      market: p.market,
-      side: p.side,
-      line: p.line,
-      americanOdds: p.americanOdds,
-      noVigProb: p.noVigProb,
-      evPercent: p.evPercent,
-      confidence: p.confidence,
-      l5: p.l5,
-      l10: p.l10,
-      l20: p.l20,
-      season: p.season,
-      tipTime: p.tipTime,
-      league: p.league,
-    })),
-  ];
-}
-
-function insightForPlayer(playerId: string, league: string): string | undefined {
-  if (league === "NBA") {
-    return mockNbaPlayerCards.find((c) => c.id === playerId)?.matchupNote;
-  }
-  if (league === "NFL") {
-    return mockNflPlayerCards.find((c) => c.id === playerId)?.matchupNote;
-  }
-  if (league === "WNBA") {
-    return mockWnbaPlayerCards.find((c) => c.id === playerId)?.matchupNote;
-  }
-  if (league === "MLB") {
-    return mockMlbPlayerCards.find((c) => c.id === playerId)?.matchupNote;
-  }
-  if (league === "ATP" || league === "WTA") {
-    return mockTennisPlayerCards.find((c) => c.id === playerId)?.matchupNote;
-  }
-  return undefined;
-}
-
 function fromBoardProps(playerId: string, props: BoardProp[]): PlayerResearchProfile | null {
   if (!props.length) return null;
   const sorted = [...props].sort((a, b) => b.evPercent - a.evPercent);
   const top = sorted[0];
-  const insight = insightForPlayer(playerId, top.league);
-  const markets = sorted.map((p) => marketFromProp(p, insight));
-  const avgStats: Record<string, number> = {};
-  if (top.league === "NBA" || top.league === "WNBA") {
-    const card =
-      top.league === "NBA"
-        ? mockNbaPlayerCards.find((c) => c.id === playerId)
-        : mockWnbaPlayerCards.find((c) => c.id === playerId);
-    if (card?.seasonAvg) {
-      avgStats.pts = card.seasonAvg.pts;
-      avgStats.reb = card.seasonAvg.reb;
-      avgStats.ast = card.seasonAvg.ast;
-    }
-  }
+  const insight = top.insight;
+  const markets = sorted.map((p) => marketFromProp(p, insight ?? p.insight));
   const chart = markets[0]?.chartGames ?? [];
   return {
     id: playerId,
@@ -447,7 +268,7 @@ function fromBoardProps(playerId: string, props: BoardProp[]): PlayerResearchPro
     },
     matchup: {
       title: `vs ${top.opponent}`,
-      defenseRank: insight?.slice(0, 48) || "Matchup context available",
+      defenseRank: insight?.slice(0, 48) || "Live matchup",
       bullets: [
         insight || `${top.opponent} matchup supports the ${top.side.toLowerCase()} lean.`,
         `Primary market: ${top.market} ${top.side} ${top.line}.`,
@@ -456,34 +277,19 @@ function fromBoardProps(playerId: string, props: BoardProp[]): PlayerResearchPro
     },
     homeSplit: {
       label: "Home",
-      samples: 12,
-      averages: Object.keys(avgStats).length
-        ? avgStats
-        : { primary: Number((markets[0].projectedValue + 0.4).toFixed(1)) },
+      samples: 0,
+      averages: { primary: Number((markets[0].projectedValue + 0.4).toFixed(1)) },
     },
     awaySplit: {
       label: "Away",
-      samples: 11,
-      averages: Object.keys(avgStats).length
-        ? {
-            pts: Number(((avgStats.pts ?? 0) * 0.94).toFixed(1)),
-            reb: Number(((avgStats.reb ?? 0) * 0.96).toFixed(1)),
-            ast: Number(((avgStats.ast ?? 0) * 0.95).toFixed(1)),
-          }
-        : { primary: Number((markets[0].projectedValue - 0.3).toFixed(1)) },
+      samples: 0,
+      averages: { primary: Number((markets[0].projectedValue - 0.3).toFixed(1)) },
     },
     recentLogs: chart.map((g) => ({
       date: g.date,
       opponent: g.opponent,
       home: g.home,
-      stats:
-        top.league === "NBA" || top.league === "WNBA"
-          ? {
-              pts: g.value,
-              reb: Number((avgStats.reb ?? 6).toFixed(0)),
-              ast: Number((avgStats.ast ?? 4).toFixed(0)),
-            }
-          : { [top.market]: g.value },
+      stats: { [top.market]: g.value },
       minutesOrSnaps: g.minutes,
     })),
     markets,
@@ -491,14 +297,17 @@ function fromBoardProps(playerId: string, props: BoardProp[]): PlayerResearchPro
   };
 }
 
-/** Resolve a player research profile from mock catalogs (any sport). */
-export function getMockPlayerResearch(playerId: string): PlayerResearchProfile | null {
-  const profile = getPlayerProfile(playerId);
-  if (profile) return fromPlayerProfile(profile);
-
-  const all = collectBoardProps();
-  const props = all.filter((p) => p.playerId === playerId);
+/** Build a research profile from live board props for a player (no mock catalogs). */
+export function getPlayerResearchFromProps(
+  playerId: string,
+  props: BoardProp[],
+): PlayerResearchProfile | null {
   return fromBoardProps(playerId, props);
+}
+
+/** @deprecated Mock catalogs removed — use live player APIs. */
+export function getMockPlayerResearch(_playerId: string): PlayerResearchProfile | null {
+  return null;
 }
 
 /** Build research profile from live NBA API player payload (passthrough + href). */

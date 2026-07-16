@@ -10,6 +10,7 @@ from app.ingestion.nfl_pipeline import (
     import_nfl_schedule,
     recalculate_nfl_analytics,
 )
+from app.ingestion.nfl_board import ensure_nfl_board, list_nfl_player_cards
 from app.providers.registry import get_nfl_providers
 
 router = APIRouter(prefix="/nfl", tags=["nfl"])
@@ -53,6 +54,29 @@ def nfl_games(dates: Optional[str] = Query(None), db: Session = Depends(get_db))
             for g in games
         ],
     }
+
+
+@router.get("/props")
+def nfl_props(
+    refresh: bool = Query(False, description="Force re-ingest slate"),
+    db: Session = Depends(get_db),
+):
+    """Live NFL research board from warehouse (auto-ingests if empty)."""
+    payload = ensure_nfl_board(db, force=refresh)
+    teams = sorted({p["team"] for p in payload["props"] if p.get("team")})
+    return {
+        **payload,
+        "teams": ["All", *teams],
+        "live": True,
+        "disclaimer": "Projections are Seraphim model estimates — not sportsbook copies.",
+    }
+
+
+@router.get("/players")
+def nfl_players(db: Session = Depends(get_db)):
+    ensure_nfl_board(db, force=False)
+    players = list_nfl_player_cards(db)
+    return {"ok": True, "players": players, "count": len(players), "live": True}
 
 
 @router.get("/featured-prop")

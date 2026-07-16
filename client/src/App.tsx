@@ -7,7 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/layout/AppShell";
 import { ParlayDraftProvider } from "@/components/parlay/ParlayDraftContext";
 import { MembershipProvider, useMembership } from "@/context/MembershipContext";
-import "@/data/registerLeagueProps";
 import DashboardPage from "@/pages/analytics/DashboardPage";
 import CommandCenterPage from "@/pages/analytics/CommandCenterPage";
 import NbaPage from "@/pages/analytics/NbaPage";

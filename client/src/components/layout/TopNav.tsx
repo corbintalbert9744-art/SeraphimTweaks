@@ -1,44 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Bell, LogOut, Menu, Search, Settings, User } from "lucide-react";
-import { mockPlayers, type PlayerSearchResult } from "@/data/mock";
-import { getPlayerProfile, listPlayerProfiles } from "@/data/playersMock";
+import type { PlayerSearchResult } from "@/data/mock";
 import { useToast } from "@/hooks/use-toast";
 import { useMembership } from "@/context/MembershipContext";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 
-function buildSearchIndex(): PlayerSearchResult[] {
-  const byId = new Map<string, PlayerSearchResult>();
-
-  for (const p of mockPlayers) {
-    byId.set(p.id, p);
-  }
-
-  for (const profile of listPlayerProfiles()) {
-    byId.set(profile.id, {
-      id: profile.id,
-      name: profile.name,
-      league: profile.league,
-      team: profile.team,
-      position: profile.position,
-    });
-  }
-
-  return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-const SEARCH_INDEX = buildSearchIndex();
-
 function hrefForPlayer(player: PlayerSearchResult): string {
-  if (getPlayerProfile(player.id)) return `/player/${player.id}`;
-  if (player.league === "NBA") return "/nba";
-  if (player.league === "NFL") return "/nfl";
-  if (player.league === "MLB") return "/mlb";
-  if (player.league === "WNBA") return "/wnba";
-  if (player.league === "ATP") return "/atp";
-  if (player.league === "WTA") return "/wta";
-  return "/players";
+  return `/player/${player.id}`;
 }
 
 export function TopNav() {
@@ -55,17 +26,62 @@ export function TopNav() {
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
+  const nbaPlayers = useQuery({
+    queryKey: ["nba-players-search"],
+    queryFn: async () => {
+      const res = await fetch("/api/nba/players");
+      if (!res.ok) return [] as PlayerSearchResult[];
+      const data = await res.json();
+      return ((data.players ?? []) as Array<Record<string, unknown>>).map(
+        (p): PlayerSearchResult => ({
+          id: String(p.id),
+          name: String(p.name ?? ""),
+          league: "NBA",
+          team: String(p.team ?? ""),
+          position: String(p.position ?? ""),
+        }),
+      );
+    },
+    staleTime: 120_000,
+  });
+
+  const nflPlayers = useQuery({
+    queryKey: ["nfl-players-search"],
+    queryFn: async () => {
+      const res = await fetch("/api/nfl/players");
+      if (!res.ok) return [] as PlayerSearchResult[];
+      const data = await res.json();
+      return ((data.players ?? []) as Array<Record<string, unknown>>).map(
+        (p): PlayerSearchResult => ({
+          id: String(p.id),
+          name: String(p.name ?? ""),
+          league: "NFL",
+          team: String(p.team ?? ""),
+          position: String(p.position ?? ""),
+        }),
+      );
+    },
+    staleTime: 120_000,
+  });
+
+  const searchIndex = useMemo(
+    () => [...(nbaPlayers.data ?? []), ...(nflPlayers.data ?? [])],
+    [nbaPlayers.data, nflPlayers.data],
+  );
+
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [] as PlayerSearchResult[];
-    return SEARCH_INDEX.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.team.toLowerCase().includes(q) ||
-        p.league.toLowerCase().includes(q) ||
-        p.position.toLowerCase().includes(q),
-    ).slice(0, 8);
-  }, [query]);
+    return searchIndex
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.team.toLowerCase().includes(q) ||
+          p.league.toLowerCase().includes(q) ||
+          p.position.toLowerCase().includes(q),
+      )
+      .slice(0, 8);
+  }, [query, searchIndex]);
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -145,9 +161,8 @@ export function TopNav() {
             ) : (
               <ul className="max-h-72 overflow-y-auto py-1" role="listbox">
                 {results.map((player) => {
-                  const hasProfile = Boolean(getPlayerProfile(player.id));
                   return (
-                    <li key={player.id} role="option">
+                    <li key={`${player.league}-${player.id}`} role="option">
                       <button
                         type="button"
                         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-white/[0.04]"
@@ -156,8 +171,7 @@ export function TopNav() {
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-neutral-100">{player.name}</p>
                           <p className="truncate text-xs text-neutral-500">
-                            {player.team} · {player.position}
-                            {hasProfile ? " · Open profile" : " · Board"}
+                            {player.team} · {player.position} · Open profile
                           </p>
                         </div>
                         <span className="shrink-0 rounded-md border border-yellow-500/20 bg-yellow-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-yellow-400">

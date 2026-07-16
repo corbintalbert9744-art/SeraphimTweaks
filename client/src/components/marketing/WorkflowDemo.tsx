@@ -1,9 +1,84 @@
 import { useMemo, useState } from "react";
 import { Check, Plus } from "lucide-react";
-import { mockNbaProps, formatAmericanOdds } from "@/data/nbaMock";
 import { cn } from "@/lib/utils";
 
 type SortKey = "l10" | "ev" | "line";
+
+/** Illustrative marketing demo only — not warehouse data. */
+const DEMO_ROWS = [
+  {
+    id: "d1",
+    player: "Primary scorer",
+    team: "BOS",
+    opponent: "NYK",
+    market: "Points",
+    side: "Over",
+    line: 26.5,
+    americanOdds: -110,
+    evPercent: 4.2,
+    noVigProb: 0.58,
+    confidence: 84,
+    l5: "4/5",
+    l10: "8/10",
+    l20: "14/20",
+    tipTime: "7:30 PM ET",
+  },
+  {
+    id: "d2",
+    player: "Floor spacer",
+    team: "GSW",
+    opponent: "LAL",
+    market: "Threes",
+    side: "Over",
+    line: 3.5,
+    americanOdds: -105,
+    evPercent: 3.1,
+    noVigProb: 0.55,
+    confidence: 78,
+    l5: "3/5",
+    l10: "7/10",
+    l20: "12/20",
+    tipTime: "10:00 PM ET",
+  },
+  {
+    id: "d3",
+    player: "Paint presence",
+    team: "DEN",
+    opponent: "OKC",
+    market: "Rebounds",
+    side: "Over",
+    line: 9.5,
+    americanOdds: -115,
+    evPercent: 2.8,
+    noVigProb: 0.54,
+    confidence: 76,
+    l5: "4/5",
+    l10: "6/10",
+    l20: "13/20",
+    tipTime: "8:00 PM ET",
+  },
+  {
+    id: "d4",
+    player: "Primary creator",
+    team: "OKC",
+    opponent: "DEN",
+    market: "Assists",
+    side: "Over",
+    line: 7.5,
+    americanOdds: 100,
+    evPercent: 5.0,
+    noVigProb: 0.6,
+    confidence: 88,
+    l5: "5/5",
+    l10: "9/10",
+    l20: "16/20",
+    tipTime: "8:00 PM ET",
+  },
+];
+
+function formatAmericanOdds(odds: number) {
+  return odds > 0 ? `+${odds}` : `${odds}`;
+}
 
 function parseHit(value: string) {
   const [h, n] = value.split("/").map(Number);
@@ -13,11 +88,11 @@ function parseHit(value: string) {
 
 export function WorkflowDemo() {
   const [sort, setSort] = useState<SortKey>("l10");
-  const [selectedId, setSelectedId] = useState(mockNbaProps[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(DEMO_ROWS[0]?.id ?? "");
   const [picks, setPicks] = useState<string[]>([]);
 
   const rows = useMemo(() => {
-    const list = [...mockNbaProps].slice(0, 8);
+    const list = [...DEMO_ROWS];
     list.sort((a, b) => {
       if (sort === "ev") return b.evPercent - a.evPercent;
       if (sort === "line") return a.line - b.line;
@@ -38,7 +113,7 @@ export function WorkflowDemo() {
       ? 0
       : Math.round(
           picks.reduce((sum, id) => {
-            const p = mockNbaProps.find((r) => r.id === id);
+            const p = DEMO_ROWS.find((r) => r.id === id);
             return sum + (p ? parseHit(p.l10) : 0);
           }, 0) / picks.length,
         );
@@ -201,7 +276,7 @@ export function WorkflowDemo() {
           ) : (
             <ul className="mt-4 space-y-2">
               {picks.map((id) => {
-                const p = mockNbaProps.find((r) => r.id === id);
+                const p = DEMO_ROWS.find((r) => r.id === id);
                 if (!p) return null;
                 return (
                   <li
