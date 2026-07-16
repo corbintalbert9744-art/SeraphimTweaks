@@ -3,6 +3,7 @@ import { Check, Lock, Plus } from "lucide-react";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { withLegHitData } from "@/lib/legStats";
+import { propResearchPath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
 import { useIsPro } from "@/components/membership/ProOnly";
 
@@ -250,6 +251,9 @@ export function PropOfTheDayCard({ prop }: { prop: PropOfDay }) {
           {added ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
           {added ? "Added" : "Add to Builder"}
         </button>
+        <Link href={propResearchPath(prop.id)} className="text-xs text-neutral-500 hover:text-yellow-400">
+          Full report
+        </Link>
         <Link href="/nba" className="text-xs text-neutral-500 hover:text-yellow-400">
           NBA board
         </Link>

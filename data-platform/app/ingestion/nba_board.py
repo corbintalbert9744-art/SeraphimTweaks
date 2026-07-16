@@ -30,7 +30,8 @@ from app.ingestion.warehouse import (
     upsert_player,
     upsert_prop,
 )
-from app.providers.comparison_lines import edge_vs_projection, get_comparison_lines_provider
+from app.providers.comparison_lines import get_comparison_lines_provider
+from app.ingestion.comparison_books import build_market_comparison_books
 from app.providers.base import NormalizedGame, NormalizedPlayer
 from app.providers.registry import get_nba_providers
 
@@ -355,7 +356,7 @@ def list_nba_props_from_warehouse(db: Session) -> list[dict[str, Any]]:
         game = db.get(Game, prop.game_id) if prop.game_id else None
         team_abbr = _team_abbr(db, player.team_id if player else None)
         opp = "OPP"
-        tip = datetime.now(timezone.utc).isoformat()
+        tip = None
         if game:
             tip = game.tipoff_at.isoformat()
             home = _team_abbr(db, game.home_team_id)
@@ -387,6 +388,12 @@ def list_nba_props_from_warehouse(db: Session) -> list[dict[str, Any]]:
             .scalar_one_or_none()
         )
         american = odds_row.american_odds if odds_row else -110
+        if tip is None:
+            stamp = (
+                (odds_row.captured_at if odds_row and odds_row.captured_at else None)
+                or getattr(analytics, "computed_at", None)
+            )
+            tip = stamp.isoformat() if stamp else None
 
         logs = []
         if player:
@@ -454,97 +461,16 @@ def get_nba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
     if not base:
         return None
     analytics = db.execute(select(PropAnalytics).where(PropAnalytics.prop_id == prop_id)).scalar_one_or_none()
-    odds = db.execute(select(Odds).where(Odds.prop_id == prop_id).order_by(Odds.captured_at.desc())).scalars().all()
     projected = float(base.get("projectedValue") or (analytics.projected_value if analytics else 0) or 0)
     model_side = str(base.get("side") or "Over")
 
-    pickem_slugs = {"prizepicks", "underdog", "sleeper", "parlayplay"}
-    by_book: dict[str, dict] = {}
-    for o in odds:
-        book = db.get(Sportsbook, o.sportsbook_id)
-        name = book.name if book else "Book"
-        slug = book.slug if book else name.lower().replace(" ", "")
-        kind = "pickem" if slug in pickem_slugs else "sportsbook"
-        slot = by_book.setdefault(
-            name,
-            {
-                "book": name,
-                "slug": slug,
-                "kind": kind,
-                "line": o.line,
-                "over": -110,
-                "under": -110,
-                "isMock": o.is_mock,
-            },
-        )
-        american = o.american_odds if o.american_odds is not None else -110
-        # Odds rows may be Over or Under — infer from American pairing isn't stored; use latest line.
-        if abs(american) >= 100:
-            # Prefer assigning to Over first then Under if we see a second tick
-            if slot["over"] == -110 or american <= -100:
-                slot["over"] = american
-            else:
-                slot["under"] = american
-        slot["line"] = o.line
-        slot["isMock"] = o.is_mock
-
-    # Always enrich with comparison-lines provider so pick'em operators appear even on old rows.
-    provider_lines = get_comparison_lines_provider().quote_lines(
+    books = build_market_comparison_books(
+        db,
         league="NBA",
-        player_name=str(base.get("player") or ""),
-        player_external_id=str(base.get("playerId") or "") or None,
-        market=str(base.get("market") or "Points"),
-        baseline_line=float(base.get("line") or projected),
-        projected_value=projected or float(base.get("line") or 0),
+        base=base,
+        projected=projected,
+        model_side=model_side,
     )
-    for row in provider_lines:
-        existing = by_book.get(row.name)
-        if (
-            existing
-            and existing.get("kind") == "sportsbook"
-            and not existing.get("isMock")
-            and not existing.get("requiresIntegration")
-        ):
-            continue  # keep live sportsbook quotes
-        by_book[row.name] = {
-            "book": row.name,
-            "slug": row.slug,
-            "kind": row.kind,
-            "line": row.line,
-            "over": row.over,
-            "under": row.under,
-            "isMock": row.is_mock,
-            "connected": getattr(row, "connected", False),
-            "requiresIntegration": getattr(row, "requires_integration", row.is_mock),
-            "integrationNote": getattr(row, "notes", "") or None,
-            "sourceProvider": getattr(row, "source_provider", None),
-            "provider": getattr(row, "provider", None),
-        }
-
-    books: list[dict[str, Any]] = []
-    for slot in by_book.values():
-        edge = edge_vs_projection(projected, float(slot["line"]), model_side)
-        books.append(
-            {
-                **slot,
-                "edgeVsProjection": edge,
-                "projectedValue": projected,
-                "modelSide": model_side,
-            }
-        )
-    # Best value among connected lines first; fall back to all
-    connected = [b for b in books if not b.get("requiresIntegration")]
-    rank_pool = connected or books
-    rank_pool.sort(key=lambda b: b.get("edgeVsProjection") or 0, reverse=True)
-    books.sort(key=lambda b: (1 if b.get("requiresIntegration") else 0, -(b.get("edgeVsProjection") or 0)))
-    for b in books:
-        b["isBestValue"] = False
-    if rank_pool:
-        best_name = rank_pool[0]["book"]
-        for b in books:
-            if b["book"] == best_name:
-                b["isBestValue"] = True
-                break
 
     line = float(base["line"])
     movement = [

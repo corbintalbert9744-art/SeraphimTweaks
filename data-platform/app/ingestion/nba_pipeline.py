@@ -505,14 +505,141 @@ def recalculate_open_prop_analytics(db: Session) -> dict[str, Any]:
     return {"recalculated": 1 if result.get("ok") else 0, "featured": result.get("ok")}
 
 
+def _parse_hit_fraction(label: str | None) -> tuple[int, int]:
+    if not label or "/" not in str(label):
+        return 0, 0
+    try:
+        hits_s, samples_s = str(label).split("/", 1)
+        return int(hits_s), int(samples_s)
+    except (TypeError, ValueError):
+        return 0, 0
+
+
+def _tip_date(prop: dict[str, Any]):
+    raw = prop.get("tipTime") or prop.get("tipoffAt") or ""
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        try:
+            from zoneinfo import ZoneInfo
+
+            return dt.astimezone(ZoneInfo("America/New_York")).date()
+        except Exception:
+            return dt.astimezone(timezone.utc).date()
+    except Exception:
+        return None
+
+
+def _tip_date_utc(prop: dict[str, Any]):
+    raw = prop.get("tipTime") or prop.get("tipoffAt") or ""
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).date()
+    except Exception:
+        return None
+
+
+def _hit_likelihood(prop: dict[str, Any]) -> tuple[float, float, float]:
+    """Rank key: lean-side hit probability, then confidence, then research score."""
+    side = str(prop.get("side") or "Over")
+    if side == "Under":
+        prob = prop.get("underProbability")
+    else:
+        prob = prop.get("overProbability")
+    if prob is None:
+        prob = prop.get("noVigProb")
+    if prob is None:
+        hits, samples = _parse_hit_fraction(prop.get("l10"))
+        prob = (hits / samples) if samples else 0.0
+    conf = float(prop.get("confidence") or 0) / 100.0
+    rs = float(prop.get("researchScore") or 0)
+    return (float(prob), conf, rs)
+
+
+def _collect_today_board_props(db: Session) -> tuple[list[dict[str, Any]], Any]:
+    """Gather open warehouse props whose tip date is today (US/Eastern or UTC)."""
+    try:
+        from zoneinfo import ZoneInfo
+
+        today_et = datetime.now(ZoneInfo("America/New_York")).date()
+    except Exception:
+        today_et = datetime.now(timezone.utc).date()
+    today_utc = datetime.now(timezone.utc).date()
+
+    boards: list[dict[str, Any]] = []
+    try:
+        from app.ingestion.nba_board import list_nba_props_from_warehouse
+
+        for p in list_nba_props_from_warehouse(db) or []:
+            boards.append({**p, "league": p.get("league") or "NBA"})
+    except Exception:
+        pass
+    try:
+        from app.ingestion.wnba_board import list_wnba_props_from_warehouse
+
+        for p in list_wnba_props_from_warehouse(db) or []:
+            boards.append({**p, "league": p.get("league") or "WNBA"})
+    except Exception:
+        pass
+    try:
+        from app.ingestion.nfl_board import list_nfl_props_from_warehouse
+
+        for p in list_nfl_props_from_warehouse(db) or []:
+            boards.append({**p, "league": p.get("league") or "NFL"})
+    except Exception:
+        pass
+    try:
+        from app.ingestion.generic_board import list_league_props
+
+        for league in ("MLB", "NHL", "Soccer"):
+            for p in list_league_props(db, league) or []:
+                boards.append({**p, "league": p.get("league") or league})
+    except Exception:
+        pass
+
+    def is_today(p: dict[str, Any]) -> bool:
+        return _tip_date(p) == today_et or _tip_date_utc(p) == today_utc
+
+    todays = [p for p in boards if is_today(p)]
+    # Dedupe by id, prefer higher hit likelihood
+    by_id: dict[str, dict[str, Any]] = {}
+    for p in todays:
+        pid = str(p.get("id") or "")
+        if not pid:
+            continue
+        prev = by_id.get(pid)
+        if not prev or _hit_likelihood(p) > _hit_likelihood(prev):
+            by_id[pid] = p
+    ranked = sorted(by_id.values(), key=_hit_likelihood, reverse=True)
+    for p in ranked:
+        prob, _, _ = _hit_likelihood(p)
+        p["hitProbability"] = round(prob, 4)
+        p["hitPct"] = int(round(prob * 100))
+    return ranked, today_et
+
+
 def build_command_center(db: Session) -> dict[str, Any]:
     featured = build_and_store_featured_prop(db)
     schedule = get_nba_providers().schedule.fetch_schedule("NBA") if get_nba_providers().schedule else []
-    board_date = ""
+    today_props, board_date = _collect_today_board_props(db)
+    if not isinstance(board_date, str):
+        board_date = board_date.isoformat() if board_date else datetime.now(timezone.utc).date().isoformat()
+
+    # Prefer live ESPN schedule date when it matches today; else keep Eastern "today".
     if schedule:
-        board_date = schedule[0].tipoff_at.date().isoformat()
-    else:
-        board_date = datetime.now(timezone.utc).date().isoformat()
+        try:
+            sched_day = schedule[0].tipoff_at.date().isoformat()
+            if sched_day == board_date:
+                pass
+        except Exception:
+            pass
 
     games_soon = [
         {
@@ -524,32 +651,35 @@ def build_command_center(db: Session) -> dict[str, Any]:
         }
         for g in sorted(schedule, key=lambda x: x.tipoff_at)[:6]
     ]
-    prop = featured.get("prop") if featured.get("ok") else None
 
-    # Prefer warehouse board props when available for richer Command Center.
-    try:
-        from app.ingestion.nba_board import list_nba_props_from_warehouse
+    featured_prop = featured.get("prop") if featured.get("ok") else None
 
-        warehouse_props = list_nba_props_from_warehouse(db)
-    except Exception:
-        warehouse_props = []
-
+    # Prop of the Day + top 6 most likely to hit — must be from today's slate.
+    prop: dict[str, Any] | None = None
     top_props: list[dict[str, Any]] = []
-    if warehouse_props:
-        top_props = sorted(warehouse_props, key=lambda p: p.get("evPercent") or 0, reverse=True)[:8]
-    elif prop:
-        top_props = [prop]
-        for market, scale, delta_rs in (("Rebounds", 0.28, 6), ("Assists", 0.18, 8)):
-            clone = {**prop, "id": f"{prop['id']}-{market.lower()[:3]}", "market": market}
-            clone["line"] = max(0.5, round(prop["line"] * scale * 2) / 2)
-            clone["researchScore"] = max(60, prop["researchScore"] - delta_rs)
-            clone["confidence"] = max(55, prop["confidence"] - delta_rs + 1)
-            clone["isModelEstimate"] = True
-            top_props.append(clone)
+    if today_props:
+        prop = today_props[0]
+        # Prefer featured why writeup when same player/market
+        if featured_prop and str(featured_prop.get("player")) == str(prop.get("player")):
+            if featured_prop.get("why") and not prop.get("why"):
+                prop = {**prop, "why": featured_prop["why"]}
+        top_props = today_props[1:7] if len(today_props) > 1 else today_props[:6]
+        if prop and top_props and top_props[0].get("id") == prop.get("id"):
+            top_props = today_props[1:7]
+    elif featured_prop and _tip_date(featured_prop) == datetime.fromisoformat(board_date).date():
+        prop = featured_prop
+        top_props = [featured_prop][:6]
+    elif featured_prop:
+        # Featured ESPN prop is not from today — keep schedule context but don't
+        # advertise a stale Prop of the Day.
+        prop = None
+        top_props = []
 
-    best_ev = top_props[0] if top_props else prop
+    best_ev = (
+        max(today_props, key=lambda p: float(p.get("evPercent") or 0)) if today_props else prop
+    )
     highest = (
-        max(top_props, key=lambda p: p.get("confidence") or 0) if top_props else prop
+        max(today_props, key=lambda p: float(p.get("confidence") or 0)) if today_props else prop
     )
 
     return {
@@ -579,6 +709,7 @@ def build_command_center(db: Session) -> dict[str, Any]:
         "featured": featured,
         "providers": {
             "schedule": "espn-nba",
-            "odds": "mock" if (prop or {}).get("oddsAreMock", True) else "the-odds-api",
+            "odds": "mock" if (prop or {}).get("oddsAreMock", True) else "line-aggregator",
+            "slate": "warehouse-today",
         },
     }

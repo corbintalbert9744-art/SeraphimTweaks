@@ -7,6 +7,8 @@ import { PropOfTheDayCard } from "@/components/command/PropOfTheDayCard";
 import { LeagueBadge } from "@/components/shared/LeagueBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { cn } from "@/lib/utils";
+import { propResearchPath } from "@/lib/playerLinks";
+import type { LeagueCode } from "@/data/mock";
 
 type CommandCenterResponse = {
   generatedAt: string;
@@ -101,9 +103,83 @@ export default function CommandCenterPage() {
           ) : (
             <EmptyState
               title="No Prop of the Day yet"
-              description="Once ESPN returns a usable NBA game + gamelog, the analytics engine will publish a featured prop here."
+              description="Waiting on today’s live slate props. Open a board after sync, then refresh."
             />
           )}
+
+          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5 transition hover:border-yellow-500/20">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-white">Most likely to hit</h2>
+                <p className="mt-1 text-xs text-neutral-500">
+                  Top 6 from today’s slate ranked by lean-side hit probability
+                </p>
+              </div>
+              <Link href="/research" className="text-xs text-yellow-400 hover:underline">
+                Research hub
+              </Link>
+            </div>
+            {(data.topProps ?? []).length === 0 ? (
+              <EmptyState
+                title="No today props yet"
+                description="Sync a pick’em board for today’s games to fill this list."
+                className="py-8"
+              />
+            ) : (
+              <ul className="divide-y divide-[#151515]">
+                {(data.topProps ?? []).slice(0, 6).map((p, idx) => {
+                  const hitPct =
+                    p.hitPct ??
+                    Math.round(
+                      Number(
+                        (p.side === "Under" ? p.underProbability : p.overProbability) ??
+                          p.noVigProb ??
+                          0,
+                      ) * 100,
+                    );
+                  return (
+                    <li
+                      key={p.id}
+                      className="flex flex-wrap items-center justify-between gap-3 py-3 transition hover:bg-white/[0.02]"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] tabular-nums text-neutral-600">#{idx + 1}</span>
+                          <LeagueBadge league={(p.league as LeagueCode) || "NBA"} />
+                          <p className="font-medium text-neutral-100">{p.player}</p>
+                        </div>
+                        <p className="mt-1 text-xs text-neutral-500">
+                          {p.side} {p.line} {p.market}
+                          {p.team ? ` · ${p.team}` : ""}
+                          {p.opponent ? ` vs ${p.opponent}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <div className="text-right">
+                          <p
+                            className={cn(
+                              "text-sm font-semibold tabular-nums",
+                              hitPct >= 60 ? "text-emerald-300" : hitPct <= 45 ? "text-red-300" : "text-white",
+                            )}
+                          >
+                            {hitPct}%
+                          </p>
+                          <p className="text-[10px] uppercase tracking-wide text-neutral-600">Hit</p>
+                        </div>
+                        <ResearchScoreBadge score={p.researchScore ?? p.confidence ?? 0} size="sm" />
+                        <Link
+                          href={propResearchPath(p.id)}
+                          className="text-xs font-medium text-yellow-400 hover:underline"
+                        >
+                          Report
+                        </Link>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
@@ -137,9 +213,9 @@ export default function CommandCenterPage() {
           <div className="grid gap-6 xl:grid-cols-3">
             <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5 xl:col-span-2 transition hover:border-yellow-500/20">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-white">Top props</h2>
-                <Link href="/nba" className="text-xs text-yellow-400 hover:underline">
-                  NBA board
+                <h2 className="text-base font-semibold text-white">Today’s board pulse</h2>
+                <Link href="/wnba" className="text-xs text-yellow-400 hover:underline">
+                  WNBA board
                 </Link>
               </div>
               {(data.topProps ?? []).length === 0 ? (
@@ -148,12 +224,12 @@ export default function CommandCenterPage() {
                 <ul className="divide-y divide-[#151515]">
                   {(data.topProps ?? []).map((p) => (
                     <li
-                      key={p.id}
+                      key={`pulse-${p.id}`}
                       className="flex flex-wrap items-center justify-between gap-3 py-3 transition hover:bg-white/[0.02]"
                     >
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <LeagueBadge league="NBA" />
+                          <LeagueBadge league={(p.league as LeagueCode) || "NBA"} />
                           <p className="font-medium text-neutral-100">{p.player}</p>
                         </div>
                         <p className="mt-1 text-xs text-neutral-500">

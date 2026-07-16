@@ -41,7 +41,7 @@ def list_nfl_props_from_warehouse(db: Session) -> list[dict[str, Any]]:
         game = db.get(Game, prop.game_id) if prop.game_id else None
         team_abbr = _team_abbr(db, player.team_id if player else None)
         opp = "OPP"
-        tip = datetime.now(timezone.utc).isoformat()
+        tip = None
         if game:
             tip = game.tipoff_at.isoformat()
             home = _team_abbr(db, game.home_team_id)
@@ -58,6 +58,12 @@ def list_nfl_props_from_warehouse(db: Session) -> list[dict[str, Any]]:
             .scalar_one_or_none()
         )
         american = odds_row.american_odds if odds_row else -110
+        if tip is None:
+            stamp = (
+                (odds_row.captured_at if odds_row and odds_row.captured_at else None)
+                or getattr(analytics, "computed_at", None)
+            )
+            tip = stamp.isoformat() if stamp else None
 
         out.append(
             {

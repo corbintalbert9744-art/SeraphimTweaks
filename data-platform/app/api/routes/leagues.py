@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db.session import get_db
 from app.ingestion.generic_board import ensure_league_board, list_league_props
+from app.ingestion.comparison_books import build_market_comparison_books
 from app.ingestion.multi_sport_sync import (
     sync_all_sports,
     sync_mlb_warehouse,
@@ -272,7 +273,20 @@ def mlb_prop_detail(prop_id: str, db: Session = Depends(get_db)):
     row = next((p for p in props if p["id"] == prop_id), None)
     if not row:
         raise HTTPException(status_code=404, detail="Prop not found")
-    return {"ok": True, "prop": row, "live": True, "league": "MLB"}
+    projected = float(row.get("projectedValue") or row.get("line") or 0)
+    books = build_market_comparison_books(
+        db,
+        league="MLB",
+        base=row,
+        projected=projected,
+        model_side=str(row.get("side") or "Over"),
+    )
+    return {
+        "ok": True,
+        "prop": {**row, "books": books, "lines": books},
+        "live": True,
+        "league": "MLB",
+    }
 
 
 @router.get("/nhl/props/{prop_id}")
@@ -281,7 +295,20 @@ def nhl_prop_detail(prop_id: str, db: Session = Depends(get_db)):
     row = next((p for p in props if p["id"] == prop_id), None)
     if not row:
         raise HTTPException(status_code=404, detail="Prop not found")
-    return {"ok": True, "prop": row, "live": True, "league": "NHL"}
+    projected = float(row.get("projectedValue") or row.get("line") or 0)
+    books = build_market_comparison_books(
+        db,
+        league="NHL",
+        base=row,
+        projected=projected,
+        model_side=str(row.get("side") or "Over"),
+    )
+    return {
+        "ok": True,
+        "prop": {**row, "books": books, "lines": books},
+        "live": True,
+        "league": "NHL",
+    }
 
 
 @router.get("/soccer/games")
