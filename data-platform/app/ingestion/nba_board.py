@@ -497,7 +497,13 @@ def get_nba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
         projected_value=projected or float(base.get("line") or 0),
     )
     for row in provider_lines:
-        if row.name in by_book and by_book[row.name].get("kind") == "sportsbook" and not by_book[row.name].get("isMock"):
+        existing = by_book.get(row.name)
+        if (
+            existing
+            and existing.get("kind") == "sportsbook"
+            and not existing.get("isMock")
+            and not existing.get("requiresIntegration")
+        ):
             continue  # keep live sportsbook quotes
         by_book[row.name] = {
             "book": row.name,
@@ -507,6 +513,9 @@ def get_nba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
             "over": row.over,
             "under": row.under,
             "isMock": row.is_mock,
+            "connected": getattr(row, "connected", False),
+            "requiresIntegration": getattr(row, "requires_integration", row.is_mock),
+            "integrationNote": getattr(row, "notes", "") or None,
         }
 
     books: list[dict[str, Any]] = []
@@ -520,11 +529,19 @@ def get_nba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
                 "modelSide": model_side,
             }
         )
-    books.sort(key=lambda b: b.get("edgeVsProjection") or 0, reverse=True)
-    if books:
-        books[0]["isBestValue"] = True
-        for b in books[1:]:
-            b["isBestValue"] = False
+    # Best value among connected lines first; fall back to all
+    connected = [b for b in books if not b.get("requiresIntegration")]
+    rank_pool = connected or books
+    rank_pool.sort(key=lambda b: b.get("edgeVsProjection") or 0, reverse=True)
+    books.sort(key=lambda b: (1 if b.get("requiresIntegration") else 0, -(b.get("edgeVsProjection") or 0)))
+    for b in books:
+        b["isBestValue"] = False
+    if rank_pool:
+        best_name = rank_pool[0]["book"]
+        for b in books:
+            if b["book"] == best_name:
+                b["isBestValue"] = True
+                break
 
     line = float(base["line"])
     movement = [
@@ -661,6 +678,38 @@ def get_nba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
             "streak": analytics.streak if analytics else None,
             "restDays": analytics.rest_days if analytics else None,
         },
+        "hitHistory": [
+            {
+                "date": r.played_at.strftime("%m/%d"),
+                "label": f"{r.played_at.strftime('%m/%d')} {'@' if not r.home else ''}{r.opponent or 'OPP'}",
+                "opponent": r.opponent or "OPP",
+                "home": bool(r.home),
+                "value": _stat(r),
+                "minutes": float(r.minutes or 0),
+                "hit": (
+                    (_stat(r) is not None)
+                    and (
+                        (_stat(r) or 0) > line
+                        if model_side == "Over"
+                        else (_stat(r) or 0) < line
+                    )
+                ),
+            }
+            for r in reversed(logs[:20])
+        ],
+        "recentGameLogs": [
+            {
+                "date": r.played_at.strftime("%b %d"),
+                "opponent": r.opponent or "OPP",
+                "home": bool(r.home),
+                "minutes": r.minutes,
+                "value": _stat(r),
+                "points": r.points,
+                "rebounds": r.rebounds,
+                "assists": r.assists,
+            }
+            for r in logs[:12]
+        ],
         "similarPropIds": [p["id"] for p in board.values() if p["id"] != prop_id][:4],
         "prediction": {
             "projectedValue": projected,

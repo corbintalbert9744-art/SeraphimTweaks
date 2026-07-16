@@ -235,6 +235,8 @@ function boardHrefFor(league: string): string {
   if (key === "NFL") return "/nfl";
   if (key === "WNBA") return "/wnba";
   if (key === "MLB") return "/mlb";
+  if (key === "NHL") return "/nhl";
+  if (key === "SOCCER") return "/soccer";
   if (key === "ATP") return "/atp";
   if (key === "WTA") return "/wta";
   return "/players";

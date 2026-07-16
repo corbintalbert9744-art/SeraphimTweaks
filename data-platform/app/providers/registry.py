@@ -75,17 +75,28 @@ def provider_status() -> list[dict]:
             ),
         },
         {
-            "name": "mock-comparison-lines",
-            "leagues": ["NBA", "NFL", "WNBA"],
+            "name": "catalog-comparison-lines",
+            "leagues": ["NBA", "NFL", "WNBA", "MLB", "NHL", "Soccer", "ATP", "WTA"],
             "capabilities": ["odds", "props", "pickem"],
             "requires_api_key": False,
             "is_mock": True,
             "configured": True,
             "legitimate": False,
             "notes": (
-                "MOCK sportsbook + pick'em comparison lines (PrizePicks, Underdog, Sleeper, ParlayPlay). "
-                "Swap via ComparisonLinesProvider without UI changes."
+                "Canonical line catalog: PrizePicks, Underdog, FanDuel, DraftKings, BetMGM, "
+                "Caesars, Fanatics Sportsbook, ESPN BET. Unconnected operators show placeholders "
+                "marked requires_integration. Swap adapters without UI changes."
             ),
+            "operators": [
+                "PrizePicks",
+                "Underdog",
+                "FanDuel",
+                "DraftKings",
+                "BetMGM",
+                "Caesars",
+                "Fanatics Sportsbook",
+                "ESPN BET",
+            ],
         },
         {
             "name": "espn-wnba",
@@ -96,6 +107,36 @@ def provider_status() -> list[dict]:
             "configured": False,
             "legitimate": False,
             "notes": "PLANNED — reuse ESPN basketball patterns from NBA adapter.",
+        },
+        {
+            "name": "mlb-provider",
+            "leagues": ["MLB"],
+            "capabilities": ["schedule", "gamelog", "injuries", "odds"],
+            "requires_api_key": True,
+            "is_mock": True,
+            "configured": False,
+            "legitimate": False,
+            "notes": "REQUIRES PROVIDER — MLB stats + odds adapter not connected.",
+        },
+        {
+            "name": "nhl-provider",
+            "leagues": ["NHL"],
+            "capabilities": ["schedule", "gamelog", "injuries", "odds"],
+            "requires_api_key": True,
+            "is_mock": True,
+            "configured": False,
+            "legitimate": False,
+            "notes": "REQUIRES PROVIDER — NHL stats + odds adapter not connected.",
+        },
+        {
+            "name": "soccer-provider",
+            "leagues": ["Soccer"],
+            "capabilities": ["schedule", "gamelog", "injuries", "odds"],
+            "requires_api_key": True,
+            "is_mock": True,
+            "configured": False,
+            "legitimate": False,
+            "notes": "REQUIRES PROVIDER — Soccer (EPL/MLS/etc.) adapter not connected.",
         },
         {
             "name": "tennis-provider",

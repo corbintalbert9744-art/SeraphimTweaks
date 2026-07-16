@@ -110,11 +110,21 @@ export function asPropDetailFromApi(row: Record<string, unknown>): PropDetail {
             line: Number(row.line ?? 0),
             over: Number(row.americanOdds ?? -110),
             under: -110,
+            requiresIntegration: true,
+            isMock: true,
           },
         ];
+  const rawLeague = String(row.league || "NBA");
+  const league = (
+    ["NBA", "NFL", "WNBA", "MLB", "NHL", "Soccer", "ATP", "WTA"].includes(rawLeague)
+      ? rawLeague
+      : rawLeague.toUpperCase() === "SOCCER"
+        ? "Soccer"
+        : "NBA"
+  ) as PropDetail["league"];
   return {
     id: String(row.id),
-    league: "NBA",
+    league,
     playerId: String(row.playerId ?? ""),
     player: String(row.player ?? ""),
     team: String(row.team ?? ""),
@@ -157,7 +167,7 @@ export function asPropDetailFromApi(row: Record<string, unknown>): PropDetail {
     overProbability: row.overProbability != null ? Number(row.overProbability) : undefined,
     underProbability: row.underProbability != null ? Number(row.underProbability) : undefined,
     bestValueBook: row.bestValueBook != null ? String(row.bestValueBook) : books.find((b) => b.isBestValue)?.book,
-    linesAreMock: Boolean(row.linesAreMock ?? books.some((b) => b.isMock)),
+    linesAreMock: Boolean(row.linesAreMock ?? books.some((b) => b.isMock || b.requiresIntegration)),
     homeAway: row.homeAway as PropDetail["homeAway"],
     minutesTrend: row.minutesTrend as PropDetail["minutesTrend"],
     projectedMinutes: row.projectedMinutes != null ? Number(row.projectedMinutes) : undefined,
@@ -165,5 +175,9 @@ export function asPropDetailFromApi(row: Record<string, unknown>): PropDetail {
     opponentHistory: row.opponentHistory as PropDetail["opponentHistory"],
     injuryImpact: row.injuryImpact as PropDetail["injuryImpact"],
     hitRates: row.hitRates as PropDetail["hitRates"],
+    hitHistory: Array.isArray(row.hitHistory) ? (row.hitHistory as PropDetail["hitHistory"]) : undefined,
+    recentGameLogs: Array.isArray(row.recentGameLogs)
+      ? (row.recentGameLogs as PropDetail["recentGameLogs"])
+      : undefined,
   };
 }

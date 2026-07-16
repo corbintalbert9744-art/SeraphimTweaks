@@ -12,6 +12,8 @@ import CommandCenterPage from "@/pages/analytics/CommandCenterPage";
 import NbaPage from "@/pages/analytics/NbaPage";
 import NflPage from "@/pages/analytics/NflPage";
 import MlbPage from "@/pages/analytics/MlbPage";
+import NhlPage from "@/pages/analytics/NhlPage";
+import SoccerPage from "@/pages/analytics/SoccerPage";
 import TennisPage from "@/pages/analytics/TennisPage";
 import WnbaPage from "@/pages/analytics/WnbaPage";
 import PlayersHubPage from "@/pages/analytics/PlayersHubPage";
@@ -64,6 +66,8 @@ function MembersApp() {
             <Route path="/nba" component={NbaPage} />
             <Route path="/nfl" component={NflPage} />
             <Route path="/mlb" component={MlbPage} />
+            <Route path="/nhl" component={NhlPage} />
+            <Route path="/soccer" component={SoccerPage} />
             <Route path="/players" component={PlayersHubPage} />
             <Route path="/research" component={ResearchHubPage} />
             <Route path="/atp">{() => <TennisPage tour="ATP" />}</Route>

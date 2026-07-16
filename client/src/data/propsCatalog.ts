@@ -18,6 +18,10 @@ export interface BookQuote {
   kind?: "sportsbook" | "pickem";
   slug?: string;
   isMock?: boolean;
+  connected?: boolean;
+  /** True when this operator has no live adapter yet — placeholder line. */
+  requiresIntegration?: boolean;
+  integrationNote?: string | null;
   edgeVsProjection?: number;
   isBestValue?: boolean;
   projectedValue?: number;
@@ -102,6 +106,26 @@ export interface PropDetail {
     streak?: number | null;
     restDays?: number | null;
   };
+  /** Full historical hit/miss series vs the research line (warehouse gamelogs). */
+  hitHistory?: Array<{
+    date: string;
+    label: string;
+    opponent: string;
+    home: boolean;
+    value: number | null;
+    minutes: number;
+    hit: boolean;
+  }>;
+  recentGameLogs?: Array<{
+    date: string;
+    opponent: string;
+    home: boolean;
+    minutes?: number | null;
+    value?: number | null;
+    points?: number | null;
+    rebounds?: number | null;
+    assists?: number | null;
+  }>;
 }
 
 const catalog: Record<string, PropDetail> = {};

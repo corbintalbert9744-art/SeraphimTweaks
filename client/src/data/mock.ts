@@ -1,4 +1,4 @@
-export type LeagueCode = "NBA" | "NFL" | "ATP" | "WTA" | "WNBA" | "MLB";
+export type LeagueCode = "NBA" | "NFL" | "ATP" | "WTA" | "WNBA" | "MLB" | "NHL" | "Soccer";
 
 export type ResearchCheckStatus = "pass" | "warn" | "fail" | "unknown";
 
@@ -420,5 +420,17 @@ export const leagueMeta: Record<
     blurb: "Hits, strikeouts, and counting props with daily slate research.",
     gamesToday: 12,
     propsLive: 268,
+  },
+  NHL: {
+    name: "NHL",
+    blurb: "Skater and goalie props with matchup and ice-time context.",
+    gamesToday: 10,
+    propsLive: 0,
+  },
+  Soccer: {
+    name: "Soccer",
+    blurb: "Shots, goals, and assist props across major soccer leagues.",
+    gamesToday: 18,
+    propsLive: 0,
   },
 };

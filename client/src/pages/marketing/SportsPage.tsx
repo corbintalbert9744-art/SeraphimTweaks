@@ -4,7 +4,7 @@ import { MarketingShell } from "@/components/marketing/MarketingShell";
 const sports = [
   {
     name: "NBA",
-    blurb: "Nightly player props with hit rates, no-vig, and Research Score on a live-ready board.",
+    blurb: "Nightly player props with hit rates, no-vig, and Research Score on a live board.",
   },
   {
     name: "NFL",
@@ -12,19 +12,23 @@ const sports = [
   },
   {
     name: "MLB",
-    blurb: "Daily hits, RBIs, strikeouts, home runs, and total bases with the same research layout.",
+    blurb: "Daily hits, RBIs, strikeouts, home runs, and total bases — provider pending.",
   },
   {
-    name: "ATP",
-    blurb: "Men’s tour match and prop research with form checkpoints and transparent scoring.",
+    name: "NHL",
+    blurb: "Skater and goalie props with ice-time and matchup research — provider pending.",
   },
   {
-    name: "WTA",
-    blurb: "Women’s tour boards using the same Seraphim research language as every other sport.",
+    name: "Soccer",
+    blurb: "Shots, goals, and assist props across major soccer leagues — provider pending.",
   },
   {
     name: "WNBA",
-    blurb: "Player props and pace/matchup context for the WNBA slate.",
+    blurb: "Player props and pace/matchup context for the WNBA slate — planned next.",
+  },
+  {
+    name: "Tennis (ATP / WTA)",
+    blurb: "Tour match and prop research with form checkpoints — requires tennis provider.",
   },
 ];
 
@@ -36,10 +40,12 @@ export default function SportsPage() {
           Supported Sports
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-          Research across six leagues
+          Research across seven sports
         </h1>
         <p className="mt-5 max-w-2xl text-lg text-neutral-400">
-          One membership. Consistent boards. Switch sports without learning a new workflow.
+          One membership. Our projection model. Line Comparison across PrizePicks, Underdog,
+          FanDuel, DraftKings, BetMGM, Caesars, Fanatics, and ESPN BET — adapters swap without
+          UI changes.
         </p>
 
         <div className="mt-16 grid gap-8 md:grid-cols-2">

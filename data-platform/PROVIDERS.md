@@ -40,9 +40,18 @@ Framework modules:
 | espn-nfl | NFL | Yes | None |
 | the-odds-api | NBA, NFL, WNBA, ATP*, WTA* | When keyed | `ODDS_API_KEY` |
 | mock-odds | all | Dev fallback | None — labeled `oddsAreMock` |
-| mock-comparison-lines | NBA, NFL, WNBA | Mock | Swap when book/pick'em keys exist |
+| **catalog-comparison-lines** | All sports | Placeholders until keyed | PrizePicks, Underdog, FanDuel, DraftKings, BetMGM, Caesars, Fanatics, ESPN BET |
 | espn-wnba | WNBA | Not yet | Build adapter (next) |
+| mlb / nhl / soccer | MLB, NHL, Soccer | Not yet | **REQUIRES PROVIDER** |
 | tennis | ATP, WTA | Not yet | **REQUIRES PROVIDER SELECTION** |
+
+### Line Comparison adapters
+
+`app/providers/comparison_lines.py` defines a fixed catalog of 8 operators.
+Each row is always returned to the UI. When an operator is not connected,
+the backend emits a **placeholder line** with `requiresIntegration: true`.
+Live The Odds API quotes overlay FanDuel / DraftKings / BetMGM (and mapped
+books) without changing PropDetail or `LineComparison`.
 
 \* ATP/WTA sport keys in The Odds API must be verified per tournament before production use.
 

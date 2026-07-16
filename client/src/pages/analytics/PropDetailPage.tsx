@@ -21,6 +21,7 @@ import { recomputeLegSide } from "@/lib/legStats";
 import { cn } from "@/lib/utils";
 import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
+import { LineComparison } from "@/components/shared/LineComparison";
 
 function MovementChart({
   points,
@@ -116,6 +117,61 @@ function MinutesTrend({ points }: { points: NonNullable<PropDetail["minutesTrend
           <span className="text-[9px] text-neutral-600">{p.date}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function HitHistoryChart({
+  history,
+  line,
+}: {
+  history: NonNullable<PropDetail["hitHistory"]>;
+  line: number;
+}) {
+  if (!history.length) {
+    return <p className="text-sm text-neutral-500">Hit-rate history fills as warehouse gamelogs land.</p>;
+  }
+  const vals = history.map((h) => h.value ?? 0);
+  const max = Math.max(...vals, line, 1) * 1.15;
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap gap-3 text-[11px] text-neutral-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" /> Hit
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-red-500/70" /> Miss
+        </span>
+        <span className="tabular-nums text-neutral-400">Line {line}</span>
+      </div>
+      <div className="flex h-36 items-end gap-1">
+        {history.map((g, i) => {
+          const v = g.value ?? 0;
+          const h = Math.max(8, (v / max) * 100);
+          return (
+            <div key={`${g.label}-${i}`} className="flex h-full flex-1 flex-col items-center justify-end">
+              <span
+                className={cn(
+                  "mb-1 text-[9px] font-semibold tabular-nums",
+                  g.hit ? "text-emerald-300" : "text-red-300/80",
+                )}
+              >
+                {g.value != null ? g.value : "—"}
+              </span>
+              <div
+                className={cn(
+                  "w-full max-w-[22px] rounded-t-md",
+                  g.hit
+                    ? "bg-gradient-to-t from-emerald-700 to-emerald-400"
+                    : "bg-gradient-to-t from-red-900/80 to-red-500/70",
+                )}
+                style={{ height: `${h}%` }}
+                title={g.label}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -265,7 +321,7 @@ export default function PropDetailPage() {
         </Link>
         {prop.linesAreMock && (
           <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-200">
-            Comparison lines · mock until live providers
+            Some lines · require integration
           </span>
         )}
       </div>
@@ -352,68 +408,31 @@ export default function PropDetailPage() {
 
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
-          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
-            <div className="mb-1 flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold text-white">Sportsbook / Pick&apos;em lines</h2>
-              <p className="text-[11px] text-neutral-500">Click a line · sorted by model edge</p>
-            </div>
-            <p className="mb-4 text-xs text-neutral-500">
-              Projection {projected.toFixed(1)} · recommendation {recommendation}. Greatest edge marked Best Value.
-            </p>
-            <ul className="space-y-2">
-              {rankedBooks.map((b) => {
-                const active = (selectedBook ?? rankedBooks.find((x) => x.isBestValue)?.book) === b.book;
-                const odds = selectedSide === "Over" ? b.over : b.under;
-                return (
-                  <li key={b.book}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBook(b.book)}
-                      className={cn(
-                        "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm transition",
-                        active
-                          ? "border-yellow-500/40 bg-yellow-500/10"
-                          : "border-[#1a1a1a] bg-black/20 hover:border-neutral-700",
-                      )}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-neutral-100">{b.book}</span>
-                          <span className="rounded border border-[#222] px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-neutral-500">
-                            {b.kind === "pickem" ? "Pick'em" : "Sportsbook"}
-                          </span>
-                          {b.isBestValue && (
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
-                              Best Value
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-[11px] text-neutral-500">
-                          Edge vs projection{" "}
-                          <span className="tabular-nums text-neutral-300">
-                            {(b.edgeVsProjection ?? 0) > 0 ? "+" : ""}
-                            {(b.edgeVsProjection ?? 0).toFixed(1)}
-                          </span>
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-semibold tabular-nums text-white">{b.line}</p>
-                        {b.kind !== "pickem" && (
-                          <p className="text-xs tabular-nums text-neutral-400">{formatAmericanOdds(odds)}</p>
-                        )}
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+          <LineComparison
+            books={prop.books}
+            projected={projected}
+            modelSide={recommendation}
+            consensusLine={prop.line}
+            selectedSide={selectedSide}
+            selectedBook={selectedBook}
+            onSelectBook={setSelectedBook}
+          />
 
           <section data-feature="hit-rates" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
             <h2 className="text-base font-semibold text-white">L5 / L10 / L20 hit rates</h2>
             <p className="mt-1 text-xs text-neutral-500">Clear rate at the consensus research line ({prop.line})</p>
             <div className="mt-4">
               <HitRateBars prop={prop} />
+            </div>
+          </section>
+
+          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5" data-feature="hit-history">
+            <h2 className="text-base font-semibold text-white">Historical hit-rate</h2>
+            <p className="mt-1 text-xs text-neutral-500">
+              Warehouse gamelogs vs line {prop.line} · lean {recommendation}
+            </p>
+            <div className="mt-4">
+              <HitHistoryChart history={prop.hitHistory ?? []} line={prop.line} />
             </div>
           </section>
 
@@ -463,7 +482,7 @@ export default function PropDetailPage() {
           <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
             <div className="mb-4 flex items-end justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold text-white">Minutes played trend</h2>
+                <h2 className="text-base font-semibold text-white">Minutes / trend</h2>
                 <p className="mt-1 text-xs text-neutral-500">
                   Projected workload · {prop.projectedMinutes ?? "—"} min · Usage proxy{" "}
                   {prop.usageRate != null ? `${prop.usageRate}%` : "—"}
@@ -471,6 +490,41 @@ export default function PropDetailPage() {
               </div>
             </div>
             <MinutesTrend points={prop.minutesTrend ?? []} />
+          </section>
+
+          <section className="card-3d rounded-2xl border border-[#1a1a1a] p-5" data-feature="game-logs">
+            <h2 className="text-base font-semibold text-white">Recent game logs</h2>
+            <p className="mt-1 text-xs text-neutral-500">{prop.market} from warehouse gamelogs</p>
+            {(prop.recentGameLogs ?? []).length === 0 ? (
+              <p className="mt-4 text-sm text-neutral-500">Game logs appear after sync.</p>
+            ) : (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="text-[10px] uppercase tracking-wider text-neutral-500">
+                    <tr>
+                      <th className="pb-2 pr-3 font-medium">Date</th>
+                      <th className="pb-2 pr-3 font-medium">Opp</th>
+                      <th className="pb-2 pr-3 font-medium">Min</th>
+                      <th className="pb-2 font-medium tabular-nums">{prop.market}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1a1a1a]">
+                    {(prop.recentGameLogs ?? []).map((g) => (
+                      <tr key={`${g.date}-${g.opponent}`}>
+                        <td className="py-2 pr-3 text-neutral-400">{g.date}</td>
+                        <td className="py-2 pr-3 text-neutral-300">
+                          {g.home ? "vs" : "@"} {g.opponent}
+                        </td>
+                        <td className="py-2 pr-3 tabular-nums text-neutral-400">{g.minutes ?? "—"}</td>
+                        <td className="py-2 tabular-nums font-medium text-neutral-100">
+                          {g.value != null ? g.value : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           <section data-feature="line-movement" className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
