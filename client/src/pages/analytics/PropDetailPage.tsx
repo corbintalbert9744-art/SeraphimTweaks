@@ -382,10 +382,35 @@ export default function PropDetailPage() {
             </div>
             <HitRateBars
               compact
-              history={prop.hitHistory ?? []}
+              history={
+                (prop.hitHistory?.length
+                  ? prop.hitHistory
+                  : (prop.recentGameLogs ?? []).map((g) => ({
+                      label: g.opponent || g.date,
+                      opponent: g.opponent,
+                      value: g.value ?? null,
+                      hit:
+                        g.value == null
+                          ? false
+                          : selectedSide === "Under"
+                            ? g.value < prop.line
+                            : g.value > prop.line,
+                    }))) ?? []
+              }
               line={prop.line}
               window={hitWindow}
               windowLabel={hitWindow}
+              propId={prop.id}
+              side={selectedSide}
+              fallbackRate={
+                hitWindow === "L5"
+                  ? prop.l5
+                  : hitWindow === "L10"
+                    ? prop.l10
+                    : hitWindow === "L20"
+                      ? prop.l20
+                      : prop.season
+              }
             />
           </section>
 

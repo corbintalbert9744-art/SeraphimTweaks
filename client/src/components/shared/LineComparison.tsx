@@ -82,7 +82,7 @@ export function SportsbookAppSwitcher({
 
   return (
     <div className="overflow-x-auto pb-1" data-feature="sportsbook-switcher">
-      <div className="flex min-w-max items-center gap-3">
+      <div className="flex min-w-max items-center gap-1.5">
         {rows.map((b) => {
           const spec = providerSpecByName(b.book) ?? CANONICAL_LINE_PROVIDERS.find((p) => p.slug === b.slug);
           const active = activeName === b.book;
@@ -95,24 +95,24 @@ export function SportsbookAppSwitcher({
               onClick={() => onSelectBook(b.book)}
               title={pending ? b.integrationNote || "Unavailable" : b.book}
               className={cn(
-                "group flex items-center gap-2 rounded-xl border px-2.5 py-1.5 transition",
+                "group flex items-center gap-1.5 rounded-lg border px-2 py-1 transition",
                 active
-                  ? "border-white/20 bg-white/[0.08] shadow-[0_0_0_1px_rgba(255,255,255,0.06)]"
+                  ? "border-white/20 bg-white/[0.08]"
                   : "border-transparent bg-white/[0.03] hover:border-white/10 hover:bg-white/[0.05]",
                 pending && !active && "opacity-70",
               )}
             >
               <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold tracking-wide text-black"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[9px] font-bold tracking-wide text-black"
                 style={{ backgroundColor: accent }}
               >
                 {spec?.mark ?? b.book.slice(0, 2).toUpperCase()}
               </span>
               <span className="text-left">
-                <span className={cn("block text-xs font-semibold", active ? "text-white" : "text-neutral-300")}>
+                <span className={cn("block text-[11px] font-semibold", active ? "text-white" : "text-neutral-300")}>
                   {b.book}
                 </span>
-                <span className="mt-0.5 block text-[10px] tabular-nums text-neutral-500">
+                <span className="block text-[9px] tabular-nums text-neutral-500">
                   {pending ? "Unavailable" : `Line ${b.line}`}
                 </span>
               </span>
@@ -178,17 +178,17 @@ export function LineComparison({
 
       <SportsbookAppSwitcher rows={rows} selectedBook={selectedBook} onSelectBook={onSelectBook} />
 
-      {/* Full comparison table — source attributed per row */}
-      <div className="mt-3 max-h-40 overflow-auto rounded-xl border border-white/[0.06]">
-        <table className="min-w-[640px] w-full text-left text-xs">
-          <thead className="sticky top-0 bg-[#111] text-[10px] uppercase tracking-wider text-neutral-500">
+      {/* Full table — no inner scroll so every operator is visible */}
+      <div className="mt-2 overflow-x-auto rounded-xl border border-white/[0.06]">
+        <table className="min-w-[560px] w-full text-left text-[11px]">
+          <thead className="bg-[#111] text-[10px] uppercase tracking-wider text-neutral-500">
             <tr>
-              <th className="px-2.5 py-1.5 font-medium">Operator</th>
-              <th className="px-2.5 py-1.5 font-medium">Line</th>
-              <th className="px-2.5 py-1.5 font-medium">Over</th>
-              <th className="px-2.5 py-1.5 font-medium">Under</th>
-              <th className="px-2.5 py-1.5 font-medium">Edge</th>
-              <th className="px-2.5 py-1.5 font-medium">Source</th>
+              <th className="px-2 py-1 font-medium">Operator</th>
+              <th className="px-2 py-1 font-medium">Line</th>
+              <th className="px-2 py-1 font-medium">Over</th>
+              <th className="px-2 py-1 font-medium">Under</th>
+              <th className="px-2 py-1 font-medium">Edge</th>
+              <th className="px-2 py-1 font-medium">Source</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.04]">
@@ -204,7 +204,7 @@ export function LineComparison({
                     activeName === row.book && !isBest && "bg-white/[0.02]",
                   )}
                 >
-                  <td className="px-2.5 py-1.5">
+                  <td className="px-2 py-1">
                     <button
                       type="button"
                       className="text-left font-medium text-neutral-100 hover:text-yellow-400"
@@ -212,24 +212,24 @@ export function LineComparison({
                     >
                       {row.book}
                       {isBest && (
-                        <span className="ml-2 rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
+                        <span className="ml-1.5 rounded border border-emerald-500/30 bg-emerald-500/10 px-1 py-0.5 text-[9px] font-semibold uppercase text-emerald-300">
                           Best
                         </span>
                       )}
                     </button>
                   </td>
-                  <td className="px-2.5 py-1.5 tabular-nums text-neutral-200">
+                  <td className="px-2 py-1 tabular-nums text-neutral-200">
                     {unavailable ? "—" : row.line}
                   </td>
-                  <td className="px-2.5 py-1.5 tabular-nums text-neutral-400">
+                  <td className="px-2 py-1 tabular-nums text-neutral-400">
                     {unavailable || row.kind === "pickem" ? "—" : formatAmericanOdds(row.over)}
                   </td>
-                  <td className="px-2.5 py-1.5 tabular-nums text-neutral-400">
+                  <td className="px-2 py-1 tabular-nums text-neutral-400">
                     {unavailable || row.kind === "pickem" ? "—" : formatAmericanOdds(row.under)}
                   </td>
                   <td
                     className={cn(
-                      "px-2.5 py-1.5 tabular-nums font-semibold",
+                      "px-2 py-1 tabular-nums font-semibold",
                       unavailable
                         ? "text-neutral-600"
                         : (row.edgeVsProjection ?? 0) >= 0
@@ -241,7 +241,7 @@ export function LineComparison({
                       ? "—"
                       : `${(row.edgeVsProjection ?? 0) > 0 ? "+" : ""}${(row.edgeVsProjection ?? 0).toFixed(1)}`}
                   </td>
-                  <td className="px-2.5 py-1.5 text-[11px] text-neutral-500">
+                  <td className="px-2 py-1 text-[10px] text-neutral-500">
                     {unavailable ? (
                       <span className="text-amber-300/80" title={row.integrationNote || undefined}>
                         Unavailable
@@ -258,48 +258,32 @@ export function LineComparison({
       </div>
 
       {active && (
-        <div className="mt-8 grid gap-6 border-t border-white/[0.06] pt-8 sm:grid-cols-[1fr_auto] sm:items-center">
-          <div className="flex items-start gap-4">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] pt-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-black"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold text-black"
               style={{ backgroundColor: spec?.accent ?? "#737373" }}
             >
               {spec?.mark ?? active.book.slice(0, 2).toUpperCase()}
             </span>
-            <div>
-              <p className="text-base font-semibold text-white">{active.book}</p>
-              <p className="mt-1 text-sm text-neutral-500">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-white">{active.book}</p>
+              <p className="truncate text-[10px] text-neutral-500">
                 {pending
-                  ? active.integrationNote || "Unavailable from configured providers"
+                  ? active.integrationNote || "Unavailable"
                   : active.isBestValue
                     ? "Best value among connected books"
-                    : `${active.kind === "pickem" ? "Pick'em" : "Sportsbook"} · via ${sourceLabel(active.sourceProvider)}`}
-              </p>
-              <p className="mt-3 text-sm text-neutral-400">
-                Model edge{" "}
-                <span className="tabular-nums text-neutral-200">
-                  {(active.edgeVsProjection ?? 0) > 0 ? "+" : ""}
-                  {(active.edgeVsProjection ?? 0).toFixed(1)}
-                </span>
-                {" · "}projection {projected.toFixed(1)} − line {active.line}
+                    : `${active.kind === "pickem" ? "Pick'em" : "Book"} · ${sourceLabel(active.sourceProvider)}`}
               </p>
             </div>
           </div>
-          <div className="text-left sm:text-right">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+          <div className="text-right">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
               {selectedSide} line
             </p>
-            <p className="mt-1 text-4xl font-semibold tabular-nums text-white">
+            <p className="text-xl font-semibold tabular-nums text-white">
               {pending ? "—" : active.line}
             </p>
-            {active.kind !== "pickem" && !pending && (
-              <p className="mt-1 text-sm tabular-nums text-neutral-400">{formatAmericanOdds(odds)}</p>
-            )}
-            {pending && (
-              <p className="mt-2 text-[11px] font-medium uppercase tracking-wider text-amber-300/90">
-                Data unavailable
-              </p>
-            )}
           </div>
         </div>
       )}
