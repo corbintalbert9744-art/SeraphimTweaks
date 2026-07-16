@@ -20,9 +20,22 @@ SPORT_KEYS = {
     "NBA": "basketball_nba",
     "NFL": "americanfootball_nfl",
     "WNBA": "basketball_wnba",
+    "MLB": "baseball_mlb",
+    "NHL": "icehockey_nhl",
+    "Soccer": "soccer_epl",  # free-tier friendly; expand per competition as needed
     # Tennis keys vary by tour — confirm before production use:
     "ATP": "tennis_atp_french_open",  # PLACEHOLDER — select correct tournament keys
     "WTA": "tennis_wta_french_open",  # PLACEHOLDER — select correct tournament keys
+}
+
+# Per-league player-prop market keys (The Odds API). Empty = skip prop fetch.
+PROP_MARKETS = {
+    "NBA": "player_points,player_rebounds,player_assists",
+    "NFL": "player_pass_yds,player_rush_yds,player_reception_yds",
+    "WNBA": "player_points,player_rebounds,player_assists",
+    "MLB": "batter_hits,batter_home_runs,batter_total_bases",
+    "NHL": "player_points,player_goals,player_assists,player_shots_on_goal",
+    "Soccer": "player_goal_scorer_anytime",  # verify against Odds API docs for your plan
 }
 
 
@@ -33,7 +46,10 @@ class TheOddsApiProvider:
         capabilities=["odds", "props"],
         requires_api_key=True,
         is_mock=False,
-        notes="Live player-prop odds when ODDS_API_KEY is set. ATP/WTA sport keys need verification.",
+        notes=(
+            "Live player-prop odds when ODDS_API_KEY is set. "
+            "Supports NBA/NFL/WNBA/MLB/NHL/Soccer keys; ATP/WTA tournament keys need verification."
+        ),
     )
 
     BASE = "https://api.the-odds-api.com/v4"
@@ -55,9 +71,26 @@ class TheOddsApiProvider:
         _ = date
         # Player props endpoint — markets vary by sport.
         # REQUIRES: confirm market keys (player_points, etc.) for each league in The Odds API docs.
+        markets = PROP_MARKETS.get(league.upper())
+        if not markets:
+            return []
         events = self._get(f"/sports/{sport}/events", {})
         out: list[NormalizedOddsQuote] = []
         now = datetime.now(timezone.utc)
+        market_labels = {
+            "player_points": "Points",
+            "player_rebounds": "Rebounds",
+            "player_assists": "Assists",
+            "player_pass_yds": "Pass Yards",
+            "player_rush_yds": "Rush Yards",
+            "player_reception_yds": "Receiving Yards",
+            "batter_hits": "Hits",
+            "batter_home_runs": "Home Runs",
+            "batter_total_bases": "Total Bases",
+            "player_goals": "Goals",
+            "player_shots_on_goal": "Shots",
+            "player_goal_scorer_anytime": "Anytime Goalscorer",
+        }
         for event in events[:8]:
             eid = event.get("id")
             try:
@@ -65,7 +98,7 @@ class TheOddsApiProvider:
                     f"/sports/{sport}/events/{eid}/odds",
                     {
                         "regions": "us",
-                        "markets": "player_points,player_rebounds,player_assists",
+                        "markets": markets,
                         "oddsFormat": "american",
                     },
                 )
@@ -73,11 +106,8 @@ class TheOddsApiProvider:
                 continue
             for book in props.get("bookmakers") or []:
                 for market in book.get("markets") or []:
-                    market_name = {
-                        "player_points": "Points",
-                        "player_rebounds": "Rebounds",
-                        "player_assists": "Assists",
-                    }.get(market.get("key") or "", market.get("key") or "Prop")
+                    mkey = market.get("key") or ""
+                    market_name = market_labels.get(mkey, mkey or "Prop")
                     for outcome in market.get("outcomes") or []:
                         out.append(
                             NormalizedOddsQuote(

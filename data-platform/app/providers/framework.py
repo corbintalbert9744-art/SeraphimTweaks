@@ -240,7 +240,7 @@ class ProviderHttpClient:
         headers = {"User-Agent": self.user_agent, "Accept": "application/json"}
         for attempt in range(1, self.max_retries + 1):
             try:
-                with httpx.Client(timeout=self.timeout, headers=headers) as client:
+                with httpx.Client(timeout=self.timeout, headers=headers, follow_redirects=True) as client:
                     res = client.get(url, params=params)
                     if res.status_code in (429, 500, 502, 503, 504) and attempt < self.max_retries:
                         time.sleep(self.backoff_seconds * attempt)

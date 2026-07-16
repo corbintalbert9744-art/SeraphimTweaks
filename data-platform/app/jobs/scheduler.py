@@ -16,6 +16,13 @@ from app.ingestion.nba_pipeline import (
     import_nba_schedule,
     recalculate_open_prop_analytics,
 )
+from app.ingestion.multi_sport_sync import (
+    sync_all_sports,
+    sync_mlb_warehouse,
+    sync_nhl_warehouse,
+    sync_odds_all_leagues,
+    sync_soccer_warehouse,
+)
 from app.ingestion.nba_sync import sync_nba_warehouse
 from app.ingestion.nfl_pipeline import (
     build_and_store_featured_nfl_prop,
@@ -51,9 +58,23 @@ def job_refresh_odds() -> None:
         return {
             "nba": build_and_store_featured_prop(db),
             "nfl": build_and_store_featured_nfl_prop(db),
+            "odds_api": sync_odds_all_leagues(db),
         }
 
     _safe("refresh_odds", _run)
+
+
+def job_multi_sport_sync() -> None:
+    """MLB / NHL / Soccer / optional supplements → warehouse → projection boards."""
+
+    def _run(db):
+        return {
+            "mlb": sync_mlb_warehouse(db),
+            "nhl": sync_nhl_warehouse(db),
+            "soccer": sync_soccer_warehouse(db),
+        }
+
+    _safe("multi_sport_sync", _run)
 
 
 def job_update_injuries() -> None:
@@ -100,6 +121,14 @@ def _bootstrap_nba_sync() -> None:
     _safe("bootstrap_nba_sync", lambda db: sync_nba_warehouse(db))
 
 
+def _bootstrap_multi_sport() -> None:
+    settings = get_settings()
+    if not settings.bootstrap_multi_sport:
+        return
+    log.info("Bootstrap multi-sport warehouse sync starting")
+    _safe("bootstrap_multi_sport", lambda db: sync_all_sports(db))
+
+
 def start_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler and _scheduler.running:
@@ -136,11 +165,19 @@ def start_scheduler() -> BackgroundScheduler:
         id="recalculate_analytics",
         replace_existing=True,
     )
+    sched.add_job(
+        job_multi_sport_sync,
+        "interval",
+        hours=max(1, settings.schedule_multi_sport_hours),
+        id="multi_sport_sync",
+        replace_existing=True,
+    )
     sched.start()
     _scheduler = sched
 
     # Fire-and-forget bootstrap so the API is ready while ESPN sync runs.
     threading.Thread(target=_bootstrap_nba_sync, name="nba-bootstrap-sync", daemon=True).start()
+    threading.Thread(target=_bootstrap_multi_sport, name="multi-sport-bootstrap", daemon=True).start()
     return sched
 
 

@@ -16,11 +16,51 @@ from app.providers.base import (
     NormalizedInjury,
     NormalizedOddsQuote,
     NormalizedPlayer,
+    NormalizedTeam,
 )
 
 
 def _id(*parts: str) -> str:
     return ":".join(p for p in parts if p)
+
+
+def _provider_slug(league: str, raw: Optional[dict] = None) -> str:
+    if raw and isinstance(raw.get("source"), str) and raw["source"]:
+        return str(raw["source"])[:32]
+    return {
+        "NBA": "espn",
+        "NFL": "espn",
+        "WNBA": "espn",
+        "MLB": "mlb-statsapi",
+        "NHL": "nhl-api",
+        "Soccer": "football-data-org",
+        "ATP": "tennis",
+        "WTA": "tennis",
+    }.get(league.upper(), league.lower()[:32] or "provider")
+
+
+def upsert_team(db: Session, t: NormalizedTeam) -> Team:
+    # Prefer stable abbrev-based ids so schedule + roster paths converge.
+    tid = _id(t.league.lower(), "team", t.abbreviation.lower() or t.external_id)
+    team = db.get(Team, tid)
+    if not team:
+        # Existing row keyed by numeric external id (legacy) with same abbr
+        existing = db.execute(
+            select(Team).where(Team.league == t.league, Team.abbreviation == t.abbreviation)
+        ).scalar_one_or_none()
+        if existing:
+            team = existing
+        else:
+            team = Team(id=tid, league=t.league, abbreviation=t.abbreviation, name=t.name)
+            db.add(team)
+    team.abbreviation = t.abbreviation
+    team.name = t.name
+    team.city = t.city
+    team.logo_url = t.logo_url
+    team.provider = _provider_slug(t.league)
+    team.external_id = t.external_id or t.abbreviation or None
+    team.updated_at = datetime.now(timezone.utc)
+    return team
 
 
 def upsert_team_from_game(db: Session, game: NormalizedGame, side: str) -> Team:
@@ -36,7 +76,7 @@ def upsert_team_from_game(db: Session, game: NormalizedGame, side: str) -> Team:
     team.abbreviation = abbr
     team.name = name
     team.logo_url = logo
-    team.provider = "espn"
+    team.provider = _provider_slug(game.league, game.raw)
     team.external_id = ext or None
     team.updated_at = datetime.now(timezone.utc)
     return team
@@ -59,7 +99,7 @@ def upsert_game(db: Session, g: NormalizedGame) -> Game:
     row.home_score = g.home_score
     row.away_score = g.away_score
     row.venue = g.venue
-    row.provider = "espn"
+    row.provider = _provider_slug(g.league, g.raw)
     row.external_id = g.external_id
     row.raw = g.raw
     row.updated_at = datetime.now(timezone.utc)
@@ -77,13 +117,14 @@ def upsert_player(db: Session, p: NormalizedPlayer, team_id: Optional[str] = Non
     row.position = p.position
     row.jersey = p.jersey
     row.headshot_url = p.headshot_url
-    row.provider = "espn"
+    row.provider = _provider_slug(p.league)
     row.external_id = p.external_id
     row.active = True
     if team_id:
         row.team_id = team_id
     elif p.team_external_id:
-        row.team_id = _id(p.league.lower(), "team", p.team_external_id)
+        candidate = _id(p.league.lower(), "team", p.team_external_id)
+        row.team_id = candidate if db.get(Team, candidate) else None
     row.updated_at = datetime.now(timezone.utc)
     return row
 

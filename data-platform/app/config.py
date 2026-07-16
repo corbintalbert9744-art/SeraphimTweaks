@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     nba_sync_per_team: int = Field(default=3, alias="NBA_SYNC_PER_TEAM")
 
     odds_api_key: str | None = Field(default=None, alias="ODDS_API_KEY")
+    football_data_api_key: str | None = Field(default=None, alias="FOOTBALL_DATA_API_KEY")
+    bootstrap_multi_sport: bool = Field(default=False, alias="BOOTSTRAP_MULTI_SPORT")
+    schedule_multi_sport_hours: int = Field(default=6, alias="MULTI_SPORT_SYNC_HOURS")
     espn_user_agent: str = "SeraphimAnalytics/1.0 (+data-platform)"
 
     model_disclaimer: str = (

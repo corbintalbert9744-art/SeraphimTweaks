@@ -235,4 +235,52 @@ export function registerDataPlatformProxy(
       res.status(503).json({ ok: false, error: "data-platform down" });
     }
   });
+
+  const proxyLeagueGet = (mount: string, upstream: string, timeoutMs = 120_000) => {
+    app.get(mount, async (req, res) => {
+      const qs = new URLSearchParams();
+      for (const [k, v] of Object.entries(req.query)) {
+        if (typeof v === "string") qs.set(k, v);
+      }
+      const suffix = qs.toString() ? `?${qs}` : "";
+      try {
+        const up = await fetch(`${BASE}${upstream}${suffix}`, {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        res.status(up.status).json(await up.json());
+      } catch {
+        res.status(503).json({
+          error: "Data platform unavailable",
+          hint: "Start with: npm run data-platform",
+          props: [],
+          games: [],
+          live: false,
+        });
+      }
+    });
+  };
+
+  proxyLeagueGet("/api/mlb/games", "/api/v1/mlb/games");
+  proxyLeagueGet("/api/mlb/props", "/api/v1/mlb/props", 180_000);
+  proxyLeagueGet("/api/nhl/games", "/api/v1/nhl/games");
+  proxyLeagueGet("/api/nhl/props", "/api/v1/nhl/props", 180_000);
+  proxyLeagueGet("/api/soccer/games", "/api/v1/soccer/games");
+  proxyLeagueGet("/api/soccer/props", "/api/v1/soccer/props");
+
+  app.post("/api/jobs/sync-all", async (req, res) => {
+    const qs = typeof req.query.dates === "string" ? `?dates=${encodeURIComponent(req.query.dates)}` : "";
+    try {
+      const upstream = await fetch(`${BASE}/api/v1/jobs/sync-all${qs}`, {
+        method: "POST",
+        signal: AbortSignal.timeout(600_000),
+      });
+      res.status(upstream.status).json(await upstream.json());
+    } catch {
+      res.status(503).json({
+        error: "Multi-sport sync requires the Python data platform",
+        hint: "Start with: npm run data-platform",
+      });
+    }
+  });
 }

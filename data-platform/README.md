@@ -10,7 +10,7 @@ Python warehouse + analytics API for NBA → NFL → WNBA → ATP → WTA.
 | DB | PostgreSQL (prod) or SQLite (local zero-config) |
 | ORM | SQLAlchemy 2 |
 | Jobs | APScheduler |
-| Providers | Adapter interfaces — ESPN NBA live, The Odds API (key), mocks labeled |
+| Providers | Adapter interfaces — ESPN (NBA/NFL/WNBA), MLB Stats API, NHL API, Football-Data.org (key), Tennis Abstract (needs selection), The Odds API (key), optional nba_api / nflverse |
 
 Auth + Stripe stay on the Node/Express app (`npm run dev`). This service owns sports data.
 
@@ -27,6 +27,11 @@ pip install -r requirements.txt
 
 # Optional live odds
 # export ODDS_API_KEY=...
+
+# Optional soccer schedules (Football-Data.org free tier)
+# export FOOTBALL_DATA_API_KEY=...
+
+# Optional packages (no keys): pip install nba_api nfl_data_py
 
 uvicorn app.main:app --reload --port 8000 --app-dir .
 ```
@@ -78,13 +83,22 @@ curl -X POST http://localhost:8000/api/v1/nba/jobs/sync
 
 | Provider | Status | Config |
 |----------|--------|--------|
-| **espn-nba** | Live (first legitimate provider) | None — public ESPN APIs |
-| **the-odds-api** | Live when keyed | `ODDS_API_KEY` — without it, **mock -110** odds are used and flagged `oddsAreMock: true` |
-| **espn-nfl** | Live | None |
-| **espn-wnba** | Planned | Build after NBA warehouse stable |
-| **ATP / WTA** | Needs selection | Choose a licensed tennis + odds provider before production |
+| **espn-nba / espn-nfl / espn-wnba** | Live | None — public ESPN APIs |
+| **mlb-statsapi** | Live | None |
+| **nhl-api** | Live | None |
+| **nba-api / nflverse** | Optional supplements | `pip install nba_api` / `nfl_data_py` (no keys) |
+| **football-data-org** | When keyed | **`FOOTBALL_DATA_API_KEY`** — without it Soccer stays empty |
+| **tennis-abstract** | Needs selection | No public API — we do not scrape or invent ATP/WTA data |
+| **the-odds-api** | Live when keyed | **`ODDS_API_KEY`** — without it, labeled mock / placeholder comparison lines |
 
 See `PROVIDERS.md` for the adapter framework.
+
+```bash
+# Multi-sport warehouse sync
+curl -X POST http://localhost:8000/api/v1/jobs/sync-all
+# or
+PYTHONPATH=. python3 scripts/sync_all_sports.py
+```
 
 ## Analytics transparency
 
@@ -115,4 +129,5 @@ SQLAlchemy models in `app/db/models.py` align with `shared/schema.ts` and add:
 5. ✅ FastAPI + scheduler  
 6. ✅ Connect frontend (Express proxy)  
 7. ✅ NFL live  
-8. ⏳ WNBA → ATP → WTA  
+8. ✅ MLB + NHL live adapters → warehouse → Projection Engine V1  
+9. ✅ Soccer (Football-Data.org key) + Tennis Abstract stub (needs selection)  

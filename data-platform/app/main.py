@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import health, nba, nfl, platform, predict, wnba
+from app.api.routes import health, leagues, nba, nfl, platform, predict, wnba
 from app.config import get_settings
 from app.db.session import init_db
 from app.jobs.scheduler import start_scheduler, stop_scheduler
@@ -54,6 +54,7 @@ def create_app() -> FastAPI:
     app.include_router(nba.router, prefix="/api/v1")
     app.include_router(nfl.router, prefix="/api/v1")
     app.include_router(wnba.router, prefix="/api/v1")
+    app.include_router(leagues.router, prefix="/api/v1")
     return app
 
 

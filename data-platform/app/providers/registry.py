@@ -9,7 +9,13 @@ from app.providers.base import ProviderMeta, capability_matrix
 from app.providers.espn.nba import EspnNbaProvider
 from app.providers.espn.nfl import EspnNflProvider
 from app.providers.espn.wnba import EspnWnbaProvider
+from app.providers.mlb.statsapi import MlbStatsApiProvider
 from app.providers.mock.odds import MockOddsProvider
+from app.providers.nba_api.provider import NbaApiProvider, nba_api_installed
+from app.providers.nflverse.provider import NflverseProvider, nflverse_installed
+from app.providers.nhl.api import NhlApiProvider
+from app.providers.soccer.football_data import FootballDataOrgProvider
+from app.providers.tennis.tennis_abstract import TennisAbstractProvider
 from app.providers.the_odds_api.odds import TheOddsApiProvider
 
 
@@ -27,11 +33,16 @@ class ProviderBundle:
     metas: list[ProviderMeta] = field(default_factory=list)
 
 
-def _odds_provider():
+def get_odds_provider():
+    """Public odds resolver — live The Odds API when keyed, else labeled mock."""
     settings = get_settings()
     if settings.odds_api_key:
         return TheOddsApiProvider(api_key=settings.odds_api_key)
     return MockOddsProvider()
+
+
+# Back-compat alias used by older call sites
+_odds_provider = get_odds_provider
 
 
 def provider_status() -> list[dict]:
@@ -40,7 +51,15 @@ def provider_status() -> list[dict]:
     nba = EspnNbaProvider()
     nfl = EspnNflProvider()
     wnba = EspnWnbaProvider()
+    mlb = MlbStatsApiProvider()
+    nhl = NhlApiProvider()
+    soccer = FootballDataOrgProvider(settings.football_data_api_key or "")
+    tennis = TennisAbstractProvider()
+    nba_api = NbaApiProvider()
+    nflverse = NflverseProvider()
     odds_live = bool(settings.odds_api_key)
+    soccer_live = bool(settings.football_data_api_key)
+
     rows = [
         {
             "name": nba.meta.name,
@@ -75,16 +94,87 @@ def provider_status() -> list[dict]:
             "homepage": wnba.meta.homepage,
         },
         {
+            "name": nba_api.meta.name,
+            "leagues": nba_api.meta.leagues,
+            "capabilities": nba_api.meta.capabilities,
+            "requires_api_key": False,
+            "is_mock": False,
+            "configured": nba_api_installed(),
+            "legitimate": nba_api_installed(),
+            "installed": nba_api_installed(),
+            "notes": nba_api.meta.notes,
+            "homepage": nba_api.meta.homepage,
+        },
+        {
+            "name": nflverse.meta.name,
+            "leagues": nflverse.meta.leagues,
+            "capabilities": nflverse.meta.capabilities,
+            "requires_api_key": False,
+            "is_mock": False,
+            "configured": nflverse_installed(),
+            "legitimate": nflverse_installed(),
+            "installed": nflverse_installed(),
+            "notes": nflverse.meta.notes,
+            "homepage": nflverse.meta.homepage,
+        },
+        {
+            "name": mlb.meta.name,
+            "leagues": mlb.meta.leagues,
+            "capabilities": mlb.meta.capabilities,
+            "requires_api_key": False,
+            "is_mock": False,
+            "configured": True,
+            "legitimate": True,
+            "notes": mlb.meta.notes,
+            "homepage": mlb.meta.homepage,
+        },
+        {
+            "name": nhl.meta.name,
+            "leagues": nhl.meta.leagues,
+            "capabilities": nhl.meta.capabilities,
+            "requires_api_key": False,
+            "is_mock": False,
+            "configured": True,
+            "legitimate": True,
+            "notes": nhl.meta.notes,
+            "homepage": nhl.meta.homepage,
+        },
+        {
+            "name": soccer.meta.name,
+            "leagues": soccer.meta.leagues,
+            "capabilities": soccer.meta.capabilities,
+            "requires_api_key": True,
+            "is_mock": False,
+            "configured": soccer_live,
+            "legitimate": soccer_live,
+            "notes": soccer.meta.notes,
+            "homepage": soccer.meta.homepage,
+            "envVar": "FOOTBALL_DATA_API_KEY",
+        },
+        {
+            "name": tennis.meta.name,
+            "leagues": tennis.meta.leagues,
+            "capabilities": tennis.meta.capabilities,
+            "requires_api_key": True,
+            "is_mock": False,
+            "configured": False,
+            "legitimate": False,
+            "notes": tennis.meta.notes,
+            "homepage": tennis.meta.homepage,
+        },
+        {
             "name": "the-odds-api",
-            "leagues": ["NBA", "NFL", "WNBA", "ATP", "WTA"],
+            "leagues": ["NBA", "NFL", "WNBA", "MLB", "NHL", "Soccer", "ATP", "WTA"],
             "capabilities": ["odds", "props"],
             "requires_api_key": True,
             "is_mock": not odds_live,
             "configured": odds_live,
             "legitimate": odds_live,
+            "envVar": "ODDS_API_KEY",
             "notes": (
                 "Live sportsbook odds when ODDS_API_KEY is set. "
-                "Without a key, MockOddsProvider supplies clearly labeled -110 placeholders."
+                "Without a key, MockOddsProvider supplies clearly labeled -110 placeholders. "
+                "Tennis sport keys are tournament-specific placeholders."
             ),
         },
         {
@@ -111,46 +201,6 @@ def provider_status() -> list[dict]:
                 "ESPN BET",
             ],
         },
-        {
-            "name": "mlb-provider",
-            "leagues": ["MLB"],
-            "capabilities": ["schedule", "gamelog", "injuries", "odds"],
-            "requires_api_key": True,
-            "is_mock": True,
-            "configured": False,
-            "legitimate": False,
-            "notes": "REQUIRES PROVIDER — MLB stats + odds adapter not connected.",
-        },
-        {
-            "name": "nhl-provider",
-            "leagues": ["NHL"],
-            "capabilities": ["schedule", "gamelog", "injuries", "odds"],
-            "requires_api_key": True,
-            "is_mock": True,
-            "configured": False,
-            "legitimate": False,
-            "notes": "REQUIRES PROVIDER — NHL stats + odds adapter not connected.",
-        },
-        {
-            "name": "soccer-provider",
-            "leagues": ["Soccer"],
-            "capabilities": ["schedule", "gamelog", "injuries", "odds"],
-            "requires_api_key": True,
-            "is_mock": True,
-            "configured": False,
-            "legitimate": False,
-            "notes": "REQUIRES PROVIDER — Soccer (EPL/MLS/etc.) adapter not connected.",
-        },
-        {
-            "name": "tennis-provider",
-            "leagues": ["ATP", "WTA"],
-            "capabilities": ["schedule", "gamelog", "odds"],
-            "requires_api_key": True,
-            "is_mock": True,
-            "configured": False,
-            "legitimate": False,
-            "notes": "REQUIRES PROVIDER SELECTION — ATP/WTA need a licensed tennis + odds source.",
-        },
     ]
     return rows
 
@@ -163,11 +213,11 @@ def get_nba_providers() -> ProviderBundle:
         schedule=espn,
         gamelog=espn,
         injuries=espn,
-        odds=_odds_provider(),
+        odds=get_odds_provider(),
         featured=espn,
         roster=espn,
         primary=espn.meta.name,
-        metas=[espn.meta, _odds_provider().meta],
+        metas=[espn.meta, get_odds_provider().meta],
     )
 
 
@@ -178,11 +228,11 @@ def get_nfl_providers() -> ProviderBundle:
         schedule=espn,
         gamelog=espn,
         injuries=espn,
-        odds=_odds_provider(),
+        odds=get_odds_provider(),
         featured=espn,
         roster=espn,
         primary=espn.meta.name,
-        metas=[espn.meta, _odds_provider().meta],
+        metas=[espn.meta, get_odds_provider().meta],
     )
 
 
@@ -194,11 +244,56 @@ def get_wnba_providers() -> ProviderBundle:
         schedule=espn,
         gamelog=espn,
         injuries=espn,
-        odds=_odds_provider(),
+        odds=get_odds_provider(),
         featured=espn,
         roster=espn,
         primary=espn.meta.name,
-        metas=[espn.meta, _odds_provider().meta],
+        metas=[espn.meta, get_odds_provider().meta],
+    )
+
+
+def get_mlb_providers() -> ProviderBundle:
+    mlb = MlbStatsApiProvider()
+    return ProviderBundle(
+        schedule=mlb,
+        gamelog=mlb,
+        injuries=None,
+        odds=get_odds_provider(),
+        featured=None,
+        roster=mlb,
+        primary=mlb.meta.name,
+        metas=[mlb.meta, get_odds_provider().meta],
+    )
+
+
+def get_nhl_providers() -> ProviderBundle:
+    nhl = NhlApiProvider()
+    return ProviderBundle(
+        schedule=nhl,
+        gamelog=nhl,
+        injuries=None,
+        odds=get_odds_provider(),
+        featured=None,
+        roster=nhl,
+        primary=nhl.meta.name,
+        metas=[nhl.meta, get_odds_provider().meta],
+    )
+
+
+def get_soccer_providers() -> ProviderBundle | None:
+    settings = get_settings()
+    if not settings.football_data_api_key:
+        return None
+    soccer = FootballDataOrgProvider(settings.football_data_api_key)
+    return ProviderBundle(
+        schedule=soccer,
+        gamelog=None,
+        injuries=None,
+        odds=get_odds_provider(),
+        featured=None,
+        roster=soccer,
+        primary=soccer.meta.name,
+        metas=[soccer.meta, get_odds_provider().meta],
     )
 
 
@@ -207,6 +302,12 @@ def list_metas() -> list[ProviderMeta]:
         EspnNbaProvider().meta,
         EspnNflProvider().meta,
         EspnWnbaProvider().meta,
+        MlbStatsApiProvider().meta,
+        NhlApiProvider().meta,
+        FootballDataOrgProvider("").meta,
+        TennisAbstractProvider().meta,
+        NbaApiProvider().meta,
+        NflverseProvider().meta,
         MockOddsProvider().meta,
         TheOddsApiProvider(api_key="").meta,
     ]
