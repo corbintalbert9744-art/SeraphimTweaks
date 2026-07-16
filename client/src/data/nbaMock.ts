@@ -57,9 +57,21 @@ export interface NbaPlayerCard {
     reb: number;
     ast: number;
   };
+  projections?: {
+    pts: number;
+    reb: number;
+    ast: number;
+  };
   topPropId: string;
+  topLean?: string;
+  topMarket?: string;
+  topSide?: "Over" | "Under" | string;
+  topLine?: number;
   confidence: number;
+  researchScore?: number;
   matchupNote: string;
+  insight?: string;
+  propIds?: string[];
 }
 
 export const nbaMarketOptions: Array<NbaMarket | "All"> = [

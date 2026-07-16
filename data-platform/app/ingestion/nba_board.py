@@ -669,10 +669,10 @@ def _player_card_from_props(props: list[dict[str, Any]], player_ext_id: str) -> 
     top = max(mine, key=lambda p: p.get("researchScore") or 0)
     name = top["player"]
     initials = "".join(part[0] for part in name.split()[:2]).upper()
-    # Season avg from Points prop recent — approximate via projected for pts/reb/ast props
     pts = next((p.get("projectedValue") for p in mine if p["market"] == "Points"), None)
     reb = next((p.get("projectedValue") for p in mine if p["market"] == "Rebounds"), None)
     ast = next((p.get("projectedValue") for p in mine if p["market"] == "Assists"), None)
+    insight = (top.get("explanation") or [None])[0] or top.get("matchupNote") or f"vs {top['opponent']}"
     return {
         "id": player_ext_id,
         "name": name,
@@ -686,10 +686,22 @@ def _player_card_from_props(props: list[dict[str, Any]], player_ext_id: str) -> 
             "reb": round(float(reb or 0), 1),
             "ast": round(float(ast or 0), 1),
         },
+        "projections": {
+            "pts": round(float(pts or 0), 1),
+            "reb": round(float(reb or 0), 1),
+            "ast": round(float(ast or 0), 1),
+        },
         "topPropId": top["id"],
+        "topLean": f"{top['market']} {top['side']} {top['line']}",
+        "topMarket": top["market"],
+        "topSide": top["side"],
+        "topLine": top["line"],
         "confidence": top.get("confidence") or 50,
-        "matchupNote": top.get("matchupNote") or f"vs {top['opponent']}",
+        "researchScore": top.get("researchScore") or top.get("confidence") or 50,
+        "matchupNote": insight,
+        "insight": insight,
         "headshot": top.get("headshot"),
+        "propIds": [p["id"] for p in mine],
     }
 
 
@@ -755,8 +767,174 @@ def _points_streak(logs: list[PlayerGameLog], line: float) -> list[dict[str, Any
     ]
 
 
+def _market_attr(market: str) -> str:
+    return {
+        "Points": "points",
+        "Rebounds": "rebounds",
+        "Assists": "assists",
+        "Threes": "threes",
+        "Steals": "steals",
+        "Blocks": "blocks",
+    }.get(market, "points")
+
+
+def _stat_from_log(r: PlayerGameLog, market: str) -> Optional[float]:
+    attr = _market_attr(market)
+    if market == "PRA":
+        vals = [r.points, r.rebounds, r.assists]
+        if any(v is None for v in vals):
+            return None
+        return float(r.points or 0) + float(r.rebounds or 0) + float(r.assists or 0)
+    v = getattr(r, attr, None)
+    return float(v) if v is not None else None
+
+
+def _parse_hit_label(label: str) -> tuple[int, int, float]:
+    try:
+        hits_s, samples_s = label.split("/")
+        hits, samples = int(hits_s), int(samples_s)
+        rate = hits / samples if samples else 0.0
+        return hits, samples, rate
+    except Exception:
+        return 0, 0, 0.0
+
+
+def _hit_windows_for_market(
+    logs: list[PlayerGameLog],
+    *,
+    market: str,
+    line: float,
+    side: str,
+    prop: dict[str, Any],
+    opponent: str,
+) -> list[dict[str, Any]]:
+    values = [v for v in (_stat_from_log(r, market) for r in logs) if v is not None]
+
+    def window(n: int, key: str, label: str) -> dict[str, Any]:
+        slice_vals = values[:n]
+        if not slice_vals:
+            hits_s = prop.get(key) if key != "season" else prop.get("season")
+            hits, samples, rate = _parse_hit_label(str(hits_s or "0/0"))
+            return {
+                "key": key,
+                "label": label,
+                "average": None,
+                "hitRate": round(rate, 4),
+                "hitPct": round(rate * 100),
+                "hits": f"{hits}/{samples}",
+            }
+        hits = sum(1 for v in slice_vals if (v > line if side == "Over" else v < line))
+        return {
+            "key": key,
+            "label": label,
+            "average": round(mean(slice_vals), 1),
+            "hitRate": round(hits / len(slice_vals), 4),
+            "hitPct": round(100 * hits / len(slice_vals)),
+            "hits": f"{hits}/{len(slice_vals)}",
+        }
+
+    opp_vals = [
+        v
+        for r in logs
+        if (r.opponent or "").upper() == opponent.upper()
+        for v in [_stat_from_log(r, market)]
+        if v is not None
+    ]
+    if opp_vals:
+        hits = sum(1 for v in opp_vals if (v > line if side == "Over" else v < line))
+        matchup = {
+            "key": "matchup",
+            "label": "Matchup",
+            "average": round(mean(opp_vals), 1),
+            "hitRate": round(hits / len(opp_vals), 4),
+            "hitPct": round(100 * hits / len(opp_vals)),
+            "hits": f"{hits}/{len(opp_vals)}",
+        }
+    else:
+        matchup = {
+            "key": "matchup",
+            "label": "Matchup",
+            "average": None,
+            "hitRate": 0.0,
+            "hitPct": 0,
+            "hits": "0/0",
+        }
+
+    return [
+        window(5, "l5", "Last 5"),
+        window(10, "l10", "Last 10"),
+        window(20, "l20", "Last 20"),
+        window(len(values) or 1, "season", "All"),
+        matchup,
+    ]
+
+
+def _chart_games(logs: list[PlayerGameLog], *, market: str, line: float, side: str, limit: int = 10) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for r in reversed(logs[:limit]):
+        value = _stat_from_log(r, market)
+        if value is None:
+            continue
+        hit = value > line if side == "Over" else value < line
+        out.append(
+            {
+                "date": r.played_at.strftime("%m/%d"),
+                "label": f"{r.played_at.strftime('%m/%d')} {'@' if not r.home else ''}{r.opponent or 'OPP'}",
+                "opponent": r.opponent or "OPP",
+                "home": bool(r.home),
+                "value": value,
+                "minutes": float(r.minutes or 0),
+                "hit": hit,
+            }
+        )
+    return out
+
+
+def _markets_payload(props: list[dict[str, Any]], logs: list[PlayerGameLog], opponent: str) -> list[dict[str, Any]]:
+    markets: list[dict[str, Any]] = []
+    for p in props:
+        projected = float(p.get("projectedValue") or p.get("line") or 0)
+        line = float(p.get("line") or 0)
+        side = str(p.get("side") or "Over")
+        edge = float(p.get("edgeVsLine") if p.get("edgeVsLine") is not None else (projected - line))
+        edge_pct = round((edge / line) * 100, 1) if line else 0.0
+        markets.append(
+            {
+                "propId": p["id"],
+                "market": p["market"],
+                "side": side,
+                "line": line,
+                "americanOdds": p.get("americanOdds", -110),
+                "projectedValue": round(projected, 2),
+                "edgeVsLine": round(edge, 2),
+                "edgePercent": edge_pct,
+                "overProbability": p.get("overProbability"),
+                "underProbability": p.get("underProbability"),
+                "researchScore": p.get("researchScore") or p.get("confidence") or 50,
+                "confidence": p.get("confidence") or 50,
+                "evPercent": p.get("evPercent") or 0,
+                "explanation": p.get("explanation") or [],
+                "why": (p.get("explanation") or [p.get("matchupNote") or ""])[0],
+                "l5": p.get("l5"),
+                "l10": p.get("l10"),
+                "l20": p.get("l20"),
+                "season": p.get("season"),
+                "hitWindows": _hit_windows_for_market(
+                    logs,
+                    market=str(p["market"]),
+                    line=line,
+                    side=side,
+                    prop=p,
+                    opponent=opponent,
+                ),
+                "chartGames": _chart_games(logs, market=str(p["market"]), line=line, side=side, limit=10),
+            }
+        )
+    return markets
+
+
 def get_nba_player_profile(db: Session, player_key: str) -> Optional[dict[str, Any]]:
-    """Accept ESPN external id or warehouse id. Shape matches frontend PlayerProfile."""
+    """Accept ESPN external id or warehouse id. Rich payload for player research UI."""
     player = db.execute(
         select(Player).where(
             (Player.external_id == player_key)
@@ -772,7 +950,8 @@ def get_nba_player_profile(db: Session, player_key: str) -> Optional[dict[str, A
         if not card:
             return None
         mine = [p for p in board_props if p.get("playerId") == player_key]
-        chart_line = float(mine[0]["line"]) if mine else float(card["seasonAvg"].get("pts") or 0)
+        markets = _markets_payload(mine, [], card["opponent"])
+        primary = markets[0] if markets else None
         return {
             "id": player_key,
             "name": card["name"],
@@ -802,30 +981,27 @@ def get_nba_player_profile(db: Session, player_key: str) -> Optional[dict[str, A
             "homeSplit": {"label": "Home", "samples": 0, "averages": card["seasonAvg"]},
             "awaySplit": {"label": "Away", "samples": 0, "averages": card["seasonAvg"]},
             "recentLogs": [],
-            "chartLine": chart_line,
-            "chartStatLabel": "Points",
+            "chartLine": primary["line"] if primary else 0,
+            "chartStatLabel": primary["market"] if primary else "Points",
             "streaks": [],
-            "h2h": {
-                "record": "—",
-                "note": "Head-to-head fills as more gamelogs land in the warehouse.",
-                "meetings": [],
-            },
+            "h2h": {"record": "—", "note": "Head-to-head fills as gamelogs land.", "meetings": []},
             "matchup": {
                 "title": f"vs {card['opponent']}",
                 "defenseRank": "Pending",
-                "bullets": [card["matchupNote"]],
+                "bullets": [card.get("insight") or card["matchupNote"]],
             },
-            "researchScore": card["confidence"],
+            "researchScore": card.get("researchScore") or card["confidence"],
             "dataQualityScore": 70,
             "aiExplain": {
                 "verdict": "neutral",
-                "headline": "Model-backed profile",
-                "body": "Open a linked prop for full factor explanation.",
+                "headline": card.get("insight") or "Model-backed profile",
+                "body": "Open a market tab for factor-level explanation.",
             },
             "checks": [],
             "propIds": [p["id"] for p in mine],
             "recommendedPropIds": [card["topPropId"]],
             "headshot": card.get("headshot"),
+            "markets": markets,
             "live": True,
         }
 
@@ -834,7 +1010,7 @@ def get_nba_player_profile(db: Session, player_key: str) -> Optional[dict[str, A
             select(PlayerGameLog)
             .where(PlayerGameLog.player_id == player.id)
             .order_by(PlayerGameLog.played_at.desc())
-            .limit(25)
+            .limit(40)
         )
         .scalars()
         .all()
@@ -851,8 +1027,9 @@ def get_nba_player_profile(db: Session, player_key: str) -> Optional[dict[str, A
     team = _team_abbr(db, player.team_id)
     opp = props[0]["opponent"] if props else "OPP"
     tip = props[0]["tipTime"] if props else ""
-    points_prop = next((p for p in props if p.get("market") == "Points"), props[0] if props else None)
-    chart_line = float(points_prop["line"]) if points_prop else (round(mean(pts) * 2) / 2 if pts else 0.0)
+    markets = _markets_payload(props, logs, opp)
+    primary = markets[0] if markets else None
+    chart_line = float(primary["line"]) if primary else (round(mean(pts) * 2) / 2 if pts else 0.0)
 
     recent = [
         {
@@ -884,8 +1061,8 @@ def get_nba_player_profile(db: Session, player_key: str) -> Optional[dict[str, A
         for p in props
     ]
 
-    explain = (props[0].get("explanation") or []) if props else []
-    conf = int(props[0].get("researchScore") or props[0].get("confidence") or 60) if props else 60
+    explain = (primary.get("explanation") or []) if primary else []
+    conf = int(primary.get("researchScore") or primary.get("confidence") or 60) if primary else 60
     verdict = "strong" if conf >= 75 else "weak" if conf < 55 else "neutral"
 
     inj = (
@@ -922,7 +1099,7 @@ def get_nba_player_profile(db: Session, player_key: str) -> Optional[dict[str, A
         "awaySplit": _split_averages(logs, home=False),
         "recentLogs": recent,
         "chartLine": chart_line,
-        "chartStatLabel": "Points",
+        "chartStatLabel": primary["market"] if primary else "Points",
         "streaks": _points_streak(logs, chart_line),
         "h2h": {
             "record": "—",
@@ -939,12 +1116,13 @@ def get_nba_player_profile(db: Session, player_key: str) -> Optional[dict[str, A
         "aiExplain": {
             "verdict": verdict,
             "headline": explain[0] if explain else "Live model profile",
-            "body": " ".join(explain[1:3]) if len(explain) > 1 else "Open linked props for factor-level explanations.",
+            "body": " ".join(explain[1:3]) if len(explain) > 1 else "Switch markets for factor-level explanations.",
         },
         "checks": (props[0].get("checks") if props and isinstance(props[0].get("checks"), list) else []) or [],
         "propIds": [p["id"] for p in props],
         "recommendedPropIds": [props[0]["id"]] if props else [],
         "headshot": player.headshot_url,
+        "markets": markets,
         "live": True,
     }
 
@@ -960,7 +1138,7 @@ def ensure_nba_board(db: Session, force: bool = False) -> dict[str, Any]:
             "players": list_nba_player_cards(db),
             "count": len(existing),
         }
-    result = import_nba_slate(db, max_games=4, per_team=2, markets=("Points", "Rebounds", "Assists"))
+    result = import_nba_slate(db, max_games=6, per_team=3, markets=("Points", "Rebounds", "Assists"))
     props = list_nba_props_from_warehouse(db) or result.get("board") or []
     return {
         "ok": True,

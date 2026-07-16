@@ -211,21 +211,39 @@ export default function WnbaPage() {
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-4 text-base font-semibold text-white">Featured players</h2>
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-white">Players</h2>
+            <p className="text-xs text-neutral-500">
+              Projections · Research Score · top lean — click a player for the full report
+            </p>
+          </div>
+          <p className="text-xs tabular-nums text-neutral-500">{cards.length} on board</p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {cards.map((card) => {
             const top = mockWnbaProps.find((p) => p.id === card.topPropId);
             const added = top ? hasLeg(top.id) : false;
             return (
-              <article key={card.id} className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
+              <article
+                key={card.id}
+                className="card-3d rounded-2xl border border-[#1a1a1a] bg-[#0c0c0c]/80 p-5 transition hover:border-yellow-500/25"
+              >
                 <div className="flex items-start gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-yellow-500/25 bg-yellow-500/10 text-sm font-semibold text-yellow-300">
+                  <Link
+                    href={`/player/${card.id}`}
+                    className="flex h-12 w-12 items-center justify-center rounded-full border border-yellow-500/35 bg-gradient-to-br from-yellow-400/20 to-amber-700/10 text-sm font-semibold text-yellow-300"
+                  >
                     {card.initials}
-                  </div>
+                  </Link>
                   <div className="min-w-0 flex-1">
                     <div className="flex justify-between gap-2">
                       <div>
-                        <h3 className="font-semibold text-white">{card.name}</h3>
+                        <h3 className="font-semibold text-white">
+                          <Link href={`/player/${card.id}`} className="hover:text-yellow-400">
+                            {card.name}
+                          </Link>
+                        </h3>
                         <p className="text-xs text-neutral-500">
                           {card.team} vs {card.opponent} · {card.position}
                         </p>
@@ -234,26 +252,26 @@ export default function WnbaPage() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-[#1a1a1a] bg-black/25 p-3">
+                <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-[#1a1a1a] bg-black/30 p-3">
                   <div className="text-center">
                     <p className="text-[10px] uppercase text-neutral-500">PTS</p>
-                    <p className="text-sm font-semibold">{card.seasonAvg.pts.toFixed(1)}</p>
+                    <p className="text-sm font-semibold tabular-nums">{card.seasonAvg.pts.toFixed(1)}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-[10px] uppercase text-neutral-500">REB</p>
-                    <p className="text-sm font-semibold">{card.seasonAvg.reb.toFixed(1)}</p>
+                    <p className="text-sm font-semibold tabular-nums">{card.seasonAvg.reb.toFixed(1)}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-[10px] uppercase text-neutral-500">AST</p>
-                    <p className="text-sm font-semibold">{card.seasonAvg.ast.toFixed(1)}</p>
+                    <p className="text-sm font-semibold tabular-nums">{card.seasonAvg.ast.toFixed(1)}</p>
                   </div>
                 </div>
-                <p className="mt-3 text-xs text-neutral-400">{card.matchupNote}</p>
+                <p className="mt-3 line-clamp-2 text-xs text-neutral-400">{card.matchupNote}</p>
                 {top && (
                   <div className="mt-4 flex items-center justify-between border-t border-[#151515] pt-4">
-                    <Link href={`/prop/${top.id}`} className="text-sm text-neutral-200 hover:text-yellow-400">
+                    <p className="text-sm font-semibold text-neutral-100">
                       {top.market} {top.side} {top.line}
-                    </Link>
+                    </p>
                     <button
                       type="button"
                       disabled={added}
@@ -262,7 +280,7 @@ export default function WnbaPage() {
                         "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium",
                         added
                           ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                          : "border-yellow-500/30 bg-yellow-500/10 text-yellow-300",
+                          : "border-yellow-500/35 bg-yellow-500/10 text-yellow-300",
                       )}
                     >
                       {added ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
