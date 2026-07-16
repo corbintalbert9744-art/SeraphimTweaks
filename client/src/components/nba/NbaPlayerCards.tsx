@@ -2,12 +2,21 @@ import { Link } from "wouter";
 import { Plus, Check } from "lucide-react";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { LeanBadge } from "@/components/shared/LeanBadge";
+import { ConfidenceBadge } from "@/components/shared/ConfidenceBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import type { NbaPlayerCard, NbaProp } from "@/data/nbaMock";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
 import { leanTextClass } from "@/lib/leanTheme";
 import { cn } from "@/lib/utils";
 
+function edgePercentOf(prop: NbaProp | undefined): number | null {
+  if (!prop) return null;
+  if (prop.edgePercent != null && Number.isFinite(prop.edgePercent)) return prop.edgePercent;
+  if (prop.projectedValue == null || !prop.line) return null;
+  return ((prop.projectedValue - prop.line) / prop.line) * 100;
+}
+
+/** Player cards for research boards — show platform line + model projection (not basketball PTS/REB/AST). */
 export function NbaPlayerCards({
   players,
   props = [],
@@ -23,7 +32,7 @@ export function NbaPlayerCards({
         <div>
           <h2 className="text-base font-semibold text-white">Players</h2>
           <p className="text-xs text-neutral-500">
-            Model projections · Research Score · top lean — click a player for the full report
+            Platform line · our projection · edge % · confidence — click a player for the full report
           </p>
         </div>
         <p className="text-xs tabular-nums text-neutral-500">{players.length} on board</p>
@@ -31,17 +40,26 @@ export function NbaPlayerCards({
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {players.map((player) => {
+          const playerProps = props.filter((p) => p.playerId === player.id);
+          // Prefer prop with a model projection; else first match / topPropId
+          const withModel = playerProps
+            .filter((p) => p.projectedValue != null)
+            .sort(
+              (a, b) =>
+                Math.abs(b.edgePercent ?? b.edgeVsLine ?? 0) -
+                Math.abs(a.edgePercent ?? a.edgeVsLine ?? 0),
+            );
           const topProp =
+            withModel[0] ??
             props.find((p) => p.id === player.topPropId) ??
-            props.find((p) => p.playerId === player.id && p.market === "Points") ??
+            playerProps[0] ??
             props.find((p) => p.playerId === player.id);
           const added = topProp ? hasLeg(topProp.id) : false;
-          const proj = player.projections ?? player.seasonAvg ?? { pts: 0, reb: 0, ast: 0 };
-          const rs = player.researchScore ?? player.confidence;
-          const topLeanLabel =
-            player.topLean ||
-            (topProp ? `${topProp.market} ${topProp.side} ${topProp.line}` : null);
+          const rs = player.researchScore ?? topProp?.researchScore ?? player.confidence;
+          const confidence = topProp?.confidence ?? player.confidence ?? 0;
+          const edgePct = edgePercentOf(topProp);
           const insight = player.insight || player.matchupNote;
+          const projected = topProp?.projectedValue;
 
           return (
             <article
@@ -64,7 +82,8 @@ export function NbaPlayerCards({
                         </Link>
                       </h3>
                       <p className="mt-0.5 text-xs text-neutral-500">
-                        {player.team} vs {player.opponent} · {player.position}
+                        {player.team} vs {player.opponent}
+                        {player.position ? ` · ${player.position}` : ""}
                       </p>
                     </div>
                     <ResearchScoreBadge score={rs} size="sm" />
@@ -73,17 +92,42 @@ export function NbaPlayerCards({
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-[#1a1a1a] bg-black/30 p-3">
-                <Avg label="PTS" value={proj.pts} side={topProp?.side} />
-                <Avg label="REB" value={proj.reb} side={topProp?.side} />
-                <Avg label="AST" value={proj.ast} side={topProp?.side} />
+                <Metric
+                  label="Line"
+                  value={topProp?.line}
+                  side={topProp?.side}
+                />
+                <Metric
+                  label="Projection"
+                  value={projected}
+                  side={topProp?.side}
+                  emphasize
+                />
+                <Metric
+                  label="Edge %"
+                  value={edgePct}
+                  side={topProp?.side}
+                  suffix="%"
+                  signed
+                />
               </div>
 
-              <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-neutral-400">{insight}</p>
+              {topProp && (
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <p className="truncate text-xs text-neutral-400">
+                    <span className="font-medium text-neutral-300">{topProp.market}</span>
+                    {insight ? ` · ${insight}` : ""}
+                  </p>
+                  <ConfidenceBadge score={confidence} size="sm" />
+                </div>
+              )}
 
-              {topLeanLabel && topProp && (
+              {topProp && (
                 <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#151515] pt-4">
                   <div className="min-w-0">
-                    <p className="text-[10px] uppercase tracking-wider text-neutral-500">{topProp.market}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-neutral-500">
+                      {topProp.market}
+                    </p>
                     <div className="mt-1">
                       <LeanBadge side={topProp.side} line={topProp.line} size="sm" />
                     </div>
@@ -112,21 +156,37 @@ export function NbaPlayerCards({
   );
 }
 
-function Avg({
+function Metric({
   label,
   value,
   side,
+  suffix = "",
+  signed = false,
+  emphasize = false,
 }: {
   label: string;
   value?: number | null;
   side?: string;
+  suffix?: string;
+  signed?: boolean;
+  emphasize?: boolean;
 }) {
   const n = typeof value === "number" && Number.isFinite(value) ? value : null;
+  const text =
+    n == null
+      ? "—"
+      : `${signed && n > 0 ? "+" : ""}${n.toFixed(1)}${suffix}`;
   return (
     <div className="text-center">
       <p className="text-[10px] uppercase tracking-wider text-neutral-500">{label}</p>
-      <p className={cn("mt-0.5 text-sm font-semibold tabular-nums", leanTextClass(side ?? "Over"))}>
-        {n == null ? "—" : n.toFixed(1)}
+      <p
+        className={cn(
+          "mt-0.5 text-sm font-semibold tabular-nums",
+          emphasize ? leanTextClass(side ?? "Over") : "text-neutral-200",
+          n != null && signed && (n >= 0 ? "text-emerald-400" : "text-red-400"),
+        )}
+      >
+        {text}
       </p>
     </div>
   );

@@ -25,13 +25,14 @@ from app.analytics.factors.base import PredictionContext
 from app.analytics.prediction import predict_prop
 from app.config import get_settings
 from app.db.models import Game, Injury, Player, PlayerGameLog, Prop, PropAnalytics
-from app.ingestion.nba_pipeline import _market_values
+from app.ingestion.generic_board import market_values_from_logs
+from app.ingestion.nba_pipeline import _market_values as _nba_market_values
 from app.ingestion.platform_board import (
     PICKEM_APP_LABELS,
     normalize_pickem_app,
     slugs_for_app,
 )
-from app.ingestion.warehouse import insert_odds, upsert_player
+from app.ingestion.warehouse import insert_odds, upsert_gamelog, upsert_player
 from app.providers.base import NormalizedOddsQuote, NormalizedPlayer, run_provider_job
 from app.providers.propline.adapter import PropLineAdapter
 from app.providers.propline.markets import normalize_league
@@ -39,11 +40,37 @@ from app.providers.propline.markets import normalize_league
 log = logging.getLogger(__name__)
 
 # Serve cached platform board if last sync is newer than this.
-PLATFORM_CACHE_TTL = timedelta(minutes=5)
+# Keep longer to avoid burning PropLine free-tier quota on every page load.
+PLATFORM_CACHE_TTL = timedelta(minutes=30)
 
-# Leagues we poll for a given board request. Board endpoint passes one league;
-# sync only that league's PropLine sport.
 MIN_LOGS_FOR_MODEL = 3
+# Cap per-request remodel so board loads stay responsive while stubs hydrate.
+REMODEL_PENDING_LIMIT = 40
+
+# PropLine / board market label → PlayerGameLog.raw JSON key (None = column / nba helper)
+MARKET_RAW_KEYS: dict[str, Optional[str]] = {
+    "Points": None,
+    "Rebounds": None,
+    "Assists": None,
+    "Threes": None,
+    "Steals": None,
+    "Blocks": None,
+    "Hits": "hits",
+    "Home Runs": "homeRuns",
+    "RBIs": "rbi",
+    "Total Bases": "totalBases",
+    "Stolen Bases": "stolenBases",
+    "Walks": "baseOnBalls",
+    "Runs": "runs",
+    "Strikeouts": "strikeOuts",
+    "Earned Runs": "earnedRuns",
+    "Hits Allowed": "hitsAllowed",
+    "Outs": "outs",
+    "Goals": "goals",
+    "Shots": "shots",
+    "Saves": "saves",
+    "Blocked Shots": "blockedShots",
+}
 
 
 def _slugify(name: str) -> str:
@@ -53,21 +80,32 @@ def _slugify(name: str) -> str:
 def _find_player_by_name(db: Session, league: str, name: str) -> Optional[Player]:
     code = normalize_league(league)
     target = name.lower().strip()
-    rows = (
-        db.execute(select(Player).where(Player.league == code)).scalars().all()
-    )
-    for p in rows:
-        if (p.full_name or "").lower().strip() == target:
-            return p
-    # Soft match: last name + first initial
+    rows = list(db.execute(select(Player).where(Player.league == code)).scalars().all())
+
+    def rank(p: Player) -> tuple[int, int]:
+        has_logs = 1 if db.execute(
+            select(PlayerGameLog.id).where(PlayerGameLog.player_id == p.id).limit(1)
+        ).first() else 0
+        is_stub = 1 if (p.external_id or "").startswith("pickem:") else 0
+        return (has_logs, -is_stub)
+
+    exact = [p for p in rows if (p.full_name or "").lower().strip() == target]
+    if exact:
+        exact.sort(key=rank, reverse=True)
+        return exact[0]
     parts = target.split()
     if len(parts) >= 2:
-        last = parts[-1]
-        first = parts[0][0]
-        for p in rows:
-            pn = (p.full_name or "").lower().split()
-            if len(pn) >= 2 and pn[-1] == last and pn[0].startswith(first):
-                return p
+        last, first = parts[-1], parts[0][0]
+        soft = [
+            p
+            for p in rows
+            if len((p.full_name or "").lower().split()) >= 2
+            and (p.full_name or "").lower().split()[-1] == last
+            and (p.full_name or "").lower().split()[0].startswith(first)
+        ]
+        if soft:
+            soft.sort(key=rank, reverse=True)
+            return soft[0]
     return None
 
 
@@ -88,6 +126,121 @@ def _ensure_platform_player(db: Session, league: str, name: str, platform: str) 
             team_external_id=None,
         ),
     )
+
+
+def _resolve_stub_external_id(db: Session, *, league: str, player: Player) -> None:
+    """Attach a real provider id to pick'em stub players so gamelogs can hydrate."""
+    code = normalize_league(league)
+    ext = str(player.external_id or "")
+    if ext and not ext.startswith("pickem:"):
+        return
+    name = (player.full_name or "").strip()
+    if not name:
+        return
+    try:
+        if code == "MLB":
+            from app.providers.mlb.statsapi import MlbStatsApiProvider
+
+            found = MlbStatsApiProvider().search_player(name)
+            if not found:
+                return
+            # Prefer an existing warehouse row with this MLB id (merge stub → real)
+            existing = db.execute(
+                select(Player).where(
+                    Player.league == code,
+                    Player.external_id == found.external_id,
+                )
+            ).scalar_one_or_none()
+            if existing and existing.id != player.id:
+                # Point callers at the real player by copying identity onto stub usage sites
+                # is handled by re-linking props; for hydrate we just use the real row's id
+                # via returning early after we switch references in remodel.
+                player.external_id = found.external_id
+                if found.position and not player.position:
+                    player.position = found.position
+                db.flush()
+                return
+            player.external_id = found.external_id
+            if found.position and not player.position:
+                player.position = found.position
+            db.flush()
+        elif code in {"NBA", "WNBA"}:
+            # Best-effort: match another warehouse player with same name + real id
+            peers = [
+                p
+                for p in db.execute(select(Player).where(Player.league == code)).scalars().all()
+                if (p.full_name or "").lower().strip() == name.lower()
+                and p.id != player.id
+                and p.external_id
+                and not str(p.external_id).startswith("pickem:")
+            ]
+            if peers:
+                peers.sort(
+                    key=lambda p: 1
+                    if db.execute(
+                        select(PlayerGameLog.id).where(PlayerGameLog.player_id == p.id).limit(1)
+                    ).first()
+                    else 0,
+                    reverse=True,
+                )
+                player.external_id = peers[0].external_id
+                if peers[0].position and not player.position:
+                    player.position = peers[0].position
+                db.flush()
+    except Exception as exc:  # noqa: BLE001
+        log.debug("resolve stub %s/%s: %s", code, name, exc)
+
+
+def _hydrate_player_logs(db: Session, *, league: str, player: Player) -> None:
+    """Fetch gamelogs when missing so the model can project vs live pick'em lines."""
+    code = normalize_league(league)
+    if db.execute(
+        select(PlayerGameLog.id).where(PlayerGameLog.player_id == player.id).limit(1)
+    ).first():
+        return
+    _resolve_stub_external_id(db, league=code, player=player)
+    ext = player.external_id
+    if not ext or str(ext).startswith("pickem:"):
+        return
+    try:
+        if code == "MLB":
+            from app.providers.mlb.statsapi import MlbStatsApiProvider
+
+            for gl in MlbStatsApiProvider().fetch_gamelog("MLB", str(ext)):
+                upsert_gamelog(db, gl, player.id)
+            db.flush()
+        elif code in {"NBA", "WNBA"}:
+            from app.providers.registry import get_nba_providers, get_wnba_providers
+
+            providers = get_wnba_providers() if code == "WNBA" else get_nba_providers()
+            if providers.gamelog:
+                for gl in providers.gamelog.fetch_gamelog(code, str(ext)):
+                    upsert_gamelog(db, gl, player.id)
+                db.flush()
+    except Exception as exc:  # noqa: BLE001
+        log.debug("hydrate logs %s/%s: %s", code, player.full_name, exc)
+
+
+def _market_samples(logs: list[PlayerGameLog], market: str) -> list[float]:
+    raw_key = MARKET_RAW_KEYS.get(market)
+    if raw_key is not None:
+        return market_values_from_logs(logs, market, raw_stat_key=raw_key)
+    if market in {
+        "Points",
+        "Rebounds",
+        "Assists",
+        "Threes",
+        "Steals",
+        "Blocks",
+        "PRA",
+        "PR",
+        "PA",
+        "RA",
+        "Pts+Rebs+Asts",
+        "3-PT Made",
+    }:
+        return _nba_market_values(logs, market)
+    return market_values_from_logs(logs, market, raw_stat_key=None)
 
 
 def _group_platform_quotes(
@@ -164,6 +317,7 @@ def _build_prediction_for_player(
     market: str,
     platform_line: float,
 ) -> tuple[Optional[Any], list[float], list[bool], list, list]:
+    _hydrate_player_logs(db, league=league, player=player)
     logs = (
         db.execute(
             select(PlayerGameLog)
@@ -174,7 +328,7 @@ def _build_prediction_for_player(
         .scalars()
         .all()
     )
-    values = _market_values(logs, market)
+    values = _market_samples(logs, market)
     if len(values) < MIN_LOGS_FOR_MODEL:
         return None, values, [], [], []
 
@@ -323,7 +477,9 @@ def sync_pickem_platform_board(
     slugs = slugs_for_app(app)
     # Cache hit: recent platform odds already in warehouse for this league
     if not force:
-        cached = _list_cached_platform_board(db, league=code, platform=app, slugs=slugs)
+        cached = _list_cached_platform_board(
+            db, league=code, platform=app, slugs=slugs, allow_stale=False
+        )
         if cached is not None:
             return cached
 
@@ -336,6 +492,22 @@ def sync_pickem_platform_board(
         except Exception as exc:  # noqa: BLE001
             log.exception("pickem sync %s/%s failed", app, code)
             job.error = str(exc)
+            stale = _list_cached_platform_board(
+                db,
+                league=code,
+                platform=app,
+                slugs=slugs,
+                allow_stale=True,
+                max_age=timedelta(days=2),
+            )
+            if stale is not None:
+                stale["note"] = (
+                    f"Showing last live {label} lines from warehouse "
+                    f"(PropLine refresh failed: {exc}). Projections remodeled vs those lines."
+                )
+                stale["cached"] = True
+                stale["refreshError"] = str(exc)
+                return stale
             return {
                 "ok": False,
                 "league": code,
@@ -356,8 +528,32 @@ def sync_pickem_platform_board(
             reason = support.get("reason") or (
                 f"PropLine returned no current {label} player props for {code}."
             )
+            stale = _list_cached_platform_board(
+                db,
+                league=code,
+                platform=app,
+                slugs=slugs,
+                allow_stale=True,
+                max_age=timedelta(days=2),
+            )
+            # Prefer warehouse lines when PropLine is rate-limited or briefly empty
+            if stale is not None and (
+                "429" in reason or "rate" in reason.lower() or "sports lookup failed" in reason.lower()
+            ):
+                stale["note"] = (
+                    f"Showing last live {label} lines from warehouse ({reason}). "
+                    "Projections remodeled vs those lines."
+                )
+                stale["cached"] = True
+                return stale
             job.rows_written = 0
             db.commit()
+            if stale is not None:
+                stale["note"] = (
+                    f"{reason} Showing last warehouse {label} lines until the feed recovers."
+                )
+                stale["cached"] = True
+                return stale
             return {
                 "ok": True,
                 "league": code,
@@ -651,7 +847,15 @@ def sync_pickem_platform_board(
 def _players_from_board(props: list[dict[str, Any]], label: str) -> list[dict[str, Any]]:
     seen: set[str] = set()
     out: list[dict[str, Any]] = []
-    for p in props:
+    # Prefer modeled props when choosing each player's featured card lean
+    ordered = sorted(
+        props,
+        key=lambda p: (
+            0 if p.get("projectedValue") is not None else 1,
+            -(abs(float(p.get("edgePercent") or p.get("edgeVsLine") or 0))),
+        ),
+    )
+    for p in ordered:
         pid = str(p.get("playerId") or "")
         if not pid or pid in seen:
             continue
@@ -679,12 +883,145 @@ def _players_from_board(props: list[dict[str, Any]], label: str) -> list[dict[st
     return out
 
 
+def _apply_prediction_to_analytics(
+    *,
+    analytics: PropAnalytics,
+    prediction: Any,
+    platform_line: float,
+    side: str,
+    over_odds: int,
+    under_odds: int,
+    settings: Any,
+    matchup_note: Optional[str] = None,
+) -> dict[str, Any]:
+    """Write model output onto PropAnalytics and return board metric fields."""
+    projected = float(prediction.projected_value)
+    edge = (
+        float(prediction.edge_vs_line)
+        if prediction.edge_vs_line is not None
+        else round(projected - platform_line, 2)
+    )
+    edge_pct = (
+        round((edge / platform_line) * 100, 2) if abs(platform_line) > 1e-9 else None
+    )
+    over_p = float(prediction.over_probability)
+    under_p = float(prediction.under_probability)
+    lean_side = "Over" if projected >= platform_line else "Under"
+    ev = expected_value(
+        over_p if lean_side == "Over" else under_p,
+        over_odds if lean_side == "Over" else under_odds,
+    )
+    analytics.projected_value = projected
+    analytics.comparison_line = platform_line
+    analytics.edge_vs_line = edge
+    analytics.over_probability = over_p
+    analytics.under_probability = under_p
+    analytics.no_vig_prob = over_p if lean_side == "Over" else under_p
+    analytics.ev_percent = round(ev, 2)
+    analytics.confidence_score = int(prediction.confidence_score)
+    analytics.research_score = int(prediction.research_score)
+    analytics.data_quality_score = prediction.data_quality_score
+    analytics.model_version = prediction.model_version
+    analytics.explain_bullets = list(prediction.explanation)
+    analytics.influential_factors = list(prediction.influential_factors or [])
+    if matchup_note:
+        analytics.matchup_note = matchup_note
+    analytics.is_model_estimate = True
+    analytics.odds_are_mock = False
+    analytics.disclaimer = settings.model_disclaimer
+    analytics.computed_at = datetime.now(timezone.utc)
+    if prediction.l5 and prediction.l10 and prediction.l20 and prediction.season:
+        analytics.l5_hits, analytics.l5_samples, analytics.l5_rate = (
+            prediction.l5.hits,
+            prediction.l5.samples,
+            prediction.l5.rate,
+        )
+        analytics.l10_hits, analytics.l10_samples, analytics.l10_rate = (
+            prediction.l10.hits,
+            prediction.l10.samples,
+            prediction.l10.rate,
+        )
+        analytics.l20_hits, analytics.l20_samples, analytics.l20_rate = (
+            prediction.l20.hits,
+            prediction.l20.samples,
+            prediction.l20.rate,
+        )
+        analytics.season_hits, analytics.season_samples, analytics.season_rate = (
+            prediction.season.hits,
+            prediction.season.samples,
+            prediction.season.rate,
+        )
+    return {
+        "projectedValue": projected,
+        "edgeVsLine": edge,
+        "edgePercent": edge_pct,
+        "confidence": int(prediction.confidence_score),
+        "researchScore": int(prediction.research_score),
+        "evPercent": round(ev, 2),
+        "noVigProb": over_p if lean_side == "Over" else under_p,
+        "side": lean_side if side else lean_side,
+        "isModelEstimate": True,
+        "modelPending": False,
+        "explanation": list(prediction.explanation),
+    }
+
+
+def _remodel_pending_board_rows(
+    db: Session,
+    *,
+    league: str,
+    rows: list[tuple[Prop, PropAnalytics, Player]],
+) -> None:
+    """Fill missing projections for cached platform props (no PropLine call)."""
+    settings = get_settings()
+    code = normalize_league(league)
+    remodeled = 0
+    attempted = 0
+    for prop, analytics, player in rows:
+        if analytics.projected_value is not None or player is None:
+            continue
+        if attempted >= REMODEL_PENDING_LIMIT:
+            break
+        attempted += 1
+        prediction, *_rest = _build_prediction_for_player(
+            db,
+            league=code,
+            player=player,
+            market=prop.market,
+            platform_line=float(prop.line),
+        )
+        if prediction is None:
+            continue
+        _apply_prediction_to_analytics(
+            analytics=analytics,
+            prediction=prediction,
+            platform_line=float(prop.line),
+            side=prop.side or "Over",
+            over_odds=100,
+            under_odds=100,
+            settings=settings,
+        )
+        # Align prop lean with model when we finally have a projection
+        prop.side = "Over" if prediction.projected_value >= float(prop.line) else "Under"
+        remodeled += 1
+    if remodeled or attempted:
+        db.commit()
+        log.info(
+            "remodeled %s/%s pending %s pick'em props this pass",
+            remodeled,
+            attempted,
+            code,
+        )
+
+
 def _list_cached_platform_board(
     db: Session,
     *,
     league: str,
     platform: str,
     slugs: frozenset[str],
+    allow_stale: bool = False,
+    max_age: Optional[timedelta] = None,
 ) -> Optional[dict[str, Any]]:
     """Return a recently synced platform board without calling PropLine again."""
     from app.db.models import Odds, Sportsbook
@@ -722,8 +1059,25 @@ def _list_cached_platform_board(
     if newest.tzinfo is None:
         newest = newest.replace(tzinfo=timezone.utc)
     age = datetime.now(timezone.utc) - newest
-    if age > PLATFORM_CACHE_TTL:
+    ttl = max_age if (allow_stale and max_age is not None) else PLATFORM_CACHE_TTL
+    if allow_stale and max_age is None:
+        ttl = timedelta(days=2)
+    if age > ttl:
         return None
+
+    # Remodel any props still missing projections (e.g. stubs now resolvable)
+    _remodel_pending_board_rows(db, league=code, rows=list(props))
+    # Re-read analytics after remodel
+    props = (
+        db.execute(
+            select(Prop, PropAnalytics, Player)
+            .join(PropAnalytics, PropAnalytics.prop_id == Prop.id)
+            .outerjoin(Player, Player.id == Prop.player_id)
+            .where(Prop.league == code, Prop.status == "open", Prop.id.like(f"{prefix}%"))
+            .order_by(PropAnalytics.research_score.desc())
+        )
+        .all()
+    )
 
     # Rebuild board rows from warehouse (already platform-scoped)
     odds_by_prop: dict[str, list] = {}
@@ -795,6 +1149,7 @@ def _list_cached_platform_board(
         return None
 
     updated = newest.isoformat()
+    with_model = sum(1 for r in board if r.get("projectedValue") is not None)
     return {
         "ok": True,
         "league": code,
@@ -803,16 +1158,19 @@ def _list_cached_platform_board(
         "props": board,
         "players": _players_from_board(board, label),
         "count": len(board),
+        "modeledCount": with_model,
         "updatedAt": updated,
         "propsUpdatedAt": updated,
         "syncedAt": updated,
         "dataSource": f"pickem:{platform}",
         "live": True,
         "cached": True,
+        "stale": allow_stale and age > PLATFORM_CACHE_TTL,
         "source": "propline-cache",
         "note": None,
         "disclaimer": (
-            f"Cached live {label} props (refreshed within {int(PLATFORM_CACHE_TTL.total_seconds() // 60)}m). "
+            f"Cached live {label} props"
+            f"{' (stale — PropLine refresh deferred)' if allow_stale and age > PLATFORM_CACHE_TTL else f' (refreshed within {int(PLATFORM_CACHE_TTL.total_seconds() // 60)}m)'}. "
             "Projections are Seraphim estimates vs those lines."
         ),
     }

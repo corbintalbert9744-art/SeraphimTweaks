@@ -19,7 +19,7 @@ const defaultFilters: NbaBoardFilters = {
   market: "All",
   team: "All",
   side: "All",
-  minConfidence: 40,
+  minConfidence: 0,
   sortKey: "edge",
   sortDir: "desc",
 };
@@ -318,7 +318,7 @@ export function SportResearchBoard({
                   marketOptions={marketOptions}
                   teamOptions={teamOptions}
                   leagueLabel={league}
-                  minConfidenceFloor={40}
+                  minConfidenceFloor={0}
                 />
               </div>
               {livePlayers.length > 0 && (

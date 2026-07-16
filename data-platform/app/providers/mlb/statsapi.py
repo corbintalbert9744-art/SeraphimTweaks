@@ -120,6 +120,41 @@ class MlbStatsApiProvider:
             )
         return out
 
+    def search_player(self, name: str) -> Optional[NormalizedPlayer]:
+        """Resolve a display name to an MLB Stats API person id."""
+        q = (name or "").strip()
+        if not q:
+            return None
+        try:
+            from urllib.parse import quote
+
+            data = self.http.get_json(f"{MLB_API}/people/search?names={quote(q)}")
+        except Exception as exc:  # noqa: BLE001
+            log.warning("mlb people search %s: %s", q, exc)
+            return None
+        people = data.get("people") or []
+        if not people:
+            return None
+        target = q.lower()
+        # Prefer exact fullName match, then first active result
+        exact = next(
+            (p for p in people if (p.get("fullName") or "").lower() == target),
+            None,
+        )
+        person = exact or next((p for p in people if p.get("active")), people[0])
+        pid = str(person.get("id") or "")
+        if not pid:
+            return None
+        pos = person.get("primaryPosition") or {}
+        return NormalizedPlayer(
+            external_id=pid,
+            league="MLB",
+            full_name=person.get("fullName") or q,
+            short_name=person.get("lastName") or q.split()[-1],
+            position=pos.get("abbreviation") if isinstance(pos, dict) else None,
+            team_external_id=None,
+        )
+
     def fetch_gamelog(self, league: str, player_external_id: str) -> list[NormalizedGamelog]:
         if league.upper() != "MLB":
             return []
@@ -167,9 +202,61 @@ class MlbStatsApiProvider:
                         "atBats": _f(st.get("atBats")),
                         "totalBases": _f(st.get("totalBases")),
                         "strikeOuts": _f(st.get("strikeOuts")),
+                        "runs": _f(st.get("runs")),
+                        "baseOnBalls": _f(st.get("baseOnBalls")),
+                        "walks": _f(st.get("baseOnBalls")),
                     },
                 )
             )
+        # Pitching game log (strikeouts / ER / outs) — merge when present
+        try:
+            pitch = self.http.get_json(
+                f"{MLB_API}/people/{player_external_id}/stats"
+                f"?stats=gameLog&group=pitching&season={season}"
+            )
+        except Exception:  # noqa: BLE001
+            pitch = None
+        if pitch:
+            pitch_splits = []
+            for block in pitch.get("stats") or []:
+                pitch_splits.extend(block.get("splits") or [])
+            by_game = {g.game_external_id: g for g in out if g.game_external_id}
+            for s in pitch_splits[:40]:
+                game = s.get("game") or {}
+                gid = str(game.get("gamePk") or "") or None
+                st = s.get("stat") or {}
+                tip_raw = (s.get("date") or "")[:10]
+                try:
+                    played = datetime.strptime(tip_raw, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                except ValueError:
+                    continue
+                outs = _f(st.get("outs"))
+                pitch_raw = {
+                    "strikeOuts": _f(st.get("strikeOuts")),
+                    "earnedRuns": _f(st.get("earnedRuns")),
+                    "hitsAllowed": _f(st.get("hits")),
+                    "outs": outs,
+                }
+                if gid and gid in by_game:
+                    existing = by_game[gid]
+                    merged = dict(existing.raw or {})
+                    merged.update({k: v for k, v in pitch_raw.items() if v is not None})
+                    existing.raw = merged
+                else:
+                    opp = (s.get("opponent") or {}).get("abbreviation") or "OPP"
+                    is_home = (s.get("isHome") is True) or (s.get("homeAway") == "home")
+                    out.append(
+                        NormalizedGamelog(
+                            player_external_id=player_external_id,
+                            league="MLB",
+                            played_at=played,
+                            opponent=opp,
+                            home=bool(is_home),
+                            game_external_id=gid,
+                            points=_f(st.get("strikeOuts")),
+                            raw={"source": "mlb-statsapi-pitching", **pitch_raw},
+                        )
+                    )
         return out
 
 

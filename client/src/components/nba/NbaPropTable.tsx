@@ -67,7 +67,7 @@ export function NbaPropTable({
             {rows.map((row) => {
               const added = hasLeg(row.id);
               const edgePct = edgePercentDisplay(row);
-              const proj = row.projectedValue ?? row.line;
+              const proj = row.projectedValue;
               return (
                 <tr key={row.id} className="transition hover:bg-white/[0.02]">
                   <td className="px-4 py-4">
@@ -92,7 +92,7 @@ export function NbaPropTable({
                   </td>
                   <td className="px-4 py-4 tabular-nums text-neutral-200">{row.line.toFixed(1)}</td>
                   <td className={cn("px-4 py-4 tabular-nums font-semibold", leanTextClass(row.side))}>
-                    {proj.toFixed(1)}
+                    {proj == null ? "—" : proj.toFixed(1)}
                   </td>
                   <td className="px-4 py-4">
                     <span
