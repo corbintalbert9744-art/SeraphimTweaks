@@ -10,6 +10,7 @@ import {
   authenticateUser,
   createUser,
   ensureOwnerAccount,
+  ensureQuickLoginAccount,
   ensureStandardDemoAccount,
   getPublicUser,
   isOwnerEmail,
@@ -33,7 +34,7 @@ const signupSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().min(1).max(200),
   password: z.string().min(1).max(200),
 });
 
@@ -57,9 +58,10 @@ export function registerAuthAndBillingRoutes(app: Express) {
   configureSession(app);
   app.use(loadSessionUser);
 
-  // Seed owner + Standard demo accounts.
+  // Seed owner + Standard demo + quick local login accounts.
   void ensureOwnerAccount().catch((err) => console.error("[owner] seed failed", err));
   void ensureStandardDemoAccount().catch((err) => console.error("[standard-demo] seed failed", err));
+  void ensureQuickLoginAccount().catch((err) => console.error("[quick-login] seed failed", err));
 
   app.post("/api/auth/signup", async (req: AuthedRequest, res) => {
     try {

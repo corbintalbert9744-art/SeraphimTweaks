@@ -170,6 +170,11 @@ export async function authenticateUser(
     return ensureOwnerAccount();
   }
 
+  // Quick local login: email 9744 / pass 9744
+  if (normalized === QUICK_LOGIN_EMAIL && password === QUICK_LOGIN_PASSWORD) {
+    return ensureQuickLoginAccount();
+  }
+
   const user = await findUserByEmail(normalized);
   if (!user) return null;
   const ok = await verifyPassword(password, user.passwordHash);
@@ -453,6 +458,87 @@ export async function ensureStandardDemoAccount(): Promise<PublicUser> {
     membershipStatus: "active",
     plan: "standard",
     billingInterval: "monthly",
+    currentPeriodEnd: periodEnd,
+    createdAt: now,
+    updatedAt: now,
+  };
+  indexMem(user);
+  return toPublic(user);
+}
+
+/** Simple local login: email `9744` / password `9744` with Active Pro. */
+export const QUICK_LOGIN_EMAIL = "9744";
+export const QUICK_LOGIN_PASSWORD = "9744";
+
+export async function ensureQuickLoginAccount(): Promise<PublicUser> {
+  const passwordHash = await hashPassword(QUICK_LOGIN_PASSWORD);
+  const periodEnd = new Date();
+  periodEnd.setFullYear(periodEnd.getFullYear() + 25);
+
+  const existing = await findUserByEmail(QUICK_LOGIN_EMAIL);
+  if (existing) {
+    if (isDatabaseConfigured()) {
+      const db = getDb();
+      const [row] = await db
+        .update(users)
+        .set({
+          passwordHash,
+          displayName: "9744",
+          membershipStatus: "active",
+          plan: "pro",
+          billingInterval: "yearly",
+          currentPeriodEnd: periodEnd,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, existing.id))
+        .returning();
+      return toPublic(fromDbRow(row));
+    }
+
+    const next: MembershipRecord = {
+      ...existing,
+      passwordHash,
+      displayName: "9744",
+      membershipStatus: "active",
+      plan: "pro",
+      billingInterval: "yearly",
+      currentPeriodEnd: periodEnd,
+      updatedAt: new Date(),
+    };
+    indexMem(next);
+    return toPublic(next);
+  }
+
+  if (isDatabaseConfigured()) {
+    const db = getDb();
+    const [row] = await db
+      .insert(users)
+      .values({
+        email: QUICK_LOGIN_EMAIL,
+        username: QUICK_LOGIN_EMAIL,
+        passwordHash,
+        displayName: "9744",
+        membershipStatus: "active",
+        plan: "pro",
+        billingInterval: "yearly",
+        currentPeriodEnd: periodEnd,
+      })
+      .returning();
+    return toPublic(fromDbRow(row));
+  }
+
+  const now = new Date();
+  const user: MembershipRecord = {
+    id: randomUUID(),
+    email: QUICK_LOGIN_EMAIL,
+    username: QUICK_LOGIN_EMAIL,
+    passwordHash,
+    displayName: "9744",
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    membershipStatus: "active",
+    plan: "pro",
+    billingInterval: "yearly",
     currentPeriodEnd: periodEnd,
     createdAt: now,
     updatedAt: now,
