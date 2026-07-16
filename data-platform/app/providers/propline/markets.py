@@ -91,9 +91,26 @@ PROP_MARKETS: dict[str, tuple[str, ...]] = {
         "player_assists",
         "player_cards",
     ),
-    # Tennis player props are not listed in PropLine Available Markets.
-    "ATP": (),
-    "WTA": (),
+    # Tennis (PropLine sport key `tennis`) — PrizePicks / Underdog player props.
+    # Market keys follow Odds-API style; unknown keys still titleize via market_label().
+    "ATP": (
+        "player_aces",
+        "player_double_faults",
+        "player_games_won",
+        "player_break_points_won",
+        "player_fantasy_score",
+        "player_total_games",
+        "player_sets_won",
+    ),
+    "WTA": (
+        "player_aces",
+        "player_double_faults",
+        "player_games_won",
+        "player_break_points_won",
+        "player_fantasy_score",
+        "player_total_games",
+        "player_sets_won",
+    ),
 }
 
 # PropLine market key → Seraphim board / analytics market label
@@ -131,6 +148,13 @@ MARKET_LABELS: dict[str, str] = {
     "2plus_goals": "2+ Goals",
     "goal_or_assist": "Goal + Assist",
     "player_cards": "Cards",
+    "player_aces": "Aces",
+    "player_double_faults": "Double Faults",
+    "player_games_won": "Games Won",
+    "player_break_points_won": "Break Points Won",
+    "player_fantasy_score": "Fantasy Score",
+    "player_total_games": "Total Games",
+    "player_sets_won": "Sets Won",
 }
 
 # Reverse: Seraphim label → preferred PropLine market key(s)
@@ -154,9 +178,14 @@ LABEL_TO_MARKET_KEYS: dict[str, tuple[str, ...]] = {
     "Shots on Target": ("player_shots_on_goal",),
     "Goal + Assist": ("goal_or_assist",),
     "Saves": ("goalie_saves",),
-    "Fantasy Score": (),  # not on PropLine — unavailable
-    "Total Games": (),
-    "Total Sets": (),
+    "Aces": ("player_aces",),
+    "Double Faults": ("player_double_faults",),
+    "Games Won": ("player_games_won",),
+    "Break Points Won": ("player_break_points_won",),
+    "Fantasy Score": ("player_fantasy_score",),
+    "Total Games": ("player_total_games", "player_games_won"),
+    "Total Sets": ("player_sets_won",),
+    "Sets Won": ("player_sets_won",),
     "Passes Attempted": (),
 }
 

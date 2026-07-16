@@ -32,12 +32,12 @@ export default function TennisPage({ tour: initialTour }: { tour?: "ATP" | "WTA"
         title={`${tour} Research Board`}
         description={
           tour === "ATP"
-            ? "ATP (Men) — ESPN singles slate with PrizePicks-style markets (Fantasy Score, Total Games, Total Sets). Green OVER · red UNDER."
-            : "WTA (Women) — ESPN singles slate with PrizePicks-style markets (Fantasy Score, Total Games, Total Sets). Green OVER · red UNDER."
+            ? "ATP (Men) — live PrizePicks/Underdog/Sleeper tennis props via PropLine (Aces, Games Won, Fantasy Score, …). Green OVER · red UNDER."
+            : "WTA (Women) — live PrizePicks/Underdog/Sleeper tennis props via PropLine (Aces, Games Won, Fantasy Score, …). Green OVER · red UNDER."
         }
         propsPath={`/api/tennis/props?tour=${tour}`}
         queryKey={`tennis-board-${tour}`}
-        emptyHint={`${tour} board builds from the live ESPN scoreboard. Refresh when tournaments have singles matchups.`}
+        emptyHint={`${tour} shows live pick'em tennis lines only. If empty, PropLine may be rate-limited — try again after the daily reset.`}
       />
     </div>
   );

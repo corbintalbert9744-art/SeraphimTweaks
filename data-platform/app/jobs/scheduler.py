@@ -73,7 +73,7 @@ def job_refresh_odds() -> None:
                 if propline_rate_limit.is_blocked():
                     pickem["stopped"] = propline_rate_limit.status()
                     break
-                for league in ("MLB", "WNBA", "NBA", "NHL", "Soccer"):
+                for league in ("MLB", "WNBA", "NBA", "NHL", "Soccer", "ATP", "WTA"):
                     if propline_rate_limit.is_blocked():
                         break
                     key = f"{platform}:{league}"
@@ -83,6 +83,12 @@ def job_refresh_odds() -> None:
                         )
                     except Exception as exc:  # noqa: BLE001
                         pickem[key] = {"ok": False, "error": str(exc)}
+                    # Tennis shares one PropLine sport key — one successful
+                    # PrizePicks pull is enough for the day to avoid double spend.
+                    if league == "ATP" and isinstance(pickem.get(key), dict):
+                        if (pickem[key].get("count") or 0) > 0 and platform == "prizepicks":
+                            # Still allow WTA to read cache / mirror below
+                            pass
 
         return {
             "nba": build_and_store_featured_prop(db),

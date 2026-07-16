@@ -286,9 +286,24 @@ class PropLineAdapter:
                     horizon_hours=horizon_hours,
                     target_day=target_day,
                 )
+                # Tennis DFS market keys are lightly documented — if the known
+                # list returns nothing, pull all markets and keep pick'em player props.
+                if not batch and code in {"ATP", "WTA"}:
+                    batch = self._fetch_sport_props(
+                        code,
+                        sk,
+                        [],
+                        bookmakers=allowed,
+                        max_events=limit,
+                        horizon_hours=horizon_hours,
+                        target_day=target_day,
+                        discover_all_markets=True,
+                    )
                 out.extend(batch)
                 # Once we have pick'em quotes for Soccer MLS, stop expanding EU leagues.
                 if code == "Soccer" and batch and sk == "soccer_mls":
+                    break
+                if code in {"ATP", "WTA"} and batch:
                     break
             except ProviderRateLimitError as exc:
                 rate_limited = True
@@ -314,17 +329,18 @@ class PropLineAdapter:
         max_events: Optional[int] = None,
         horizon_hours: int = UPCOMING_HORIZON_HOURS,
         target_day: Optional[datetime] = None,
+        discover_all_markets: bool = False,
     ) -> list[NormalizedOddsQuote]:
         """Fetch props via bulk /odds (1 call), fall back to per-event only if needed."""
-        markets_param = ",".join(markets)
+        markets_param = ",".join(markets) if markets else ""
         limit = max_events if max_events is not None else self.max_events
+        params: dict[str, Any] = {}
+        if markets_param and not discover_all_markets:
+            params["markets"] = markets_param
 
         # Preferred path: one bulk odds call covers the whole sport slate.
         try:
-            bulk = self._get(
-                f"/sports/{sport_key}/odds",
-                {"markets": markets_param},
-            )
+            bulk = self._get(f"/sports/{sport_key}/odds", params or None)
         except ProviderRateLimitError:
             raise
         except Exception as exc:  # noqa: BLE001
@@ -346,9 +362,12 @@ class PropLineAdapter:
                 if eid is None:
                     continue
                 try:
+                    odds_params: dict[str, Any] = {}
+                    if markets_param and not discover_all_markets:
+                        odds_params["markets"] = markets_param
                     payload = self._get(
                         f"/sports/{sport_key}/events/{eid}/odds",
-                        {"markets": markets_param},
+                        odds_params or None,
                     )
                 except ProviderRateLimitError:
                     raise

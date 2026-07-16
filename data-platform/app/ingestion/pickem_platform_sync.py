@@ -72,6 +72,13 @@ MARKET_RAW_KEYS: dict[str, Optional[str]] = {
     "Shots": "shots",
     "Saves": "saves",
     "Blocked Shots": "blockedShots",
+    "Aces": "aces",
+    "Double Faults": "double_faults",
+    "Games Won": "games_won",
+    "Break Points Won": "break_points_won",
+    "Fantasy Score": "fantasy_score",
+    "Total Games": "total_games",
+    "Sets Won": "sets_won",
 }
 
 
@@ -895,12 +902,9 @@ def sync_pickem_platform_board(
         job.rows_written = len(board_rows)
         db.commit()
 
-    board_rows.sort(
-        key=lambda r: (
-            -(r.get("edgePercent") if r.get("edgePercent") is not None else -999),
-            r.get("player") or "",
-        )
-    )
+    if code in {"ATP", "WTA"} and board_rows:
+        _mirror_tennis_sibling_board(db, source_league=code, platform=app, board_rows=board_rows)
+
     updated = (latest_capture or datetime.now(timezone.utc)).isoformat()
     return _finalize_platform_board(
         db,
@@ -917,6 +921,90 @@ def sync_pickem_platform_board(
             "Projections are Seraphim model estimates vs those lines — not invented lines."
         ),
     )
+
+
+def _mirror_tennis_sibling_board(
+    db: Session,
+    *,
+    source_league: str,
+    platform: str,
+    board_rows: list[dict[str, Any]],
+) -> None:
+    """PropLine uses one `tennis` sport key — mirror live lines to the other tour board."""
+    sibling = "WTA" if source_league == "ATP" else "ATP" if source_league == "WTA" else None
+    if not sibling or not board_rows:
+        return
+    mirrored = 0
+    for row in board_rows:
+        player = db.get(Player, row.get("playerWarehouseId")) if row.get("playerWarehouseId") else None
+        if player is None:
+            # Resolve by external id
+            ext = row.get("playerId")
+            if ext:
+                player = db.execute(
+                    select(Player).where(Player.external_id == str(ext))
+                ).scalar_one_or_none()
+        if player is None:
+            continue
+        prop = _upsert_platform_prop(
+            db,
+            league=sibling,
+            platform=platform,
+            player=player,
+            market=str(row.get("market") or "Aces"),
+            side=str(row.get("side") or "Over"),
+            line=float(row.get("line") or 0),
+            game_id=None,
+        )
+        db.flush()
+        analytics = db.execute(
+            select(PropAnalytics).where(PropAnalytics.prop_id == prop.id)
+        ).scalar_one_or_none()
+        if not analytics:
+            analytics = PropAnalytics(id=str(uuid.uuid4()), prop_id=prop.id, league=sibling)
+            db.add(analytics)
+        analytics.league = sibling
+        analytics.projected_value = row.get("projectedValue")
+        analytics.comparison_line = float(row.get("line") or 0)
+        analytics.edge_vs_line = row.get("edgeVsLine")
+        analytics.confidence_score = int(row.get("confidence") or 0)
+        analytics.research_score = int(row.get("researchScore") or 0)
+        analytics.ev_percent = float(row.get("evPercent") or 0)
+        analytics.no_vig_prob = float(row.get("noVigProb") or 0.5)
+        analytics.matchup_note = row.get("game")
+        analytics.is_model_estimate = bool(row.get("isModelEstimate"))
+        analytics.odds_are_mock = False
+        analytics.computed_at = datetime.now(timezone.utc)
+        # Copy odds so sibling board cache can resolve platform quotes
+        from app.providers.base import NormalizedOddsQuote
+
+        for side_name, odds_key in (("Over", "overOdds"), ("Under", "underOdds")):
+            american = row.get(odds_key)
+            if american is None:
+                continue
+            q = NormalizedOddsQuote(
+                league=sibling,
+                player_external_id=str(player.external_id or player.id),
+                player_name=str(row.get("player") or player.full_name),
+                market=str(row.get("market") or ""),
+                side=side_name,
+                line=float(row.get("line") or 0),
+                american_odds=int(american),
+                sportsbook_slug=str(row.get("platformSlug") or platform),
+                sportsbook_name=str(row.get("platformName") or platform),
+                game_external_id=None,
+                captured_at=datetime.now(timezone.utc),
+                is_mock=False,
+                source_provider=str(row.get("sourceProvider") or "propline"),
+                home_team=None,
+                away_team=None,
+                raw={"commence_time": row.get("commenceTime") or row.get("tipTime")},
+            )
+            insert_odds(db, q, prop.id, provider_name=q.source_provider or "propline")
+        mirrored += 1
+    if mirrored:
+        db.commit()
+        log.info("mirrored %s tennis pick'em props %s → %s", mirrored, source_league, sibling)
 
 
 def _apply_upcoming_slate_filter(
@@ -1208,7 +1296,26 @@ def _list_cached_platform_board(
         .all()
     )
     if not props:
-        return None
+        # Tennis: PropLine is one sport feed — try the sibling tour cache.
+        if code in {"ATP", "WTA"}:
+            sibling = "WTA" if code == "ATP" else "ATP"
+            sib_prefix = f"{sibling.lower()}:pickem:{platform}:"
+            props = (
+                db.execute(
+                    select(Prop, PropAnalytics, Player)
+                    .join(PropAnalytics, PropAnalytics.prop_id == Prop.id)
+                    .outerjoin(Player, Player.id == Prop.player_id)
+                    .where(
+                        Prop.league == sibling,
+                        Prop.status == "open",
+                        Prop.id.like(f"{sib_prefix}%"),
+                    )
+                    .order_by(PropAnalytics.research_score.desc())
+                )
+                .all()
+            )
+        if not props:
+            return None
 
     # Freshness: newest odds capture for this platform
     prop_ids = [p.id for p, _, _ in props]
