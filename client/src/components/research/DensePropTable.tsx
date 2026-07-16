@@ -1,11 +1,9 @@
 import { Plus, Check } from "lucide-react";
 import { Link } from "wouter";
 import { ConfidenceBadge } from "@/components/shared/ConfidenceBadge";
-import { LeanBadge } from "@/components/shared/LeanBadge";
-import { leanTextClass } from "@/lib/leanTheme";
 import { playerProfilePath, propResearchPath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
-import { HitRateMatrixCell } from "./HitRateChips";
+import { EvPlusBadge, HitPctChip } from "./DeskPrimitives";
 import { parseHitRate } from "./hitRate";
 
 export type DensePropRow = {
@@ -25,6 +23,8 @@ export type DensePropRow = {
   researchScore?: number;
   noVigProb?: number;
   evPercent?: number;
+  americanOdds?: number;
+  platformName?: string | null;
   l5?: string;
   l10?: string;
   l20?: string;
@@ -33,18 +33,26 @@ export type DensePropRow = {
 
 function edgeOf(row: DensePropRow): number | null {
   if (row.edgePercent != null && Number.isFinite(row.edgePercent)) return row.edgePercent;
+  if (row.evPercent != null && Number.isFinite(row.evPercent)) return row.evPercent;
   const proj = row.projectedValue;
   if (proj == null || !row.line) return null;
   return ((proj - row.line) / row.line) * 100;
 }
 
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+}
+
 /**
- * High-density prop board table — line, projection, edge, L5–Season hit matrix, builder.
+ * Dense board table styled after professional prop research desks:
+ * Player · Matchup · Line · EV+ · L5/L10/L20/SZN hit chips · Add
  */
 export function DensePropTable({
   rows,
   title = "Prop board",
-  subtitle = "Projection · edge · hit rates · confidence",
+  subtitle = "Line · EV+ · hit rates",
   platformLabel,
   onAdd,
   hasLeg,
@@ -59,103 +67,111 @@ export function DensePropTable({
   return (
     <section
       data-feature="dense-prop-table"
-      className="overflow-hidden rounded-xl border border-[#1a1a1a] bg-[#0d0d0d]"
+      className="overflow-hidden rounded-xl border border-[#1a1a1a] bg-[#0b0b0b]"
     >
-      <div className="flex items-center justify-between border-b border-[#1a1a1a] px-4 py-3.5 sm:px-5">
+      <div className="flex items-center justify-between border-b border-[#1a1a1a] px-4 py-3 sm:px-5">
         <div>
           <h2 className="text-sm font-semibold text-white sm:text-base">{title}</h2>
           <p className="mt-0.5 text-xs text-neutral-500">
             {platformLabel ? `${platformLabel} · ${subtitle}` : subtitle}
           </p>
         </div>
-        <div className="hidden items-center gap-3 text-[11px] sm:flex">
-          <span className="inline-flex items-center gap-1.5 text-emerald-400">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" /> OVER
-          </span>
-          <span className="inline-flex items-center gap-1.5 text-red-400">
-            <span className="h-2 w-2 rounded-full bg-red-400" /> UNDER
-          </span>
-        </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-[1100px] w-full text-left text-sm">
-          <thead className="bg-white/[0.02] text-[10px] uppercase tracking-wider text-neutral-500">
+        <table className="min-w-[1080px] w-full text-left text-sm">
+          <thead className="bg-[#0f0f0f] text-[10px] uppercase tracking-wider text-neutral-500">
             <tr>
               <th className="px-3 py-2.5 font-medium">Player</th>
-              <th className="px-3 py-2.5 font-medium">Market</th>
+              <th className="px-3 py-2.5 font-medium">Matchup</th>
               <th className="px-3 py-2.5 font-medium">Line</th>
-              <th className="px-3 py-2.5 font-medium">Proj</th>
-              <th className="px-3 py-2.5 font-medium">Edge</th>
-              <th className="px-3 py-2.5 font-medium text-right">L5</th>
-              <th className="px-3 py-2.5 font-medium text-right">L10</th>
-              <th className="px-3 py-2.5 font-medium text-right">L20</th>
-              <th className="px-3 py-2.5 font-medium text-right">Season</th>
+              <th className="px-3 py-2.5 font-medium">EV+</th>
+              <th className="px-3 py-2.5 font-medium text-center">L5</th>
+              <th className="px-3 py-2.5 font-medium text-center">L10</th>
+              <th className="px-3 py-2.5 font-medium text-center">L20</th>
+              <th className="px-3 py-2.5 font-medium text-center">Szn</th>
               <th className="px-3 py-2.5 font-medium">Conf</th>
               <th className="px-3 py-2.5 font-medium text-right">Add</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/[0.04]">
+          <tbody className="divide-y divide-[#141414]">
             {rows.map((row) => {
               const added = hasLeg(row.id);
               const edgePct = edgeOf(row);
               const proj = row.projectedValue;
+              const vsAvg =
+                proj != null ? Number((proj - row.line).toFixed(1)) : null;
               const l10 = parseHitRate(row.l10);
               return (
                 <tr
                   key={row.id}
                   className={cn(
                     "transition hover:bg-white/[0.025]",
-                    l10.pct >= 70 && "bg-emerald-500/[0.03]",
+                    l10.pct >= 80 && "bg-emerald-500/[0.03]",
                   )}
                 >
                   <td className="px-3 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#2a2a2a] bg-[#141414] text-[11px] font-semibold text-yellow-400">
+                        {initials(row.player)}
+                      </span>
+                      <div className="min-w-0">
+                        <Link
+                          href={playerProfilePath(row.playerId)}
+                          className="font-medium text-neutral-100 hover:text-yellow-400"
+                        >
+                          {row.player}
+                        </Link>
+                        <p className="mt-0.5 text-[11px] text-neutral-500">
+                          {row.position || row.team}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3">
                     <Link
-                      href={playerProfilePath(row.playerId)}
-                      className="font-medium text-neutral-100 hover:text-yellow-400"
+                      href={propResearchPath(row.id)}
+                      className="font-medium text-neutral-200 hover:text-yellow-400"
                     >
-                      {row.player}
+                      {row.market}
                     </Link>
                     <p className="mt-0.5 text-[11px] text-neutral-500">
-                      {row.team} vs {row.opponent}
-                      {row.position ? ` · ${row.position}` : ""}
+                      vs {row.opponent} · {row.team}
                     </p>
                   </td>
                   <td className="px-3 py-3">
-                    <Link href={propResearchPath(row.id)} className="text-neutral-300 hover:text-yellow-400">
-                      {row.market}
-                    </Link>
-                    <div className="mt-1">
-                      <LeanBadge side={row.side === "Under" ? "Under" : "Over"} line={row.line} size="sm" />
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 tabular-nums text-neutral-200">{row.line.toFixed(1)}</td>
-                  <td className={cn("px-3 py-3 tabular-nums font-semibold", leanTextClass(row.side === "Under" ? "Under" : "Over"))}>
-                    {proj == null ? "—" : proj.toFixed(1)}
-                  </td>
-                  <td className="px-3 py-3">
-                    <span
-                      className={cn(
-                        "rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums",
-                        (edgePct ?? 0) >= 0
-                          ? "bg-emerald-500/10 text-emerald-300"
-                          : "bg-red-500/10 text-red-300",
-                      )}
-                    >
-                      {edgePct == null ? "—" : `${edgePct > 0 ? "+" : ""}${edgePct.toFixed(1)}%`}
-                    </span>
+                    <p className="text-base font-semibold tabular-nums text-white">
+                      {row.line.toFixed(1)}
+                    </p>
+                    <p className="text-[11px] text-neutral-500">
+                      {row.side}
+                      {vsAvg != null ? (
+                        <span
+                          className={cn(
+                            "ml-1.5 tabular-nums",
+                            vsAvg >= 0 ? "text-emerald-400" : "text-red-400",
+                          )}
+                        >
+                          {vsAvg > 0 ? "+" : ""}
+                          {vsAvg} avg
+                        </span>
+                      ) : null}
+                    </p>
                   </td>
                   <td className="px-3 py-3">
-                    <HitRateMatrixCell value={row.l5} />
+                    <EvPlusBadge ev={edgePct ?? 0} />
                   </td>
-                  <td className="px-3 py-3">
-                    <HitRateMatrixCell value={row.l10} />
+                  <td className="px-3 py-3 text-center">
+                    <HitPctChip value={row.l5} />
                   </td>
-                  <td className="px-3 py-3">
-                    <HitRateMatrixCell value={row.l20} />
+                  <td className="px-3 py-3 text-center">
+                    <HitPctChip value={row.l10} />
                   </td>
-                  <td className="px-3 py-3">
-                    <HitRateMatrixCell value={row.season} />
+                  <td className="px-3 py-3 text-center">
+                    <HitPctChip value={row.l20} />
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    <HitPctChip value={row.season} />
                   </td>
                   <td className="px-3 py-3">
                     <ConfidenceBadge score={row.confidence} size="sm" />

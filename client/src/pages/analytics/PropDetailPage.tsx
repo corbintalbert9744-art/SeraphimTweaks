@@ -26,7 +26,9 @@ import { LineComparison } from "@/components/shared/LineComparison";
 import {
   HitRateBars,
   HitRateChips,
+  HitRateSummaryBoxes,
   LineMovementChart,
+  NoVigOddsCard,
   parseHitRate,
   type HitWindow,
 } from "@/components/research";
@@ -398,6 +400,41 @@ export default function PropDetailPage() {
                 onSelect={setHitWindow}
               />
             </div>
+            <HitRateSummaryBoxes
+              className="mb-5"
+              windows={[
+                {
+                  key: "L5",
+                  label: "L5",
+                  hitPct: parseHitRate(prop.l5).pct,
+                  average: null,
+                  hits: prop.l5,
+                },
+                {
+                  key: "L10",
+                  label: "L10",
+                  hitPct: parseHitRate(prop.l10).pct,
+                  average: null,
+                  hits: prop.l10,
+                },
+                {
+                  key: "L20",
+                  label: "L20",
+                  hitPct: parseHitRate(prop.l20).pct,
+                  average: null,
+                  hits: prop.l20,
+                },
+                {
+                  key: "Season",
+                  label: "Season",
+                  hitPct: parseHitRate(prop.season).pct,
+                  average: null,
+                  hits: prop.season,
+                },
+              ]}
+              activeKey={hitWindow}
+              onSelect={(k) => setHitWindow(k as HitWindow)}
+            />
             <HitRateBars
               history={prop.hitHistory ?? []}
               line={prop.line}
@@ -557,6 +594,11 @@ export default function PropDetailPage() {
 
         {/* Roomier right rail */}
         <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+          <NoVigOddsCard
+            overPct={Math.round(prop.noVigProb * 1000) / 10}
+            vigPct={5.2}
+            side={selectedSide}
+          />
           <section className={cn(panel, "p-6 sm:p-8")} data-feature="metrics-row">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
               Selected book

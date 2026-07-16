@@ -6,3 +6,11 @@ export { ResearchPanel, MetricStrip } from "./ResearchPanel";
 export { LineMovementChart } from "./LineMovementChart";
 export { ResearchFiltersBar, type ResearchFilterState } from "./ResearchFiltersBar";
 export { DensePropTable, type DensePropRow } from "./DensePropTable";
+export {
+  HitPctChip,
+  EvPlusBadge,
+  HitRateSummaryBoxes,
+  MarketTabs,
+  NoVigOddsCard,
+  BookLineStrip,
+} from "./DeskPrimitives";

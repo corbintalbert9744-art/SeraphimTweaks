@@ -68,11 +68,24 @@ export function HitRateChips({
 
 export function HitRateMatrixCell({ value }: { value?: string }) {
   const parsed = parseHitRate(value);
+  const tone =
+    parsed.pct >= 70
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+      : parsed.pct >= 50
+        ? "border-yellow-500/35 bg-yellow-500/10 text-yellow-300"
+        : parsed.pct > 0
+          ? "border-red-500/35 bg-red-500/10 text-red-300"
+          : "border-transparent text-neutral-600";
   return (
-    <div className="text-right">
-      <p className={cn("text-sm font-semibold tabular-nums", hitToneClass(parsed.pct))}>
+    <div className="flex flex-col items-end gap-0.5">
+      <span
+        className={cn(
+          "inline-flex min-w-[2.75rem] items-center justify-center rounded-md border px-1.5 py-1 text-xs font-semibold tabular-nums",
+          tone,
+        )}
+      >
         {parsed.pct ? `${parsed.pct}%` : "—"}
-      </p>
+      </span>
       <p className="text-[10px] tabular-nums text-neutral-600">{parsed.label}</p>
     </div>
   );

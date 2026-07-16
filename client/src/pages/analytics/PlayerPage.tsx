@@ -22,6 +22,12 @@ import { leanTextClass } from "@/lib/leanTheme";
 import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
+import {
+  BookLineStrip,
+  HitRateSummaryBoxes,
+  MarketTabs,
+  NoVigOddsCard,
+} from "@/components/research";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
 import type { NbaProp } from "@/data/nbaMock";
 
@@ -461,32 +467,23 @@ export default function PlayerPage() {
           </div>
         </div>
 
-        {/* OddsIQ-style market tabs — one chip per available line/stat */}
-        <div className="mt-5 -mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
-          {markets.map((m, i) => (
-            <button
-              key={m.propId}
-              type="button"
-              onClick={() => {
-                setMarketIdx(i);
-                setSide(null);
-                setTab("chart");
-              }}
-              className={cn(
-                "shrink-0 rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-wide transition",
-                i === marketIdx
-                  ? "bg-yellow-400 text-black"
-                  : "bg-[#141414] text-neutral-400 hover:bg-[#1a1a1a] hover:text-neutral-200",
-              )}
-            >
-              {m.market}
-              <span className="ml-1.5 tabular-nums opacity-80">{m.line}</span>
-            </button>
-          ))}
-        </div>
+        {/* Market tabs — underline active (research-desk style) */}
+        <MarketTabs
+          className="mt-5"
+          markets={markets.map((m) => ({
+            id: m.propId,
+            label: m.market,
+            line: m.line,
+          }))}
+          activeIndex={marketIdx}
+          onSelect={(i) => {
+            setMarketIdx(i);
+            setSide(null);
+            setTab("chart");
+          }}
+        />
 
-        {/* Selected prop header — OddsIQ style */}
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t border-[#1a1a1a] pt-4">
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
               Selected prop
@@ -503,10 +500,42 @@ export default function PlayerPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-center">
-              <p className="text-[10px] uppercase tracking-wider text-yellow-500/80">Line</p>
-              <p className="text-xl font-semibold tabular-nums text-yellow-300">{market.line}</p>
+            <div className="flex items-center gap-1 rounded-xl border border-[#222] bg-[#0c0c0c] px-2 py-1.5">
+              <button
+                type="button"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white"
+                onClick={() => {
+                  /* line is from market; UI affordance for desk parity */
+                }}
+                aria-label="Lower line"
+              >
+                −
+              </button>
+              <span className="min-w-[3rem] text-center text-lg font-semibold tabular-nums text-white">
+                {market.line}
+              </span>
+              <button
+                type="button"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white"
+                aria-label="Higher line"
+              >
+                +
+              </button>
             </div>
+            <button
+              type="button"
+              disabled={added}
+              onClick={() => addCurrent()}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold",
+                added
+                  ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                  : "bg-emerald-500 text-black hover:bg-emerald-400",
+              )}
+            >
+              {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {added ? "Added" : "+ Parlay"}
+            </button>
             <Link
               href={propResearchPath(market.propId)}
               className="rounded-xl border border-[#2a2a2a] bg-[#141414] px-3 py-2.5 text-xs font-semibold text-yellow-400 transition hover:border-yellow-500/40 hover:bg-yellow-500/10"
@@ -519,35 +548,17 @@ export default function PlayerPage() {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="space-y-4">
-          {/* Hit-rate strip */}
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {(market.hitWindows ?? []).map((w) => (
-              <button
-                key={w.key}
-                type="button"
-                onClick={() => setWindowKey(w.key)}
-                className={cn(
-                  "min-w-[5.75rem] shrink-0 rounded-xl border px-3 py-2.5 text-left transition",
-                  windowKey === w.key
-                    ? "border-yellow-500/40 bg-yellow-500/10"
-                    : "border-[#1a1a1a] bg-[#0c0c0c]",
-                )}
-              >
-                <p className="text-[10px] uppercase tracking-wider text-neutral-500">{w.label}</p>
-                <p
-                  className={cn(
-                    "mt-1 text-lg font-semibold tabular-nums",
-                    w.hitPct >= 55 ? "text-emerald-300" : w.hitPct <= 45 ? "text-red-300" : "text-white",
-                  )}
-                >
-                  {w.hitPct}%
-                </p>
-                <p className="text-[11px] tabular-nums text-neutral-400">
-                  Avg {w.average != null ? w.average.toFixed(1) : "—"}
-                </p>
-              </button>
-            ))}
-          </div>
+          <HitRateSummaryBoxes
+            windows={(market.hitWindows ?? []).map((w) => ({
+              key: w.key,
+              label: w.label,
+              hitPct: w.hitPct,
+              average: w.average,
+              hits: w.hits,
+            }))}
+            activeKey={windowKey}
+            onSelect={setWindowKey}
+          />
           {activeWindow && (
             <p className="text-[11px] text-neutral-500">
               {activeWindow.label}: {activeWindow.hits} hits ({activeWindow.hitPct}% over) vs line{" "}
@@ -555,7 +566,7 @@ export default function PlayerPage() {
             </p>
           )}
 
-          <div className="card-3d rounded-2xl border border-[#1a1a1a] p-4 sm:p-5">
+          <div className="rounded-2xl border border-[#1a1a1a] bg-[#0c0c0c] p-4 sm:p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-white">
                 {profile.league} · {market.market}
@@ -576,7 +587,7 @@ export default function PlayerPage() {
                     className={cn(
                       "rounded-lg px-2.5 py-1 text-xs font-medium transition",
                       tab === id
-                        ? "bg-yellow-400/15 text-yellow-300"
+                        ? "bg-emerald-500/15 text-emerald-300"
                         : "text-neutral-500 hover:text-neutral-300",
                     )}
                   >
@@ -796,21 +807,56 @@ export default function PlayerPage() {
           </ProOnly>
         </div>
 
-        {/* Insights sidebar (OddsIQ-style) */}
+        {/* Insights sidebar — no-vig + matchup (research-desk refs) */}
         <aside className="space-y-3">
-          <div className="card-3d rounded-2xl border border-[#1a1a1a] p-4">
+          <NoVigOddsCard
+            overPct={
+              Math.round(
+                (market.overProbability ??
+                  (market.side === "Over" ? market.confidence / 100 : 1 - market.confidence / 100)) *
+                  1000,
+              ) / 10
+            }
+            vigPct={5.2}
+            side={selectedSide}
+          />
+
+          <BookLineStrip
+            books={[
+              {
+                book: "Seraphim",
+                line: market.line,
+                odds: market.americanOdds > 0 ? `+${market.americanOdds}` : String(market.americanOdds),
+                evPct: market.evPercent,
+                highlight: true,
+              },
+              {
+                book: "Consensus",
+                line: market.line,
+                odds: "-110",
+                evPct: null,
+              },
+            ]}
+          />
+
+          <div className="rounded-2xl border border-[#1a1a1a] bg-[#0c0c0c] p-4">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
               Insights
             </p>
             <h3 className="mt-1 text-sm font-semibold text-white">{profile.matchup.title}</h3>
             <p className="mt-1 text-xs text-neutral-500">{profile.matchup.defenseRank}</p>
             <div className="mt-4 flex items-center justify-center">
-              <div className="relative flex h-28 w-28 items-center justify-center rounded-full border-4 border-yellow-500/40">
+              <div className="relative flex h-28 w-28 items-center justify-center rounded-full border-4 border-emerald-500/35">
                 <div className="text-center">
-                  <p className="text-2xl font-semibold tabular-nums text-yellow-300">
-                    {Math.round(market.confidence)}%
+                  <p className="text-2xl font-semibold tabular-nums text-emerald-300">
+                    {Math.round(
+                      (selectedSide === "Under"
+                        ? market.underProbability ?? 1 - (market.overProbability ?? 0.5)
+                        : market.overProbability ?? market.confidence / 100) * 100,
+                    )}
+                    %
                   </p>
-                  <p className="text-[10px] uppercase text-neutral-500">Conf</p>
+                  <p className="text-[10px] uppercase text-neutral-500">Lean</p>
                 </div>
               </div>
             </div>
@@ -822,7 +868,7 @@ export default function PlayerPage() {
             </p>
           </div>
 
-          <div className="card-3d rounded-2xl border border-[#1a1a1a] p-4">
+          <div className="rounded-2xl border border-[#1a1a1a] bg-[#0c0c0c] p-4">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
               Home / Away
             </p>

@@ -25,15 +25,15 @@ export function parseHitRate(value: string | null | undefined): ParsedHitRate {
 }
 
 export function hitToneClass(pct: number): string {
-  if (pct >= 65) return "text-emerald-300";
-  if (pct >= 50) return "text-neutral-200";
+  if (pct >= 70) return "text-emerald-300";
+  if (pct >= 50) return "text-yellow-300";
   if (pct > 0) return "text-red-300";
   return "text-neutral-600";
 }
 
 export function hitBgClass(pct: number): string {
-  if (pct >= 65) return "bg-emerald-500/15 text-emerald-300 border-emerald-500/25";
-  if (pct >= 50) return "bg-white/[0.04] text-neutral-200 border-white/[0.08]";
-  if (pct > 0) return "bg-red-500/10 text-red-300 border-red-500/20";
+  if (pct >= 70) return "bg-emerald-500/15 text-emerald-300 border-emerald-500/40";
+  if (pct >= 50) return "bg-yellow-500/10 text-yellow-300 border-yellow-500/35";
+  if (pct > 0) return "bg-red-500/10 text-red-300 border-red-500/35";
   return "bg-transparent text-neutral-600 border-transparent";
 }

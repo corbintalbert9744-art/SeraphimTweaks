@@ -79,7 +79,7 @@ export function HitRateBars({
                 <div
                   className={cn(
                     "w-full max-w-[28px] rounded-t-sm transition",
-                    g.hit ? "bg-emerald-500" : "bg-red-500/75",
+                    g.hit ? "bg-emerald-400" : "bg-red-500/80",
                   )}
                   style={{ height: `${h}%` }}
                   title={`${g.label}: ${v}${g.opponent ? ` vs ${g.opponent}` : ""}`}
