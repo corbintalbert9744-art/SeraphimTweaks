@@ -11,7 +11,9 @@ from app.ingestion.multi_sport_sync import (
     sync_soccer_warehouse,
     sync_tennis_warehouse,
 )
-from app.providers.registry import get_mlb_providers, get_nhl_providers, get_soccer_providers
+from app.providers.espn.soccer import EspnSoccerProvider
+from app.providers.espn.tennis import EspnTennisProvider
+from app.providers.registry import get_mlb_providers, get_nhl_providers
 
 router = APIRouter(tags=["leagues"])
 
@@ -110,22 +112,35 @@ def nhl_sync(dates: str | None = Query(None), db: Session = Depends(get_db)):
     return sync_nhl_warehouse(db, date=dates)
 
 
+@router.get("/mlb/props/{prop_id}")
+def mlb_prop_detail(prop_id: str, db: Session = Depends(get_db)):
+    props = list_league_props(db, "MLB")
+    row = next((p for p in props if p["id"] == prop_id), None)
+    if not row:
+        raise HTTPException(status_code=404, detail="Prop not found")
+    return {"ok": True, "prop": row, "live": True, "league": "MLB"}
+
+
+@router.get("/nhl/props/{prop_id}")
+def nhl_prop_detail(prop_id: str, db: Session = Depends(get_db)):
+    props = list_league_props(db, "NHL")
+    row = next((p for p in props if p["id"] == prop_id), None)
+    if not row:
+        raise HTTPException(status_code=404, detail="Prop not found")
+    return {"ok": True, "prop": row, "live": True, "league": "NHL"}
+
+
 @router.get("/soccer/games")
 def soccer_games(dates: str | None = Query(None), db: Session = Depends(get_db)):
-    providers = get_soccer_providers()
-    if providers is None:
-        settings = get_settings()
-        return {
-            "date": dates,
-            "source": "football-data-org",
-            "live": False,
-            "games": [],
-            "requiresApiKey": True,
-            "configured": bool(settings.football_data_api_key),
-            "error": "FOOTBALL_DATA_API_KEY not configured — no fabricated soccer fixtures.",
-        }
-    games = providers.schedule.fetch_schedule("Soccer", dates) if providers.schedule else []
-    return {"date": dates, "source": "football-data-org", "live": True, "games": _games_payload(games)}
+    espn = EspnSoccerProvider()
+    games = espn.fetch_schedule("Soccer", dates)
+    return {
+        "date": dates,
+        "source": "espn-soccer",
+        "live": True,
+        "games": _games_payload(games),
+        "note": "ESPN public scoreboard (no key). Optional FOOTBALL_DATA_API_KEY enriches fixtures.",
+    }
 
 
 @router.get("/soccer/props")
@@ -137,28 +152,67 @@ def soccer_props(db: Session = Depends(get_db)):
         "league": "Soccer",
         "props": props,
         "count": len(props),
-        "live": bool(props),
-        "requiresApiKey": not bool(settings.football_data_api_key),
+        "live": True,
+        "source": "espn-soccer",
+        "requiresApiKey": False,
+        "footballDataConfigured": bool(settings.football_data_api_key),
         "note": (
-            "Schedule sync available with FOOTBALL_DATA_API_KEY. "
-            "Player prop logs are not fabricated — awaiting events extension."
-            if not props
-            else None
+            None
+            if props
+            else "ESPN schedules sync without a key. Player prop logs are not fabricated — awaiting an events provider. Optional FOOTBALL_DATA_API_KEY enriches fixtures."
         ),
     }
 
 
 @router.post("/soccer/jobs/sync")
 def soccer_sync(dates: str | None = Query(None), db: Session = Depends(get_db)):
-    result = sync_soccer_warehouse(db, date=dates)
-    if not result.get("ok") and result.get("requiresApiKey"):
-        raise HTTPException(status_code=503, detail=result)
-    return result
+    return sync_soccer_warehouse(db, date=dates)
+
+
+@router.get("/tennis/games")
+def tennis_games(
+    tour: str = Query("ATP"),
+    dates: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    code = "WTA" if tour.upper() == "WTA" else "ATP"
+    espn = EspnTennisProvider()
+    games = espn.fetch_schedule(code, dates)
+    return {"date": dates, "tour": code, "source": "espn-tennis", "live": True, "games": _games_payload(games)}
+
+
+@router.get("/tennis/props")
+def tennis_props(tour: str = Query("ATP"), db: Session = Depends(get_db)):
+    code = "WTA" if tour.upper() == "WTA" else "ATP"
+    props = list_league_props(db, code)
+    return {
+        "ok": True,
+        "league": code,
+        "props": props,
+        "count": len(props),
+        "live": True,
+        "source": "espn-tennis",
+        "requiresConfiguration": False,
+        "note": (
+            None
+            if props
+            else (
+                f"{code} schedule syncs from ESPN (no key). "
+                "Match prop gamelogs are not fabricated. "
+                "ODDS_API_KEY enables tournament odds when sport keys are verified; Tennis Abstract is not scraped."
+            )
+        ),
+    }
+
+
+@router.post("/tennis/jobs/sync")
+def tennis_sync(tour: str = Query("ATP"), dates: str | None = Query(None), db: Session = Depends(get_db)):
+    return sync_tennis_warehouse(db, tour=tour, date=dates)
 
 
 @router.get("/tennis/status")
-def tennis_status(db: Session = Depends(get_db)):
-    return sync_tennis_warehouse(db)
+def tennis_status(tour: str = Query("ATP"), db: Session = Depends(get_db)):
+    return sync_tennis_warehouse(db, tour=tour)
 
 
 @router.post("/jobs/sync-all")

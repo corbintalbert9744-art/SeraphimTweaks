@@ -1,6 +1,6 @@
 import type { LeagueCode } from "@/data/mock";
 
-export type SportTabId = "NBA" | "NFL" | "MLB" | "NHL" | "Soccer" | "ATP" | "WTA" | "WNBA";
+export type SportTabId = "NBA" | "NFL" | "MLB" | "NHL" | "Soccer" | "Tennis" | "WNBA";
 
 export interface SportTab {
   id: SportTabId;
@@ -16,8 +16,7 @@ export const SPORT_TABS: SportTab[] = [
   { id: "NHL", label: "NHL", href: "/nhl", league: "NHL" },
   { id: "Soccer", label: "Soccer", href: "/soccer", league: "Soccer" },
   { id: "WNBA", label: "WNBA", href: "/wnba", league: "WNBA" },
-  { id: "ATP", label: "ATP", href: "/atp", league: "ATP" },
-  { id: "WTA", label: "WTA", href: "/wta", league: "WTA" },
+  { id: "Tennis", label: "Tennis", href: "/tennis", league: "ATP" },
 ];
 
 export function sportTabFromPath(pathname: string): SportTabId | null {
@@ -27,8 +26,16 @@ export function sportTabFromPath(pathname: string): SportTabId | null {
   if (path === "/mlb" || path.startsWith("/mlb/")) return "MLB";
   if (path === "/nhl" || path.startsWith("/nhl/")) return "NHL";
   if (path === "/soccer" || path.startsWith("/soccer/")) return "Soccer";
-  if (path === "/atp" || path.startsWith("/atp/")) return "ATP";
-  if (path === "/wta" || path.startsWith("/wta/")) return "WTA";
+  if (
+    path === "/tennis" ||
+    path.startsWith("/tennis/") ||
+    path === "/atp" ||
+    path.startsWith("/atp/") ||
+    path === "/wta" ||
+    path.startsWith("/wta/")
+  ) {
+    return "Tennis";
+  }
   if (path === "/wnba" || path.startsWith("/wnba/")) return "WNBA";
   return null;
 }

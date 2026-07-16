@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
 import { scoreHueStyle } from "@/lib/leanTheme";
 
-/** Map Research Score → hue: low red → mid orange → high green. */
-export function ResearchScoreBadge({
+/** Color-coded confidence (same red→orange→green scale as Research Score). */
+export function ConfidenceBadge({
   score,
   size = "md",
   className,
@@ -12,7 +12,6 @@ export function ResearchScoreBadge({
   className?: string;
 }) {
   const { color, border, bg } = scoreHueStyle(score);
-
   return (
     <span
       className={cn(
@@ -21,9 +20,9 @@ export function ResearchScoreBadge({
         className,
       )}
       style={{ color, borderColor: border, backgroundColor: bg }}
-      title="Research Score — checklist-backed, not win probability"
+      title="Confidence — model certainty in the projection"
     >
-      <span className="text-[9px] font-medium uppercase tracking-wider opacity-70">RS</span>
+      <span className="text-[9px] font-medium uppercase tracking-wider opacity-70">Conf</span>
       {score}
     </span>
   );

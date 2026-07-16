@@ -184,16 +184,46 @@ export default function PropDetailPage() {
     queryKey: ["live-prop", propId],
     enabled: Boolean(propId),
     queryFn: async () => {
+      const tryProp = async (path: string, league?: string) => {
+        const res = await fetch(path);
+        if (!res.ok) return null;
+        const data = await res.json();
+        const raw = (data.prop ?? data) as Record<string, unknown>;
+        const detail = asPropDetailFromApi(league ? { ...raw, league } : raw);
+        cacheNbaPropDetail(detail);
+        return detail;
+      };
+
       if (propId.startsWith("wnba:")) {
-        const wnbaRes = await fetch(`/api/wnba/props/${encodeURIComponent(propId)}`);
-        if (wnbaRes.ok) {
-          const data = await wnbaRes.json();
-          const detail = asPropDetailFromApi({
-            ...((data.prop ?? data) as Record<string, unknown>),
-            league: "WNBA",
-          });
-          cacheNbaPropDetail(detail);
-          return detail;
+        const d = await tryProp(`/api/wnba/props/${encodeURIComponent(propId)}`, "WNBA");
+        if (d) return d;
+      }
+      if (propId.startsWith("mlb:")) {
+        const d = await tryProp(`/api/mlb/props/${encodeURIComponent(propId)}`, "MLB");
+        if (d) return d;
+      }
+      if (propId.startsWith("nhl:")) {
+        const d = await tryProp(`/api/nhl/props/${encodeURIComponent(propId)}`, "NHL");
+        if (d) return d;
+      }
+      if (propId.startsWith("soccer:") || propId.startsWith("atp:") || propId.startsWith("wta:")) {
+        const league = propId.startsWith("soccer:")
+          ? "Soccer"
+          : propId.startsWith("wta:")
+            ? "WTA"
+            : "ATP";
+        const path = propId.startsWith("soccer:")
+          ? "/api/soccer/props"
+          : `/api/tennis/props?tour=${league}`;
+        const board = await fetch(path);
+        if (board.ok) {
+          const data = (await board.json()) as { props: Record<string, unknown>[] };
+          const row = data.props.find((p) => String(p.id) === propId);
+          if (row) {
+            const detail = asPropDetailFromApi({ ...row, league });
+            cacheNbaPropDetail(detail);
+            return detail;
+          }
         }
       }
       if (propId.startsWith("nfl:")) {
@@ -208,29 +238,21 @@ export default function PropDetailPage() {
           }
         }
       }
-      const nbaRes = await fetch(`/api/nba/props/${encodeURIComponent(propId)}`);
-      if (nbaRes.ok) {
-        const data = await nbaRes.json();
-        const detail = asPropDetailFromApi((data.prop ?? data) as Record<string, unknown>);
-        cacheNbaPropDetail(detail);
-        return detail;
-      }
-      const wnbaRes = await fetch(`/api/wnba/props/${encodeURIComponent(propId)}`);
-      if (wnbaRes.ok) {
-        const data = await wnbaRes.json();
-        const detail = asPropDetailFromApi({
-          ...((data.prop ?? data) as Record<string, unknown>),
-          league: "WNBA",
-        });
-        cacheNbaPropDetail(detail);
-        return detail;
-      }
-      const nflBoard = await fetch("/api/nfl/props");
-      if (nflBoard.ok) {
-        const data = (await nflBoard.json()) as { props: Record<string, unknown>[] };
+      const nba = await tryProp(`/api/nba/props/${encodeURIComponent(propId)}`);
+      if (nba) return nba;
+      const wnba = await tryProp(`/api/wnba/props/${encodeURIComponent(propId)}`, "WNBA");
+      if (wnba) return wnba;
+      // Fallback: scan MLB/NHL boards
+      for (const [path, league] of [
+        ["/api/mlb/props", "MLB"],
+        ["/api/nhl/props", "NHL"],
+      ] as const) {
+        const board = await fetch(path);
+        if (!board.ok) continue;
+        const data = (await board.json()) as { props: Record<string, unknown>[] };
         const row = data.props.find((p) => String(p.id) === propId);
         if (row) {
-          const detail = asPropDetailFromApi({ ...row, league: "NFL" });
+          const detail = asPropDetailFromApi({ ...row, league });
           cacheNbaPropDetail(detail);
           return detail;
         }
@@ -308,11 +330,15 @@ export default function PropDetailPage() {
       ? "/nfl"
       : prop.league === "WNBA"
         ? "/wnba"
-        : prop.league === "ATP"
-          ? "/atp"
-          : prop.league === "WTA"
-            ? "/wta"
-            : "/nba";
+        : prop.league === "MLB"
+          ? "/mlb"
+          : prop.league === "NHL"
+            ? "/nhl"
+            : prop.league === "Soccer"
+              ? "/soccer"
+              : prop.league === "ATP" || prop.league === "WTA"
+                ? "/tennis"
+                : "/nba";
 
   const panel = "rounded-3xl border border-white/[0.06] bg-[#0d0d0d]";
 
@@ -384,7 +410,14 @@ export default function PropDetailPage() {
             </p>
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-500">{prop.why}</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <span className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-300">
+              <span
+                className={cn(
+                  "rounded-xl border px-4 py-2 text-sm font-semibold",
+                  recommendation === "Over"
+                    ? "border-emerald-500/35 bg-emerald-500/12 text-emerald-300"
+                    : "border-red-500/35 bg-red-500/12 text-red-300",
+                )}
+              >
                 Lean {recommendation}
               </span>
               {prop.edgeVsLine != null && (
@@ -405,11 +438,20 @@ export default function PropDetailPage() {
                 className={cn(
                   "rounded-2xl border px-5 py-5 text-left transition",
                   selectedSide === s
-                    ? "border-yellow-500/35 bg-yellow-500/[0.08]"
+                    ? s === "Over"
+                      ? "border-emerald-500/40 bg-emerald-500/[0.1]"
+                      : "border-red-500/40 bg-red-500/[0.1]"
                     : "border-white/[0.06] bg-white/[0.02] hover:border-white/15",
                 )}
               >
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{s}</p>
+                <p
+                  className={cn(
+                    "text-[11px] font-semibold uppercase tracking-wider",
+                    s === "Over" ? "text-emerald-400" : "text-red-400",
+                  )}
+                >
+                  {s}
+                </p>
                 <p className="mt-2 text-2xl font-semibold tabular-nums text-white">
                   {formatAmericanOdds(
                     s === "Over"
@@ -418,7 +460,14 @@ export default function PropDetailPage() {
                   )}
                 </p>
                 {s === recommendation && (
-                  <p className="mt-2 text-[10px] uppercase tracking-wider text-yellow-400">Model lean</p>
+                  <p
+                    className={cn(
+                      "mt-2 text-[10px] uppercase tracking-wider",
+                      s === "Over" ? "text-emerald-400" : "text-red-400",
+                    )}
+                  >
+                    Model lean
+                  </p>
                 )}
               </button>
             ))}

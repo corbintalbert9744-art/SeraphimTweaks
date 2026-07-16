@@ -158,7 +158,8 @@ export function LineComparison({
           </p>
         </div>
         <p className="text-xs text-neutral-600">
-          Lean <span className="text-yellow-400">{modelSide}</span>
+          Lean{" "}
+          <span className={modelSide === "Over" ? "text-emerald-400" : "text-red-400"}>{modelSide}</span>
         </p>
       </div>
 

@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Plus, Check } from "lucide-react";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
+import { LeanBadge } from "@/components/shared/LeanBadge";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import type { NbaPlayerCard, NbaProp } from "@/data/nbaMock";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
@@ -36,7 +37,7 @@ export function NbaPlayerCards({
           const added = topProp ? hasLeg(topProp.id) : false;
           const proj = player.projections ?? player.seasonAvg;
           const rs = player.researchScore ?? player.confidence;
-          const lean =
+          const topLeanLabel =
             player.topLean ||
             (topProp ? `${topProp.market} ${topProp.side} ${topProp.line}` : null);
           const insight = player.insight || player.matchupNote;
@@ -78,9 +79,14 @@ export function NbaPlayerCards({
 
               <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-neutral-400">{insight}</p>
 
-              {lean && topProp && (
+              {topLeanLabel && topProp && (
                 <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#151515] pt-4">
-                  <p className="min-w-0 truncate text-sm font-semibold text-neutral-100">{lean}</p>
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-wider text-neutral-500">{topProp.market}</p>
+                    <div className="mt-1">
+                      <LeanBadge side={topProp.side} line={topProp.line} size="sm" />
+                    </div>
+                  </div>
                   <button
                     type="button"
                     disabled={added}

@@ -253,7 +253,11 @@ export default function NbaPage() {
                 description="Lower min confidence or clear team/market filters."
               />
             ) : (
-              <NbaPropTable rows={filtered} />
+              <NbaPropTable
+                rows={filtered}
+                title="NBA Prop Board"
+                subtitle="Green OVER · red UNDER · open any row for Line Comparison"
+              />
             )}
           </div>
         </>

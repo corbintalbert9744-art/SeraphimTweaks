@@ -267,6 +267,29 @@ export function registerDataPlatformProxy(
   proxyLeagueGet("/api/nhl/props", "/api/v1/nhl/props", 180_000);
   proxyLeagueGet("/api/soccer/games", "/api/v1/soccer/games");
   proxyLeagueGet("/api/soccer/props", "/api/v1/soccer/props");
+  proxyLeagueGet("/api/tennis/games", "/api/v1/tennis/games");
+  proxyLeagueGet("/api/tennis/props", "/api/v1/tennis/props");
+  // prop detail proxies
+  app.get("/api/mlb/props/:id", async (req, res) => {
+    try {
+      const up = await fetch(`${BASE}/api/v1/mlb/props/${encodeURIComponent(req.params.id)}`, {
+        signal: AbortSignal.timeout(30_000),
+      });
+      res.status(up.status).json(await up.json());
+    } catch {
+      res.status(503).json({ error: "Data platform unavailable" });
+    }
+  });
+  app.get("/api/nhl/props/:id", async (req, res) => {
+    try {
+      const up = await fetch(`${BASE}/api/v1/nhl/props/${encodeURIComponent(req.params.id)}`, {
+        signal: AbortSignal.timeout(30_000),
+      });
+      res.status(up.status).json(await up.json());
+    } catch {
+      res.status(503).json({ error: "Data platform unavailable" });
+    }
+  });
 
   app.post("/api/jobs/sync-all", async (req, res) => {
     const qs = typeof req.query.dates === "string" ? `?dates=${encodeURIComponent(req.query.dates)}` : "";

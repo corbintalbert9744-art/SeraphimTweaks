@@ -8,6 +8,8 @@ from app.config import get_settings
 from app.providers.base import ProviderMeta, capability_matrix
 from app.providers.espn.nba import EspnNbaProvider
 from app.providers.espn.nfl import EspnNflProvider
+from app.providers.espn.soccer import EspnSoccerProvider
+from app.providers.espn.tennis import EspnTennisProvider
 from app.providers.espn.wnba import EspnWnbaProvider
 from app.providers.mlb.statsapi import MlbStatsApiProvider
 from app.providers.mock.odds import MockOddsProvider
@@ -138,6 +140,28 @@ def provider_status() -> list[dict]:
             "legitimate": True,
             "notes": nhl.meta.notes,
             "homepage": nhl.meta.homepage,
+        },
+        {
+            "name": EspnSoccerProvider().meta.name,
+            "leagues": ["Soccer"],
+            "capabilities": EspnSoccerProvider().meta.capabilities,
+            "requires_api_key": False,
+            "is_mock": False,
+            "configured": True,
+            "legitimate": True,
+            "notes": EspnSoccerProvider().meta.notes,
+            "homepage": EspnSoccerProvider().meta.homepage,
+        },
+        {
+            "name": EspnTennisProvider().meta.name,
+            "leagues": ["ATP", "WTA"],
+            "capabilities": EspnTennisProvider().meta.capabilities,
+            "requires_api_key": False,
+            "is_mock": False,
+            "configured": True,
+            "legitimate": True,
+            "notes": EspnTennisProvider().meta.notes,
+            "homepage": EspnTennisProvider().meta.homepage,
         },
         {
             "name": soccer.meta.name,
@@ -302,6 +326,8 @@ def list_metas() -> list[ProviderMeta]:
         EspnNbaProvider().meta,
         EspnNflProvider().meta,
         EspnWnbaProvider().meta,
+        EspnSoccerProvider().meta,
+        EspnTennisProvider().meta,
         MlbStatsApiProvider().meta,
         NhlApiProvider().meta,
         FootballDataOrgProvider("").meta,

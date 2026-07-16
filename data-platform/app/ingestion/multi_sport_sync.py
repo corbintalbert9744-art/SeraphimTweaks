@@ -32,7 +32,6 @@ from app.providers.nflverse.provider import NflverseProvider, nflverse_installed
 from app.providers.nhl.api import NhlApiProvider
 from app.providers.registry import get_odds_provider
 from app.providers.soccer.football_data import FootballDataOrgProvider
-from app.providers.tennis.tennis_abstract import TennisAbstractProvider
 
 log = logging.getLogger(__name__)
 
@@ -130,44 +129,78 @@ def sync_nhl_warehouse(db: Session, *, date: Optional[str] = None, max_teams: in
 
 
 def sync_soccer_warehouse(db: Session, *, date: Optional[str] = None) -> dict[str, Any]:
+    """ESPN soccer schedules (no key) + optional Football-Data.org when keyed."""
+    from app.providers.espn.soccer import EspnSoccerProvider
+
+    stages: dict[str, Any] = {}
+    espn = EspnSoccerProvider()
+    with run_provider_job(db, provider="espn-soccer", league="Soccer", job="sync_schedule") as job:
+        games = espn.fetch_schedule("Soccer", date)
+        for g in games:
+            upsert_game(db, g)
+        job.rows_written = len(games)
+        stages["espn"] = {"imported": len(games)}
+
     settings = get_settings()
     key = settings.football_data_api_key
-    if not key:
-        return {
-            "ok": False,
-            "provider": "football-data-org",
+    if key:
+        provider = FootballDataOrgProvider(key)
+        with run_provider_job(db, provider="football-data-org", league="Soccer", job="sync_schedule") as job:
+            fd_games = provider.fetch_schedule("Soccer", date)
+            for g in fd_games:
+                upsert_game(db, g)
+            job.rows_written = len(fd_games)
+            stages["footballData"] = {"imported": len(fd_games)}
+    else:
+        stages["footballData"] = {
             "requiresApiKey": True,
-            "error": "FOOTBALL_DATA_API_KEY not configured — no fabricated soccer data.",
+            "envVar": "FOOTBALL_DATA_API_KEY",
+            "note": "Optional enrichment — ESPN schedule already imported without a key.",
         }
-    provider = FootballDataOrgProvider(key)
-    stages: dict[str, Any] = {"provider": provider.meta.name}
 
-    with run_provider_job(db, provider="football-data-org", league="Soccer", job="sync_schedule") as job:
-        games = provider.fetch_schedule("Soccer", date)
+    stages["board"] = {
+        "props": 0,
+        "note": "Match schedules imported from ESPN. Player prop logs require an events provider — not fabricated.",
+    }
+    stages["ok"] = True
+    stages["provider"] = "espn-soccer"
+    return stages
+
+
+def sync_tennis_warehouse(db: Session, *, tour: str = "ATP", date: Optional[str] = None) -> dict[str, Any]:
+    """ESPN ATP/WTA schedules (no key). No fabricated match props."""
+    from app.providers.espn.tennis import EspnTennisProvider
+
+    code = "WTA" if tour.upper() == "WTA" else "ATP"
+    provider = EspnTennisProvider()
+    stages: dict[str, Any] = {"provider": provider.meta.name, "tour": code}
+
+    with run_provider_job(db, provider="espn-tennis", league=code, job="sync_schedule") as job:
+        games = provider.fetch_schedule(code, date)
         for g in games:
             upsert_game(db, g)
         job.rows_written = len(games)
         stages["schedule"] = {"imported": len(games)}
 
-    # Soccer player logs need an events provider — schedule-only until extended.
+    players_n = 0
+    with run_provider_job(db, provider="espn-tennis", league=code, job="sync_slate_players") as job:
+        for p in provider.fetch_slate_players(code):
+            upsert_player(db, p)
+            players_n += 1
+        job.rows_written = players_n
+        stages["players"] = {"imported": players_n}
+
+    # Explicit: no fabricated prop boards without match-stat logs
     stages["board"] = {
         "props": 0,
-        "note": "Match schedule imported. Player prop logs require an events provider extension.",
+        "note": (
+            "ESPN schedule + slate players imported. Match prop gamelogs are not fabricated. "
+            "ODDS_API_KEY enables tournament odds when sport keys are verified; "
+            "Tennis Abstract is not scraped."
+        ),
     }
     stages["ok"] = True
     return stages
-
-
-def sync_tennis_warehouse(db: Session) -> dict[str, Any]:
-    _ = db
-    provider = TennisAbstractProvider()
-    return {
-        "ok": False,
-        "provider": provider.meta.name,
-        "requiresConfiguration": True,
-        "error": provider.meta.notes,
-        "schedule": {"imported": 0},
-    }
 
 
 def sync_odds_all_leagues(db: Session) -> dict[str, Any]:
@@ -267,7 +300,14 @@ def sync_all_sports(db: Session, *, date: Optional[str] = None) -> dict[str, Any
         log.exception("NHL sync failed")
         results["sources"]["NHL"] = {"ok": False, "error": str(exc)}
     results["sources"]["Soccer"] = sync_soccer_warehouse(db, date=date)
-    results["sources"]["Tennis"] = sync_tennis_warehouse(db)
+    try:
+        results["sources"]["ATP"] = sync_tennis_warehouse(db, tour="ATP", date=date)
+    except Exception as exc:  # noqa: BLE001
+        results["sources"]["ATP"] = {"ok": False, "error": str(exc)}
+    try:
+        results["sources"]["WTA"] = sync_tennis_warehouse(db, tour="WTA", date=date)
+    except Exception as exc:  # noqa: BLE001
+        results["sources"]["WTA"] = {"ok": False, "error": str(exc)}
     results["sources"]["odds"] = sync_odds_all_leagues(db)
     results["ok"] = True
     return results

@@ -70,6 +70,7 @@ function MembersApp() {
             <Route path="/soccer" component={SoccerPage} />
             <Route path="/players" component={PlayersHubPage} />
             <Route path="/research" component={ResearchHubPage} />
+            <Route path="/tennis">{() => <TennisPage />}</Route>
             <Route path="/atp">{() => <TennisPage tour="ATP" />}</Route>
             <Route path="/wta">{() => <TennisPage tour="WTA" />}</Route>
             <Route path="/wnba" component={WnbaPage} />

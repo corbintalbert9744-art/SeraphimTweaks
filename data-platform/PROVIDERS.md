@@ -48,15 +48,16 @@ Framework modules:
 | **espn-nba** | NBA | Yes | None |
 | **espn-nfl** | NFL | Yes | None |
 | **espn-wnba** | WNBA | Yes | None |
+| **espn-soccer** | Soccer | Yes (schedule) | None — props need events extension |
+| **espn-tennis** | ATP, WTA | Yes (schedule) | None — match props not fabricated |
 | **nba-api** | NBA (WNBA limited) | When `pip install nba_api` | Optional package |
 | **nflverse** | NFL | When `pip install nfl_data_py` | Optional package |
 | **mlb-statsapi** | MLB | Yes | None |
 | **nhl-api** | NHL | Yes | None |
-| **football-data-org** | Soccer | When keyed | **`FOOTBALL_DATA_API_KEY`** (free tier) |
-| **tennis-abstract** | ATP, WTA | No | **REQUIRES PROVIDER SELECTION** — no public API; we do not scrape or invent data |
-| **the-odds-api** | NBA, NFL, WNBA, MLB, NHL, Soccer, ATP*, WTA* | When keyed | **`ODDS_API_KEY`** |
-| mock-odds | all | Dev fallback | None — labeled `oddsAreMock` |
-| **catalog-comparison-lines** | All sports | Placeholders until keyed | PrizePicks, Underdog, FanDuel, DraftKings, BetMGM, Caesars, Fanatics, ESPN BET |
+| **football-data-org** | Soccer | When keyed | **`FOOTBALL_DATA_API_KEY`** (optional enrichment) |
+| **tennis-abstract** | ATP, WTA | No | **Not scraped** — placeholder only |
+| **the-odds-api** | Multi | When keyed | **`ODDS_API_KEY`** |
+| mock-odds / catalog-comparison-lines | all | Placeholders | Labeled until keyed |
 
 ### Keys that must be set (not fabricated)
 
