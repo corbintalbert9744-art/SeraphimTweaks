@@ -1,4 +1,4 @@
-"""Predict API — run Seraphim model without sportsbook dependency."""
+"""Predict API — Projection Engine V1 without sportsbook dependency."""
 
 from __future__ import annotations
 
@@ -8,8 +8,9 @@ from typing import Any, Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.analytics.factors import default_factor_stack
 from app.analytics.factors.base import PredictionContext
-from app.analytics.prediction import MODEL_VERSION, predict_prop
+from app.analytics.prediction import MODEL_VERSION, V1_FACTOR_KEYS, predict_prop
 
 router = APIRouter(prefix="/predict", tags=["predict"])
 
@@ -28,6 +29,9 @@ class PredictRequest(BaseModel):
     league_avg_allowed: Optional[float] = None
     pace_index: Optional[float] = None
     usage_index: Optional[float] = None
+    expected_minutes: Optional[float] = None
+    vs_opponent_values: list[float] = Field(default_factory=list)
+    tipoff_at_iso: Optional[str] = None
     # Optional line the user sees elsewhere — comparison only
     comparison_line: Optional[float] = None
     played_at_iso: list[str] = Field(default_factory=list)
@@ -35,24 +39,33 @@ class PredictRequest(BaseModel):
 
 @router.get("/model")
 def model_info() -> dict[str, Any]:
+    stack = default_factor_stack()
     return {
         "modelVersion": MODEL_VERSION,
+        "name": "Seraphim Projection Engine V1",
         "type": "rule-based",
         "ml": False,
+        "factors": [
+            {"key": f.key, "label": f.label}
+            for f in stack
+        ],
+        "requiredFactors": list(V1_FACTOR_KEYS),
         "notes": (
-            "Modular factor stack: season baseline, recent form, home/away, rest, "
-            "injury, matchup, pace/usage, streak. Sportsbook lines are comparison-only."
+            "V1 projects every player prop from historical performance, recent form, "
+            "home/away splits, opponent strength, expected minutes, usage, injuries, "
+            "and rest days. Sportsbook lines are comparison-only."
         ),
-        "roadmap": "Add ML later once warehouse has enough labeled history.",
         "outputs": [
             "projectedValue",
+            "confidenceScore",
+            "researchScore",
+            "explanation",
             "overProbability",
             "underProbability",
-            "researchScore",
-            "confidenceScore",
-            "explanation",
             "influentialFactors",
+            "factorBreakdown",
         ],
+        "roadmap": "Add ML later once warehouse has enough labeled history.",
     }
 
 
@@ -65,9 +78,15 @@ def predict_prop_endpoint(body: PredictRequest) -> dict[str, Any]:
         except ValueError:
             continue
     if not played_at and body.values:
-        # Synthetic descending timestamps for rest factor when dates omitted
         now = datetime.now(timezone.utc)
         played_at = [now] * len(body.values)
+
+    tipoff_at = None
+    if body.tipoff_at_iso:
+        try:
+            tipoff_at = datetime.fromisoformat(body.tipoff_at_iso.replace("Z", "+00:00"))
+        except ValueError:
+            tipoff_at = None
 
     homes = body.homes or [True] * len(body.values)
     if len(homes) < len(body.values):
@@ -83,6 +102,9 @@ def predict_prop_endpoint(body: PredictRequest) -> dict[str, Any]:
         injury_status=body.injury_status,
         is_home=body.is_home,
         opponent_abbr=body.opponent_abbr,
+        tipoff_at=tipoff_at,
+        expected_minutes=body.expected_minutes,
+        vs_opponent_values=list(body.vs_opponent_values),
         opponent_def_rank=body.opponent_def_rank,
         opponent_stat_allowed=body.opponent_stat_allowed,
         league_avg_allowed=body.league_avg_allowed,
@@ -90,4 +112,12 @@ def predict_prop_endpoint(body: PredictRequest) -> dict[str, Any]:
         usage_index=body.usage_index,
     )
     pred = predict_prop(ctx, comparison_line=body.comparison_line)
-    return {"ok": True, "prediction": pred.to_api_dict()}
+    payload = pred.to_api_dict()
+    return {
+        "ok": True,
+        "projection": payload["projectedValue"],
+        "confidenceScore": payload["confidenceScore"],
+        "researchScore": payload["researchScore"],
+        "explanation": payload["explanation"],
+        "prediction": payload,
+    }

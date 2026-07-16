@@ -175,11 +175,18 @@ def build_and_store_featured_prop(db: Session, game_external_id: Optional[str] =
         matchup = f"@ {game.home_abbr}"
         is_home = False
 
-    # --- Seraphim model prediction (independent of sportsbooks) ---
+    # --- Seraphim Projection Engine V1 (independent of sportsbooks) ---
     point_logs = [r for r in logs if r.points is not None]
     homes = [bool(r.home) for r in point_logs]
     minutes = [r.minutes for r in point_logs]
     played_at = [r.played_at for r in point_logs]
+    vs_opp: list[float] = []
+    for r in point_logs:
+        if (r.opponent or "").upper() == opp_abbr.upper() and r.points is not None:
+            # Featured prop is Points-first; board path uses market-aware helper
+            vs_opp.append(float(r.points))
+    mins_clean = [m for m in minutes if m is not None and m > 0]
+    expected_minutes = mean(mins_clean[:5]) if len(mins_clean) >= 3 else (mean(mins_clean) if mins_clean else None)
     ctx = PredictionContext(
         league="NBA",
         market=market,
@@ -190,7 +197,9 @@ def build_and_store_featured_prop(db: Session, game_external_id: Optional[str] =
         injury_status=injury_status,
         is_home=is_home,
         opponent_abbr=opp_abbr,
-        # Matchup/pace filled when team_stats warehouse is populated
+        tipoff_at=game.tipoff_at,
+        expected_minutes=expected_minutes,
+        vs_opponent_values=vs_opp,
         opponent_def_rank=None,
         pace_index=None,
         usage_index=None,

@@ -96,6 +96,18 @@ def _build_one_prop(
     minutes = [r.minutes for r in point_logs[: len(values)]]
     played_at = [r.played_at for r in point_logs[: len(values)]]
 
+    # H2H sample vs tonight's opponent (opponent strength proxy)
+    vs_opp: list[float] = []
+    for r in point_logs:
+        if (r.opponent or "").upper() != opp_abbr.upper():
+            continue
+        mv = _market_values([r], market)
+        if mv:
+            vs_opp.append(mv[0])
+
+    mins_clean = [m for m in minutes if m is not None and m > 0]
+    expected_minutes = mean(mins_clean[:5]) if len(mins_clean) >= 3 else (mean(mins_clean) if mins_clean else None)
+
     ctx = PredictionContext(
         league="NBA",
         market=market,
@@ -106,6 +118,9 @@ def _build_one_prop(
         injury_status=injury_status,
         is_home=is_home,
         opponent_abbr=opp_abbr,
+        tipoff_at=game.tipoff_at,
+        expected_minutes=expected_minutes,
+        vs_opponent_values=vs_opp,
     )
     comparison_line = round(mean(values[:10]) * 2) / 2
     prediction = predict_prop(ctx, comparison_line=comparison_line)

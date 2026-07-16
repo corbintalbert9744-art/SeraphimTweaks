@@ -1,10 +1,12 @@
 from app.analytics.factors.base import FactorResult, PredictionContext
 from app.analytics.factors.context import (
+    ExpectedMinutesFactor,
     InjuryFactor,
     MatchupFactor,
     PaceUsageFactor,
     RestFactor,
     StreakMomentumFactor,
+    UsageFactor,
 )
 from app.analytics.factors.form import HomeAwayFactor, RecentFormFactor, SeasonBaselineFactor
 
@@ -17,6 +19,8 @@ __all__ = [
     "RestFactor",
     "InjuryFactor",
     "MatchupFactor",
+    "ExpectedMinutesFactor",
+    "UsageFactor",
     "PaceUsageFactor",
     "StreakMomentumFactor",
     "default_factor_stack",
@@ -24,14 +28,15 @@ __all__ = [
 
 
 def default_factor_stack():
-    """Ordered modular stack — rule-based v1 (no ML)."""
+    """Projection Engine V1 — ordered modular stack (no ML)."""
     return [
-        SeasonBaselineFactor(),
+        SeasonBaselineFactor(),  # historical performance
         RecentFormFactor(),
         HomeAwayFactor(),
         RestFactor(),
         InjuryFactor(),
-        MatchupFactor(),
-        PaceUsageFactor(),
+        MatchupFactor(),  # opponent strength (+ H2H proxy)
+        ExpectedMinutesFactor(),
+        UsageFactor(),
         StreakMomentumFactor(),
     ]

@@ -214,6 +214,13 @@ def build_and_store_featured_nfl_prop(
     homes = [bool(r.home) for r in logs[: len(values)]]
     minutes = [r.minutes for r in logs[: len(values)]]
     played_at = [r.played_at for r in logs[: len(values)]]
+    mins_clean = [m for m in minutes if m is not None and m > 0]
+    expected_minutes = mean(mins_clean[:5]) if len(mins_clean) >= 3 else (mean(mins_clean) if mins_clean else None)
+    vs_opp = [
+        float(v)
+        for r, v in zip(logs[: len(values)], values)
+        if (r.opponent or "").upper() == opp_abbr.upper()
+    ]
     ctx = PredictionContext(
         league="NFL",
         market=market,
@@ -224,6 +231,9 @@ def build_and_store_featured_nfl_prop(
         injury_status=injury_status,
         is_home=is_home,
         opponent_abbr=opp_abbr,
+        tipoff_at=game.tipoff_at,
+        expected_minutes=expected_minutes,
+        vs_opponent_values=vs_opp,
     )
     prediction = predict_prop(ctx, comparison_line=comparison_line)
     side = "Over" if prediction.projected_value >= comparison_line else "Under"

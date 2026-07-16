@@ -1,36 +1,43 @@
-# Seraphim prediction engine (rule-based v1)
+# Seraphim Projection Engine V1
 
 We are **not** a line-copying platform. The model generates its own projections
 from modular factors; sportsbook lines are optional comparison inputs only.
 
-## Outputs (per prop)
+## Outputs (every player prop)
 
 | Field | Meaning |
 |-------|---------|
-| `projectedValue` | Model-estimated stat |
+| `projectedValue` / `projection` | Model-estimated stat |
+| `confidenceScore` / `confidence` | Conviction given samples + factor coverage (0–100) |
+| `researchScore` | Evidence quality / factor agreement (0–100) |
+| `explanation` | Human-readable bullets of why |
 | `overProbability` / `underProbability` | Model P(side) vs comparison line |
-| `researchScore` | 0–100 evidence quality / agreement |
-| `confidenceScore` | Conviction given samples + coverage |
-| `explanation` | AI-style bullets of influential factors |
-| `influentialFactors` | Ranked factor list |
+| `influentialFactors` / `factorBreakdown` | Ranked / full factor list |
 
-## Factor stack (debuggable, no ML yet)
+## Factor stack (V1)
 
-1. Season baseline  
-2. Recent form (L5/L10)  
-3. Home / away  
-4. Rest days  
-5. Injury / availability  
-6. Opponent matchup *(skipped until `team_stats` filled)*  
-7. Pace & usage  
-8. Streak momentum  
+| # | Factor | Signal |
+|---|--------|--------|
+| 1 | Historical performance | Weighted season / L20 / L10 baseline |
+| 2 | Recent form | L5 / L10 vs historical mean |
+| 3 | Home / away | Venue split vs season |
+| 4 | Rest days | Days from last game → tipoff |
+| 5 | Injury / availability | Status haircut |
+| 6 | Opponent strength | Def rank / allowed **or** H2H vs opponent |
+| 7 | Expected minutes | Projected workload vs season minutes |
+| 8 | Usage | Usage/pace index **or** per-minute rate |
+| 9 | Streak momentum | Mild mean-reversion on long streaks |
+
+```
+projected = historical_baseline + Σ available factor adjustments
+```
 
 Roadmap: keep this rule-based core → add ML once the warehouse has enough labeled history.
 
 ## API
 
-- `GET /api/v1/predict/model` — model metadata  
-- `POST /api/v1/predict/prop` — run prediction on supplied history  
-- Featured NBA/NFL props include a top-level `prediction` object  
+- `GET /api/v1/predict/model` — model metadata + factor list  
+- `POST /api/v1/predict/prop` — run V1 on supplied history  
+- NBA/NFL board props persist `projectedValue`, confidence, research score, and explanation  
 
 All probabilities are **model estimates**, not guaranteed chances of winning.
