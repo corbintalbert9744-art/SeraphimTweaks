@@ -179,6 +179,16 @@ def mlb_players(db: Session = Depends(get_db)):
     return {"ok": True, "league": "MLB", "players": _players_from_props(props)}
 
 
+@router.get("/mlb/players/{player_id}")
+def mlb_player_detail(player_id: str, db: Session = Depends(get_db)):
+    from app.ingestion.multisport_player import get_multisport_player_profile
+
+    profile = get_multisport_player_profile(db, league="MLB", player_key=player_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return profile
+
+
 @router.post("/mlb/jobs/sync")
 def mlb_sync(dates: str | None = Query(None), db: Session = Depends(get_db)):
     return sync_mlb_warehouse(db, date=dates)

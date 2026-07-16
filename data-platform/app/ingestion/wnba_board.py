@@ -21,6 +21,7 @@ from app.analytics.prediction import predict_prop
 from app.config import get_settings
 from app.db.models import Game, Injury, Odds, Player, PlayerGameLog, Prop, PropAnalytics, Sportsbook, Team
 from app.ingestion.nba_pipeline import _market_values, _run_log
+from app.ingestion.slate_times import format_gamelog_date, format_gamelog_time
 from app.ingestion.warehouse import (
     insert_odds,
     upsert_game,
@@ -1120,7 +1121,9 @@ def get_wnba_player_profile(db: Session, player_key: str) -> Optional[dict[str, 
 
     recent = [
         {
-            "date": r.played_at.strftime("%b %d"),
+            "date": format_gamelog_date(r.played_at),
+            "time": format_gamelog_time(r.played_at),
+            "playedAt": r.played_at.isoformat() if r.played_at else None,
             "opponent": r.opponent or "OPP",
             "home": bool(r.home),
             "result": "—",

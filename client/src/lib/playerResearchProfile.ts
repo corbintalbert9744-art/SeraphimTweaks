@@ -11,6 +11,7 @@ export type HitWindow = {
 
 export type ChartGame = {
   date: string;
+  time?: string | null;
   label: string;
   opponent: string;
   home: boolean;
@@ -57,6 +58,8 @@ export type PlayerResearchProfile = {
   awaySplit: { label: string; samples: number; averages: Record<string, number> };
   recentLogs: Array<{
     date: string;
+    time?: string | null;
+    playedAt?: string | null;
     opponent: string;
     home: boolean;
     stats: Record<string, number>;

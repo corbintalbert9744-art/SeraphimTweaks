@@ -87,7 +87,7 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
                 className="fill-neutral-600"
                 fontSize="8"
               >
-                {g.date}
+                {g.time ? `${g.date} ${g.time}` : g.date}
               </text>
             </g>
           );
@@ -145,6 +145,13 @@ export default function PlayerPage() {
       }
 
       // Prefer league-specific endpoints; never accept an empty-market hit.
+      const mlb = await tryLeague(
+        `/api/mlb/players/${encodeURIComponent(playerId)}`,
+        "MLB",
+        "/mlb",
+      );
+      if (mlb) return mlb;
+
       const wnba = await tryLeague(
         `/api/wnba/players/${encodeURIComponent(playerId)}`,
         "WNBA",
@@ -557,6 +564,7 @@ export default function PlayerPage() {
                 <thead className="text-[11px] uppercase tracking-wider text-neutral-500">
                   <tr>
                     <th className="pb-3 font-medium">Date</th>
+                    <th className="pb-3 font-medium">Time</th>
                     <th className="pb-3 font-medium">Opp</th>
                     <th className="pb-3 font-medium">H/A</th>
                     {logKeys.map((k) => (
@@ -569,8 +577,11 @@ export default function PlayerPage() {
                 </thead>
                 <tbody className="divide-y divide-[#151515]">
                   {profile.recentLogs.map((log) => (
-                    <tr key={`${log.date}-${log.opponent}`}>
+                    <tr key={`${log.date}-${log.time ?? ""}-${log.opponent}`}>
                       <td className="py-2.5 text-neutral-300">{log.date}</td>
+                      <td className="py-2.5 tabular-nums text-neutral-400">
+                        {log.time || "—"}
+                      </td>
                       <td className="py-2.5 text-neutral-200">{log.opponent}</td>
                       <td className="py-2.5 text-neutral-500">{log.home ? "H" : "A"}</td>
                       {logKeys.map((k) => (

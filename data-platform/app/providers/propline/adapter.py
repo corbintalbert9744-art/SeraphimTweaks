@@ -41,7 +41,7 @@ BASE_URL = "https://api.prop-line.com/v1"
 # Prefer the upcoming slate PrizePicks users see (today + tomorrow), not a random
 # slice of PropLine's event list.
 UPCOMING_HORIZON_HOURS = 48
-UPCOMING_LOOKBACK_HOURS = 4  # keep tips that just started
+UPCOMING_LOOKBACK_HOURS = 0  # pick'em boards should not keep tips that already started
 
 
 class PropLineAdapter:

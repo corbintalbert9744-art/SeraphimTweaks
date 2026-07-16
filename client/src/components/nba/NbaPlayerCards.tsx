@@ -84,6 +84,19 @@ export function NbaPlayerCards({
                       <p className="mt-0.5 text-xs text-neutral-500">
                         {player.team} vs {player.opponent}
                         {player.position ? ` · ${player.position}` : ""}
+                        {player.tipTime
+                          ? ` · ${(() => {
+                              const t = Date.parse(player.tipTime);
+                              return Number.isFinite(t)
+                                ? new Date(t).toLocaleString([], {
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })
+                                : player.tipTime;
+                            })()}`
+                          : ""}
                       </p>
                     </div>
                     <ResearchScoreBadge score={rs} size="sm" />

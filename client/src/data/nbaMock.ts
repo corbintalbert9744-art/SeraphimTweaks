@@ -77,6 +77,7 @@ export interface NbaPlayerCard {
   researchScore?: number;
   matchupNote: string;
   insight?: string;
+  tipTime?: string;
   propIds?: string[];
 }
 

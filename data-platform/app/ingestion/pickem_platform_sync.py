@@ -32,6 +32,7 @@ from app.ingestion.platform_board import (
     normalize_pickem_app,
     slugs_for_app,
 )
+from app.ingestion.slate_times import enrich_and_filter_upcoming_props
 from app.ingestion.warehouse import insert_odds, upsert_gamelog, upsert_player
 from app.providers.base import NormalizedOddsQuote, NormalizedPlayer, ProviderRateLimitError, run_provider_job
 from app.providers.propline import rate_limit as propline_rate_limit
@@ -901,29 +902,112 @@ def sync_pickem_platform_board(
         )
     )
     updated = (latest_capture or datetime.now(timezone.utc)).isoformat()
-    players = _players_from_board(board_rows, label)
-
-    return {
-        "ok": True,
-        "league": code,
-        "platform": app,
-        "platformLabel": label,
-        "props": board_rows,
-        "players": players,
-        "count": len(board_rows),
-        "updatedAt": updated,
-        "propsUpdatedAt": updated,
-        "syncedAt": datetime.now(timezone.utc).isoformat(),
-        "dataSource": f"pickem:{app}",
-        "live": True,
-        "source": "propline",
-        "note": None
-        if board_rows
-        else f"No current {label} props for {code} after sync.",
-        "disclaimer": (
+    return _finalize_platform_board(
+        db,
+        league=code,
+        platform=app,
+        label=label,
+        board_rows=board_rows,
+        updated=updated,
+        syncedAt=datetime.now(timezone.utc).isoformat(),
+        source="propline",
+        note=None if board_rows else f"No current {label} props for {code} after sync.",
+        disclaimer=(
             f"Lines are live {label} props via PropLine. "
             "Projections are Seraphim model estimates vs those lines — not invented lines."
         ),
+    )
+
+
+def _apply_upcoming_slate_filter(
+    db: Session,
+    *,
+    league: str,
+    platform: str,
+    board_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Drop finished tips, attach tip times, and close stale warehouse props."""
+    filtered, meta = enrich_and_filter_upcoming_props(
+        board_rows,
+        league=league,
+        drop_unknown_when_upcoming_exist=False,
+    )
+    keep_ids = {str(r.get("id")) for r in filtered if r.get("id")}
+    if meta.get("droppedFinished"):
+        code = normalize_league(league)
+        prefix = f"{code.lower()}:pickem:{platform}:"
+        open_props = (
+            db.execute(
+                select(Prop).where(
+                    Prop.league == code,
+                    Prop.status == "open",
+                    Prop.id.like(f"{prefix}%"),
+                )
+            )
+            .scalars()
+            .all()
+        )
+        closed = 0
+        for prop in open_props:
+            if prop.id not in keep_ids:
+                was_on_board = any(str(r.get("id")) == prop.id for r in board_rows)
+                if was_on_board:
+                    prop.status = "closed"
+                    closed += 1
+        if closed:
+            db.commit()
+            log.info(
+                "closed %s finished %s/%s pick'em props (upcoming slate filter)",
+                closed,
+                code,
+                platform,
+            )
+    return filtered
+
+
+def _finalize_platform_board(
+    db: Session,
+    *,
+    league: str,
+    platform: str,
+    label: str,
+    board_rows: list[dict[str, Any]],
+    updated: str,
+    **extra: Any,
+) -> dict[str, Any]:
+    code = normalize_league(league)
+    filtered = _apply_upcoming_slate_filter(
+        db, league=code, platform=platform, board_rows=board_rows
+    )
+    filtered.sort(
+        key=lambda r: (
+            -(r.get("edgePercent") if r.get("edgePercent") is not None else -999),
+            r.get("tipTime") or "",
+            r.get("player") or "",
+        )
+    )
+    with_model = sum(1 for r in filtered if r.get("projectedValue") is not None)
+    note = extra.pop("note", None)
+    if not filtered and board_rows:
+        suffix = (
+            "All cached tips look finished — waiting on PropLine for the next PrizePicks slate."
+        )
+        note = f"{note} {suffix}".strip() if note else suffix
+    return {
+        "ok": True,
+        "league": code,
+        "platform": platform,
+        "platformLabel": label,
+        "props": filtered,
+        "players": _players_from_board(filtered, label),
+        "count": len(filtered),
+        "modeledCount": with_model,
+        "updatedAt": updated,
+        "propsUpdatedAt": updated,
+        "dataSource": f"pickem:{platform}",
+        "live": True,
+        "note": note,
+        **extra,
     }
 
 
@@ -956,6 +1040,7 @@ def _players_from_board(props: list[dict[str, Any]], label: str) -> list[dict[st
                 "confidence": p.get("confidence") or 0,
                 "researchScore": p.get("researchScore") or 0,
                 "matchupNote": p.get("game") or f"{p.get('market')} · {label}",
+                "tipTime": p.get("tipTime") or p.get("commenceTime"),
                 "topPropId": p.get("id"),
                 "topMarket": p.get("market"),
                 "topSide": p.get("side"),
@@ -1232,31 +1317,24 @@ def _list_cached_platform_board(
         return None
 
     updated = newest.isoformat()
-    with_model = sum(1 for r in board if r.get("projectedValue") is not None)
-    return {
-        "ok": True,
-        "league": code,
-        "platform": platform,
-        "platformLabel": label,
-        "props": board,
-        "players": _players_from_board(board, label),
-        "count": len(board),
-        "modeledCount": with_model,
-        "updatedAt": updated,
-        "propsUpdatedAt": updated,
-        "syncedAt": updated,
-        "dataSource": f"pickem:{platform}",
-        "live": True,
-        "cached": True,
-        "stale": allow_stale and age > PLATFORM_CACHE_TTL,
-        "source": "propline-cache",
-        "note": None,
-        "disclaimer": (
+    return _finalize_platform_board(
+        db,
+        league=code,
+        platform=platform,
+        label=label,
+        board_rows=board,
+        updated=updated,
+        syncedAt=updated,
+        cached=True,
+        stale=allow_stale and age > PLATFORM_CACHE_TTL,
+        source="propline-cache",
+        disclaimer=(
             f"Cached live {label} props"
             f"{' (stale — PropLine refresh deferred)' if allow_stale and age > PLATFORM_CACHE_TTL else f' (refreshed within {int(PLATFORM_CACHE_TTL.total_seconds() // 60)}m)'}. "
+            "Upcoming tips only — finished games are removed. "
             "Projections are Seraphim estimates vs those lines."
         ),
-    }
+    )
 
 
 def ensure_pickem_platform_board(
