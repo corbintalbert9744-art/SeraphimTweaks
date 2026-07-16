@@ -37,6 +37,16 @@ export interface BookQuote {
   lineDiffFromConsensus?: number | null;
   /** Signed gap vs best-value line for the model side. */
   lineDiffFromBest?: number | null;
+  /** +EV engine fields (projection vs this book’s line). */
+  expectedValue?: number | null;
+  evPercent?: number | null;
+  modelEdge?: number | null;
+  modelProbability?: number | null;
+  impliedProbability?: number | null;
+  isPlusEv?: boolean;
+  isStrongPlusEv?: boolean;
+  evSide?: "Over" | "Under" | string;
+  pricingMode?: string | null;
 }
 
 export interface OpponentDefense {
@@ -88,6 +98,12 @@ export interface PropDetail {
   linesDiffer?: boolean;
   connectedBookCount?: number;
   consensusLine?: number | null;
+  isPlusEv?: boolean;
+  isStrongPlusEv?: boolean;
+  modelEdge?: number | null;
+  modelProbability?: number | null;
+  impliedProbability?: number | null;
+  bestEvBook?: string | null;
   homeAway?: {
     home: { samples: number; average: number | null; rate?: number | null };
     away: { samples: number; average: number | null; rate?: number | null };

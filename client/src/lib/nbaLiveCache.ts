@@ -177,6 +177,12 @@ export function asPropDetailFromApi(row: Record<string, unknown>): PropDetail {
     connectedBookCount:
       row.connectedBookCount != null ? Number(row.connectedBookCount) : undefined,
     consensusLine: row.consensusLine != null ? Number(row.consensusLine) : null,
+    isPlusEv: Boolean(row.isPlusEv),
+    isStrongPlusEv: Boolean(row.isStrongPlusEv),
+    modelEdge: row.modelEdge != null ? Number(row.modelEdge) : null,
+    modelProbability: row.modelProbability != null ? Number(row.modelProbability) : null,
+    impliedProbability: row.impliedProbability != null ? Number(row.impliedProbability) : null,
+    bestEvBook: row.bestEvBook != null ? String(row.bestEvBook) : null,
     homeAway: row.homeAway as PropDetail["homeAway"],
     minutesTrend: row.minutesTrend as PropDetail["minutesTrend"],
     projectedMinutes: row.projectedMinutes != null ? Number(row.projectedMinutes) : undefined,

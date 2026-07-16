@@ -38,30 +38,43 @@ export function HitPctChip({
   );
 }
 
+/** Thresholds aligned with data-platform `app.analytics.plus_ev`. */
+export const PLUS_EV_THRESHOLD = 4;
+export const STRONG_PLUS_EV_THRESHOLD = 12;
+
 export function EvPlusBadge({
   ev,
   className,
+  compact = false,
+  showDash = true,
 }: {
   ev: number;
   className?: string;
+  /** Smaller pill for dense tables. */
+  compact?: boolean;
+  /** When false, render nothing below threshold instead of an em dash. */
+  showDash?: boolean;
 }) {
-  if (!Number.isFinite(ev) || ev < 4) {
+  if (!Number.isFinite(ev) || ev < PLUS_EV_THRESHOLD) {
+    if (!showDash) return null;
     return <span className={cn("text-xs text-neutral-600", className)}>—</span>;
   }
-  const strong = ev >= 12;
+  const strong = ev >= STRONG_PLUS_EV_THRESHOLD;
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+        "inline-flex items-center rounded-full border font-semibold tabular-nums",
+        compact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-[11px]",
         strong
           ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
           : "border-emerald-500/25 bg-emerald-500/10 text-emerald-400/90",
         className,
       )}
+      title={strong ? "Strong positive expected value" : "Positive expected value"}
     >
-      {strong ? "Strong EV+ " : "EV+ "}
+      {strong ? "+EV Strong " : "+EV "}
       {ev > 0 ? "+" : ""}
-      {ev.toFixed(0)}%
+      {ev.toFixed(compact ? 0 : 1)}%
     </span>
   );
 }

@@ -241,6 +241,7 @@ export function LineComparison({
               <th className="px-2 py-1 font-medium">Over</th>
               <th className="px-2 py-1 font-medium">Under</th>
               <th className="px-2 py-1 font-medium">Edge</th>
+              <th className="px-2 py-1 font-medium">EV</th>
               <th className="px-2 py-1 font-medium">Updated</th>
               <th className="px-2 py-1 font-medium">Source</th>
             </tr>
@@ -315,6 +316,23 @@ export function LineComparison({
                     {unavailable
                       ? "—"
                       : `${(row.edgeVsProjection ?? 0) > 0 ? "+" : ""}${(row.edgeVsProjection ?? 0).toFixed(1)}`}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-2 py-1 tabular-nums font-semibold",
+                      unavailable
+                        ? "text-neutral-600"
+                        : row.isPlusEv || (row.expectedValue ?? row.evPercent ?? 0) >= 4
+                          ? "text-emerald-300"
+                          : "text-neutral-400",
+                    )}
+                  >
+                    {unavailable || (row.expectedValue ?? row.evPercent) == null
+                      ? "—"
+                      : `${Number(row.expectedValue ?? row.evPercent) > 0 ? "+" : ""}${Number(row.expectedValue ?? row.evPercent).toFixed(1)}%`}
+                    {!unavailable && row.isPlusEv ? (
+                      <span className="ml-1 text-[9px] font-semibold uppercase text-emerald-400">+EV</span>
+                    ) : null}
                   </td>
                   <td className="px-2 py-1 text-[10px] tabular-nums text-neutral-500">
                     {unavailable ? "—" : formatRelativeUpdate(row.capturedAt)}

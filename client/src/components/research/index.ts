@@ -9,6 +9,8 @@ export { DensePropTable, type DensePropRow } from "./DensePropTable";
 export {
   HitPctChip,
   EvPlusBadge,
+  PLUS_EV_THRESHOLD,
+  STRONG_PLUS_EV_THRESHOLD,
   HitRateSummaryBoxes,
   MarketTabs,
   NoVigOddsCard,

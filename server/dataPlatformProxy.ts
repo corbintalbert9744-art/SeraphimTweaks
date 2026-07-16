@@ -215,6 +215,39 @@ export function registerDataPlatformProxy(
     }
   });
 
+  // Positive Expected Value (+EV) board
+  app.get("/api/plus-ev", async (req, res) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(req.query)) {
+      if (typeof v === "string") qs.set(k, v);
+    }
+    const suffix = qs.toString() ? `?${qs}` : "";
+    await proxyGet(`/api/v1/plus-ev${suffix}`, res, async () => {
+      res.status(503).json({
+        error: "+EV board requires the data platform",
+        props: [],
+        count: 0,
+      });
+    }, 180_000);
+  });
+
+  app.get("/api/plus-ev/thresholds", async (_req, res) => {
+    await proxyGet(`/api/v1/plus-ev/thresholds`, res, async () => {
+      res.json({ plusEvThreshold: 4, strongPlusEvThreshold: 12 });
+    });
+  });
+
+  app.get("/api/plus-ev/prop/:id", async (req, res) => {
+    const qs = typeof req.query.league === "string" ? `?league=${encodeURIComponent(req.query.league)}` : "";
+    await proxyGet(
+      `/api/v1/plus-ev/prop/${encodeURIComponent(req.params.id)}${qs}`,
+      res,
+      async () => {
+        res.status(503).json({ error: "+EV prop detail requires the data platform" });
+      },
+    );
+  });
+
   // Live Odds Comparison — canonical books + pick'em via provider adapters
   app.get("/api/odds/providers", async (_req, res) => {
     await proxyGet(`/api/v1/odds/providers`, res, async () => {

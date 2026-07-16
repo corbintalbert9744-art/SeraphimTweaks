@@ -9,10 +9,12 @@ import { asPropDetailFromApi } from "@/lib/nbaLiveCache";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { propResearchPath } from "@/lib/playerLinks";
-import { HitRateMatrixCell } from "@/components/research";
+import { EvPlusBadge, HitRateMatrixCell } from "@/components/research";
 import { usePickemApp } from "@/context/PickemAppContext";
 import { PickemAppGate, PickemAppSwitcher } from "@/components/shared/PickemAppGate";
 import type { LeagueCode } from "@/data/mock";
+
+type HubSort = "ev" | "edge" | "confidence" | "researchScore";
 
 function isLivePickemRow(row: Record<string, unknown>): boolean {
   const id = String(row.id ?? "");
@@ -87,6 +89,7 @@ export default function ResearchHubPage() {
   const { appId, app, ready } = usePickemApp();
   const platform = appId || "prizepicks";
   const [leagueFilter, setLeagueFilter] = useState<(typeof LEAGUES)[number]>("All");
+  const [sortBy, setSortBy] = useState<HubSort>("researchScore");
 
   const commandCenter = useQuery({
     queryKey: ["command-center"],
@@ -154,9 +157,20 @@ export default function ResearchHubPage() {
   }, [commandCenter.data, liveBoards.data]);
 
   const filtered = useMemo(() => {
-    if (leagueFilter === "All") return props;
-    return props.filter((p) => p.league === leagueFilter);
-  }, [props, leagueFilter]);
+    const base = leagueFilter === "All" ? props : props.filter((p) => p.league === leagueFilter);
+    const scored = [...base];
+    scored.sort((a, b) => {
+      if (sortBy === "ev") return Number(b.evPercent || 0) - Number(a.evPercent || 0);
+      if (sortBy === "edge") {
+        const ae = Number(a.edgeVsLine ?? (a.projectedValue != null ? a.projectedValue - a.line : 0));
+        const be = Number(b.edgeVsLine ?? (b.projectedValue != null ? b.projectedValue - b.line : 0));
+        return be - ae;
+      }
+      if (sortBy === "confidence") return Number(b.confidence || 0) - Number(a.confidence || 0);
+      return Number(b.researchScore || 0) - Number(a.researchScore || 0);
+    });
+    return scored;
+  }, [props, leagueFilter, sortBy]);
 
   const loading =
     ready &&
@@ -186,6 +200,12 @@ export default function ResearchHubPage() {
           <div className="flex flex-wrap items-center gap-2">
             <PickemAppSwitcher />
             <Link
+              href="/plus-ev"
+              className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-300 transition hover:border-emerald-500/50"
+            >
+              +EV Engine
+            </Link>
+            <Link
               href="/players"
               className="rounded-xl border border-[#1a1a1a] bg-[#111] px-3 py-2 text-sm text-neutral-300 transition hover:border-yellow-500/30 hover:text-yellow-400"
             >
@@ -213,6 +233,31 @@ export default function ResearchHubPage() {
         <span className="ml-auto text-[11px] tabular-nums text-neutral-500">
           {filtered.length} live pick{filtered.length === 1 ? "" : "s"}
         </span>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Sort</span>
+        {(
+          [
+            ["ev", "Highest EV"],
+            ["edge", "Model edge"],
+            ["confidence", "Confidence"],
+            ["researchScore", "Research score"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setSortBy(id)}
+            className={
+              sortBy === id
+                ? "rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300"
+                : "rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1 text-[11px] text-neutral-400 hover:text-neutral-200"
+            }
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {loading && <CardSkeleton rows={3} />}
@@ -265,9 +310,7 @@ export default function ResearchHubPage() {
                       {formatAmericanOdds(prop.americanOdds)}
                     </td>
                     <td className="px-3 py-3">
-                      <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-300">
-                        +{Number(prop.evPercent || 0).toFixed(1)}%
-                      </span>
+                      <EvPlusBadge ev={Number(prop.evPercent || 0)} compact />
                     </td>
                     <td className="px-3 py-3">
                       <ResearchScoreBadge score={prop.researchScore} size="sm" />

@@ -380,6 +380,41 @@ def build_live_odds_comparison(
     if not meta.get("linesUpdatedAt") and snap_at is not None:
         meta["linesUpdatedAt"] = _iso(snap_at)
 
+    # Attach +EV metrics per connected book (projection vs that market line)
+    from app.analytics.plus_ev import PLUS_EV_THRESHOLD, evaluate_book_quote, sigma_from_prop
+
+    sigma = sigma_from_prop({**base, "projectedValue": projected or baseline})
+    best_ev_book = None
+    best_ev_val = None
+    for b in books:
+        ev = evaluate_book_quote(
+            projected=float(projected or baseline),
+            sigma=sigma,
+            book=b,
+            preferred_side=model_side if model_side in ("Over", "Under") else "Over",
+        )
+        if ev is None:
+            b["isPlusEv"] = False
+            b["expectedValue"] = None
+            b["modelProbability"] = None
+            b["impliedProbability"] = None
+            continue
+        b["isPlusEv"] = ev.is_plus_ev
+        b["isStrongPlusEv"] = ev.is_strong_plus_ev
+        b["expectedValue"] = round(ev.expected_value, 2) if ev.expected_value is not None else None
+        b["evPercent"] = b["expectedValue"]
+        b["modelEdge"] = ev.model_edge
+        b["modelEdgePct"] = ev.model_edge_pct
+        b["modelProbability"] = round(ev.model_probability, 4)
+        b["impliedProbability"] = (
+            round(ev.implied_probability, 4) if ev.implied_probability is not None else None
+        )
+        b["evSide"] = ev.side
+        b["pricingMode"] = ev.pricing_mode
+        if ev.expected_value is not None and (best_ev_val is None or ev.expected_value > best_ev_val):
+            best_ev_val = ev.expected_value
+            best_ev_book = b.get("book")
+
     return {
         "books": books,
         "lines": books,
@@ -389,6 +424,9 @@ def build_live_odds_comparison(
         "connectedCount": meta.get("connectedCount", 0),
         "bestLineBook": meta.get("bestLineBook"),
         "bestLine": meta.get("bestLine"),
+        "bestEvBook": best_ev_book,
+        "bestEvPercent": best_ev_val,
+        "isPlusEv": bool(best_ev_val is not None and best_ev_val >= PLUS_EV_THRESHOLD),
         "modelSide": model_side,
         "baselineLine": baseline,
         "projectedValue": projected or baseline,

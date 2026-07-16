@@ -21,6 +21,17 @@ export function expectedValue(prob: number, american: number): number {
   return ((prob * profit - (1 - prob) * stake) / stake) * 100;
 }
 
+/** Aligned with data-platform `app.analytics.plus_ev`. */
+export const PLUS_EV_THRESHOLD = 4;
+export const STRONG_PLUS_EV_THRESHOLD = 12;
+
+export function isPlusEv(evPercent: number | null | undefined, modelEdge?: number | null): boolean {
+  if (evPercent == null || !Number.isFinite(evPercent)) return false;
+  if (evPercent < PLUS_EV_THRESHOLD) return false;
+  if (modelEdge != null && Number.isFinite(modelEdge) && modelEdge <= 0) return false;
+  return true;
+}
+
 export type HitWindow = { hits: number; samples: number; rate: number; label: string };
 
 export function hitRate(values: number[], line: number, side: "Over" | "Under", n: number): HitWindow {

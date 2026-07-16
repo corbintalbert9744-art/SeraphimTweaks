@@ -684,6 +684,8 @@ def build_command_center(db: Session) -> dict[str, Any]:
 
     # OddsIQ-style no-vig board: strongest juice-free lean edges on today's slate.
     best_no_vig = _rank_novig_picks(today_props, limit=8)
+    # +EV board: projection vs market lines (threshold from plus_ev engine)
+    best_plus_ev = _rank_plus_ev_picks(today_props, limit=8)
     generated_at = datetime.now(timezone.utc).isoformat()
     notifications: list[dict[str, Any]] = []
     for p in best_no_vig[:6]:
@@ -704,6 +706,25 @@ def build_command_center(db: Session) -> dict[str, Any]:
                 "propId": p.get("id"),
                 "league": p.get("league") or "NBA",
                 "noVigEdgePct": edge_pct,
+                "createdAt": generated_at,
+            }
+        )
+    for p in best_plus_ev[:4]:
+        ev_pct = float(p.get("evPercent") or 0)
+        notifications.append(
+            {
+                "id": f"plusev:{p.get('id')}",
+                "kind": "plusev",
+                "tone": "research",
+                "title": f"+EV · {p.get('player')}",
+                "detail": (
+                    f"{p.get('bestEvSide') or p.get('side')} {p.get('bestEvLine') or p.get('line')} "
+                    f"{p.get('market')} · +{ev_pct:.1f}% EV"
+                    + (f" · {p.get('bestEvBook')}" if p.get("bestEvBook") else "")
+                ),
+                "propId": p.get("id"),
+                "league": p.get("league") or "NBA",
+                "evPercent": ev_pct,
                 "createdAt": generated_at,
             }
         )
@@ -745,6 +766,7 @@ def build_command_center(db: Session) -> dict[str, Any]:
         "propOfTheDay": prop,
         "topProps": top_props,
         "bestNoVigPicks": best_no_vig,
+        "bestPlusEvPicks": best_plus_ev,
         "bestEvToday": best_ev,
         "gamesStartingSoon": games_soon,
         "injuryAlerts": featured.get("injuries") or [],
@@ -801,3 +823,20 @@ def _rank_novig_picks(props: list[dict[str, Any]], *, limit: int = 8) -> list[di
         reverse=True,
     )
     return ranked[:limit]
+
+
+def _rank_plus_ev_picks(props: list[dict[str, Any]], *, limit: int = 8) -> list[dict[str, Any]]:
+    """Rank props that clear the +EV threshold vs available market lines."""
+    from app.analytics.plus_ev import enrich_prop_with_plus_ev, sort_plus_ev_props
+
+    enriched: list[dict[str, Any]] = []
+    for p in props:
+        if p.get("projectedValue") is None:
+            continue
+        row = enrich_prop_with_plus_ev(p, books=p.get("books") or p.get("lines") or [])
+        if not row.get("isPlusEv"):
+            continue
+        # Keep payload light for Command Center
+        row.pop("marketEv", None)
+        enriched.append(row)
+    return sort_plus_ev_props(enriched, sort_by="ev")[:limit]

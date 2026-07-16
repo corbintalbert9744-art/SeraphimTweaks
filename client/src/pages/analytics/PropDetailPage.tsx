@@ -23,6 +23,7 @@ import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { LineComparison } from "@/components/shared/LineComparison";
 import {
+  EvPlusBadge,
   HitRateBars,
   HitRateSummaryBoxes,
   LineMovementChart,
@@ -319,6 +320,7 @@ export default function PropDetailPage() {
                       {prop.edgeVsLine.toFixed(1)}
                     </span>
                   )}
+                  <EvPlusBadge ev={Number(prop.evPercent || 0)} showDash={false} />
                 </div>
                 <p className="mt-1 line-clamp-1 text-[11px] text-neutral-500">{prop.why}</p>
               </div>

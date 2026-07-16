@@ -31,9 +31,10 @@ export type DensePropRow = {
   season?: string;
 };
 
-function edgeOf(row: DensePropRow): number | null {
-  if (row.edgePercent != null && Number.isFinite(row.edgePercent)) return row.edgePercent;
+/** Prefer true pricing EV% for the +EV badge; fall back to projection edge %. */
+function evForBadge(row: DensePropRow): number | null {
   if (row.evPercent != null && Number.isFinite(row.evPercent)) return row.evPercent;
+  if (row.edgePercent != null && Number.isFinite(row.edgePercent)) return row.edgePercent;
   const proj = row.projectedValue;
   if (proj == null || !row.line) return null;
   return ((proj - row.line) / row.line) * 100;
@@ -97,7 +98,7 @@ export function DensePropTable({
           <tbody className="divide-y divide-[#141414]">
             {rows.map((row) => {
               const added = hasLeg(row.id);
-              const edgePct = edgeOf(row);
+              const edgePct = evForBadge(row);
               const proj = row.projectedValue;
               const vsAvg =
                 proj != null ? Number((proj - row.line).toFixed(1)) : null;
