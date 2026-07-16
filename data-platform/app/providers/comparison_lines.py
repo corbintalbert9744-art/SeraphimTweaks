@@ -1,16 +1,18 @@
 """Comparison line providers — sportsbooks + fantasy pick'em.
 
 UI never talks to a vendor SDK. Ingest / serializers call these adapters.
-Swap PlaceholderComparisonLinesProvider for live PrizePicks / Underdog / Odds API
-adapters without changing PropDetail or the board.
+Live quotes come from the multi-provider aggregator (PropLine, SharpAPI,
+The Odds API, Antelytics) cached in Postgres.
 
 Canonical operators (always returned):
-  PrizePicks, Underdog, FanDuel, DraftKings, BetMGM, Caesars, Fanatics, ESPN BET
+  PrizePicks, Underdog, FanDuel, DraftKings, BetMGM, Bovada, Pinnacle, BetRivers
+
+Missing operators are marked requires_integration / unavailable — never fabricated.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Literal, Optional, Protocol, runtime_checkable
 
@@ -26,78 +28,60 @@ class LineProviderSpec:
     slug: str
     name: str
     kind: ProviderKind
-    # Offset from baseline when emitting placeholder/demo lines
     placeholder_offset: float = 0.0
-    # True when a live adapter is wired and producing real quotes
     connected: bool = False
     notes: str = ""
 
 
-# Fixed catalog — UI always shows these rows. Add adapters by flipping `connected`.
+# Fixed catalog — UI always shows these rows. Live adapters flip rows via live_quotes.
 CANONICAL_LINE_PROVIDERS: tuple[LineProviderSpec, ...] = (
     LineProviderSpec(
         "prizepicks",
         "PrizePicks",
         "pickem",
-        placeholder_offset=-1.5,
-        connected=False,
-        notes="Primary pick'em comparison for WNBA/NBA. Live PrizePicks adapter not connected — placeholder vs our projection.",
+        notes="Live when PropLine (or another adapter) returns PrizePicks — otherwise unavailable.",
     ),
     LineProviderSpec(
         "underdog",
         "Underdog",
         "pickem",
-        placeholder_offset=-1.0,
-        connected=False,
-        notes="Requires Underdog Fantasy API adapter.",
+        notes="Live when PropLine / Underdog Fantasy quotes arrive — otherwise unavailable.",
     ),
     LineProviderSpec(
         "fanduel",
         "FanDuel",
         "sportsbook",
-        placeholder_offset=0.0,
-        connected=False,
-        notes="Covered by The Odds API when ODDS_API_KEY is set.",
+        notes="Live via PropLine / SharpAPI / The Odds API when keyed.",
     ),
     LineProviderSpec(
         "draftkings",
         "DraftKings",
         "sportsbook",
-        placeholder_offset=0.0,
-        connected=False,
-        notes="Covered by The Odds API when ODDS_API_KEY is set.",
+        notes="Live via PropLine / SharpAPI / The Odds API when keyed.",
     ),
     LineProviderSpec(
         "betmgm",
         "BetMGM",
         "sportsbook",
-        placeholder_offset=0.5,
-        connected=False,
-        notes="Covered by The Odds API when ODDS_API_KEY is set.",
+        notes="Live via PropLine / SharpAPI / The Odds API when keyed.",
     ),
     LineProviderSpec(
-        "caesars",
-        "Caesars",
+        "bovada",
+        "Bovada",
         "sportsbook",
-        placeholder_offset=0.5,
-        connected=False,
-        notes="Requires Caesars / Odds API book key mapping.",
+        notes="Live via PropLine when keyed.",
     ),
     LineProviderSpec(
-        "fanatics",
-        "Fanatics Sportsbook",
+        "pinnacle",
+        "Pinnacle",
         "sportsbook",
-        placeholder_offset=-0.5,
-        connected=False,
-        notes="Requires Fanatics Sportsbook adapter.",
+        notes="Live via PropLine / SharpAPI when keyed.",
     ),
     LineProviderSpec(
-        "espnbet",
-        "ESPN BET",
+        "betrivers",
+        "BetRivers",
         "sportsbook",
-        placeholder_offset=0.0,
-        connected=False,
-        notes="Requires ESPN BET / Odds API book key mapping.",
+        notes="Live via PropLine when keyed.",
     ),
 )
 
@@ -116,6 +100,7 @@ class ComparisonLine:
     connected: bool = False
     requires_integration: bool = True
     provider: str = "comparison-lines"
+    source_provider: Optional[str] = None
     notes: str = ""
 
 
@@ -128,7 +113,6 @@ def edge_vs_projection(projected: float, line: float, model_side: str) -> float:
 def best_value_line(lines: list[dict], *, model_side: str) -> Optional[str]:
     if not lines:
         return None
-    # Prefer connected lines when ranking best value
     eligible = [row for row in lines if not row.get("requiresIntegration")] or lines
     ranked = sorted(
         eligible,
@@ -161,11 +145,29 @@ class ComparisonLinesProvider(Protocol):
         ...
 
 
-class CatalogComparisonLinesProvider:
-    """Always returns the canonical 8 operators.
+_SLUG_ALIASES = {
+    "draftkings": "draftkings",
+    "fanduel": "fanduel",
+    "betmgm": "betmgm",
+    "williamhill_us": "caesars",
+    "caesars": "caesars",
+    "espnbet": "espnbet",
+    "espn_bet": "espnbet",
+    "fanatics": "fanatics",
+    "bovada": "bovada",
+    "pinnacle": "pinnacle",
+    "betrivers": "betrivers",
+    "prizepicks": "prizepicks",
+    "underdog": "underdog",
+    "unibet": "unibet",
+}
 
-    - Connected sportsbooks: use live Odds API quotes when present.
-    - Otherwise: placeholder line near baseline, clearly marked requires_integration.
+
+class CatalogComparisonLinesProvider:
+    """Always returns the canonical operators.
+
+    - Connected books: use live aggregator quotes when present (with source_provider).
+    - Otherwise: unavailable placeholder — requires_integration, not fabricated.
     """
 
     meta = ProviderMeta(
@@ -175,9 +177,8 @@ class CatalogComparisonLinesProvider:
         requires_api_key=False,
         is_mock=True,
         notes=(
-            "Canonical line catalog (PrizePicks, Underdog, FanDuel, DraftKings, BetMGM, "
-            "Caesars, Fanatics, ESPN BET). Unconnected operators return placeholder lines "
-            "marked requires_integration. Swap individual adapters without UI changes."
+            "Canonical line catalog. Live rows come from the multi-provider aggregator cache. "
+            "Unavailable operators stay labeled — never fabricated."
         ),
     )
 
@@ -194,63 +195,60 @@ class CatalogComparisonLinesProvider:
         live_quotes: Optional[list[NormalizedOddsQuote]] = None,
     ) -> list[ComparisonLine]:
         _ = (league, player_name, player_external_id, market, projected_value, game_external_id)
-        live_by_slug: dict[str, NormalizedOddsQuote] = {}
+        live_by_slug: dict[str, dict[str, NormalizedOddsQuote]] = {}
         for q in live_quotes or []:
             slug = (q.sportsbook_slug or "").lower().replace(" ", "").replace("-", "")
-            # Normalize common Odds API keys
-            aliases = {
-                "draftkings": "draftkings",
-                "fanduel": "fanduel",
-                "betmgm": "betmgm",
-                "williamhill_us": "caesars",
-                "caesars": "caesars",
-                "espnbet": "espnbet",
-                "espn_bet": "espnbet",
-                "fanatics": "fanatics",
-            }
-            key = aliases.get(slug, slug)
-            # Prefer Over quotes for line
-            if key not in live_by_slug or q.side == "Over":
-                live_by_slug[key] = q
+            key = _SLUG_ALIASES.get(slug, slug)
+            bucket = live_by_slug.setdefault(key, {})
+            if q.side not in bucket or q.side == "Over":
+                bucket[q.side] = q
+            if "line" not in bucket or q.side == "Over":
+                bucket["line"] = q  # type: ignore[assignment]
 
         out: list[ComparisonLine] = []
         for spec in CANONICAL_LINE_PROVIDERS:
-            live = live_by_slug.get(spec.slug)
-            if live is not None:
-                over = live.american_odds if live.side == "Over" else -110
-                under = live.american_odds if live.side == "Under" else -110
-                # Pair if we only have one side
+            sides = live_by_slug.get(spec.slug)
+            if sides:
+                over_q = sides.get("Over")
+                under_q = sides.get("Under")
+                line_q = over_q or under_q or next(iter(sides.values()))
+                source = (
+                    (over_q or under_q or line_q).source_provider  # type: ignore[union-attr]
+                    if line_q
+                    else None
+                )
                 out.append(
                     ComparisonLine(
                         name=spec.name,
                         slug=spec.slug,
                         kind=spec.kind,
-                        line=float(live.line),
-                        over=over if live.side == "Over" else -110,
-                        under=under if live.side == "Under" else -110,
+                        line=float(line_q.line),  # type: ignore[union-attr]
+                        over=int(over_q.american_odds) if over_q else -110,
+                        under=int(under_q.american_odds) if under_q else -110,
                         is_mock=False,
                         connected=True,
                         requires_integration=False,
-                        provider=live.sportsbook_slug or "the-odds-api",
-                        notes="Live quote",
+                        provider=source or "line-aggregator",
+                        source_provider=source,
+                        notes=f"Live via {source or 'aggregator'}",
                     )
                 )
                 continue
 
-            placeholder_line = max(0.5, round((baseline_line + spec.placeholder_offset) * 2) / 2)
             out.append(
                 ComparisonLine(
                     name=spec.name,
                     slug=spec.slug,
                     kind=spec.kind,
-                    line=placeholder_line,
+                    line=float(baseline_line),
                     over=-110,
                     under=-110,
                     is_mock=True,
-                    connected=spec.connected,
-                    requires_integration=not spec.connected,
-                    provider="placeholder",
-                    notes=spec.notes or "Requires integration",
+                    connected=False,
+                    requires_integration=True,
+                    provider="unavailable",
+                    source_provider=None,
+                    notes=spec.notes or "Unavailable from configured line providers — not fabricated.",
                 )
             )
         return out
@@ -280,6 +278,8 @@ class CatalogComparisonLinesProvider:
             game_external_id=game_external_id,
             live_quotes=live_quotes,
         ):
+            if row.requires_integration:
+                continue  # do not persist fabricated placeholders
             for side, american in (("Over", row.over), ("Under", row.under)):
                 quotes.append(
                     NormalizedOddsQuote(
@@ -295,17 +295,16 @@ class CatalogComparisonLinesProvider:
                         game_external_id=game_external_id,
                         captured_at=now,
                         is_mock=row.is_mock,
+                        source_provider=row.source_provider,
                     )
                 )
         return quotes
 
 
-# Back-compat alias
 MockComparisonLinesProvider = CatalogComparisonLinesProvider
 
 
 def get_comparison_lines_provider() -> ComparisonLinesProvider:
-    """Registry hook — swap to composite live providers when keys exist."""
     return CatalogComparisonLinesProvider()
 
 

@@ -144,11 +144,50 @@ class NormalizedOddsQuote:
     game_external_id: Optional[str] = None
     captured_at: Optional[datetime] = None
     is_mock: bool = False
+    # Which upstream adapter supplied this quote (propline, sharpapi, the-odds-api, …)
+    source_provider: Optional[str] = None
 
 
-# ---------------------------------------------------------------------------
-# Protocols (capability contracts)
-# ---------------------------------------------------------------------------
+class ProviderRateLimitError(RuntimeError):
+    """Raised when an upstream odds API returns HTTP 429 — aggregator falls through."""
+
+    def __init__(self, provider: str, message: str = "rate limit exceeded"):
+        super().__init__(f"{provider}: {message}")
+        self.provider = provider
+
+
+@dataclass
+class LeagueSupportStatus:
+    league: str
+    supported: bool
+    reason: Optional[str] = None
+    unavailable: bool = False
+
+
+@runtime_checkable
+class LineMarketProvider(Protocol):
+    """Common adapter interface for market-line sources.
+
+    New providers implement this protocol and register in the aggregator —
+    no frontend changes required when sportsbook slugs map to the canonical catalog.
+    """
+
+    meta: ProviderMeta
+
+    @property
+    def source_id(self) -> str:
+        """Stable id written to odds.provider / quote.source_provider."""
+        ...
+
+    def is_configured(self) -> bool:
+        ...
+
+    def supports_league(self, league: str) -> LeagueSupportStatus:
+        ...
+
+    def fetch_player_prop_odds(self, league: str, date: Optional[str] = None) -> list[NormalizedOddsQuote]:
+        """Return player-prop quotes. Raise ProviderRateLimitError on 429."""
+        ...
 
 
 @runtime_checkable

@@ -239,13 +239,20 @@ def upsert_prop(
     return row
 
 
-def insert_odds(db: Session, quote: NormalizedOddsQuote, prop_id: str) -> Odds:
+def insert_odds(
+    db: Session,
+    quote: NormalizedOddsQuote,
+    prop_id: str,
+    *,
+    provider_name: Optional[str] = None,
+) -> Odds:
+    provider = provider_name or quote.source_provider or ("mock" if quote.is_mock else "line-aggregator")
     book = ensure_sportsbook(
         db,
         quote.sportsbook_slug,
         quote.sportsbook_name,
-        kind="pickem" if quote.sportsbook_slug in {"prizepicks", "underdog", "sleeper", "parlayplay"} else "sportsbook",
-        provider="mock" if quote.is_mock else "the-odds-api",
+        kind="pickem" if quote.sportsbook_slug in {"prizepicks", "underdog", "sleeper", "parlayplay", "dabble"} else "sportsbook",
+        provider=provider,
     )
     db.flush()
     oid = str(uuid.uuid4())
@@ -257,7 +264,7 @@ def insert_odds(db: Session, quote: NormalizedOddsQuote, prop_id: str) -> Odds:
         american_odds=quote.american_odds,
         line=quote.line,
         implied_prob=None,
-        provider="mock" if quote.is_mock else "the-odds-api",
+        provider=provider if not quote.is_mock else "mock",
         is_mock=quote.is_mock,
         captured_at=quote.captured_at or datetime.now(timezone.utc),
     )

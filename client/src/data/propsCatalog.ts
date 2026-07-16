@@ -26,6 +26,9 @@ export interface BookQuote {
   isBestValue?: boolean;
   projectedValue?: number;
   modelSide?: "Over" | "Under";
+  /** Upstream adapter that supplied this line (propline, sharpapi, …). */
+  sourceProvider?: string | null;
+  provider?: string | null;
 }
 
 export interface OpponentDefense {

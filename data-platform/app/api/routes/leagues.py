@@ -304,6 +304,22 @@ def sync_all(dates: str | None = Query(None), db: Session = Depends(get_db)):
     return sync_all_sports(db, date=dates)
 
 
+@router.post("/jobs/sync-lines")
+def sync_lines(db: Session = Depends(get_db)):
+    """Refresh multi-provider market lines into Postgres (scheduled + manual)."""
+    from app.ingestion.line_aggregation_sync import sync_aggregated_lines
+
+    return sync_aggregated_lines(db)
+
+
+@router.get("/lines/providers")
+def line_providers_status():
+    """Aggregator + adapter status for ops / debugging."""
+    from app.providers.line_aggregation.factory import get_line_aggregator
+
+    return get_line_aggregator().status()
+
+
 @router.post("/leagues/{league}/board")
 def rebuild_league_board(league: str, db: Session = Depends(get_db)):
     code = league.upper()

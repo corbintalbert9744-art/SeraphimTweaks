@@ -1,4 +1,8 @@
-/** Canonical line operators shown on every prop research report. */
+/** Canonical line operators shown on every prop research report.
+
+ * New upstream adapters (PropLine, SharpAPI, …) map onto these slugs —
+ * the frontend does not need changes when a new source is added.
+ */
 
 export type LineProviderKind = "sportsbook" | "pickem";
 
@@ -7,9 +11,7 @@ export type LineProviderSpec = {
   name: string;
   kind: LineProviderKind;
   notes: string;
-  /** Short mark for the app switcher (no external logo assets). */
   mark: string;
-  /** Accent for the switcher chip */
   accent: string;
 };
 
@@ -20,7 +22,7 @@ export const CANONICAL_LINE_PROVIDERS: LineProviderSpec[] = [
     kind: "pickem",
     mark: "PP",
     accent: "#8b5cf6",
-    notes: "Primary pick'em comparison for WNBA/NBA. Live adapter pending — placeholder vs our projection.",
+    notes: "Live when a configured aggregator source returns PrizePicks — otherwise unavailable.",
   },
   {
     slug: "underdog",
@@ -28,7 +30,7 @@ export const CANONICAL_LINE_PROVIDERS: LineProviderSpec[] = [
     kind: "pickem",
     mark: "UD",
     accent: "#f97316",
-    notes: "Requires Underdog Fantasy API adapter.",
+    notes: "Live when PropLine / Underdog quotes arrive — otherwise unavailable.",
   },
   {
     slug: "fanduel",
@@ -36,7 +38,7 @@ export const CANONICAL_LINE_PROVIDERS: LineProviderSpec[] = [
     kind: "sportsbook",
     mark: "FD",
     accent: "#1493ff",
-    notes: "Live when The Odds API key is configured.",
+    notes: "Live via PropLine / SharpAPI / The Odds API when keyed.",
   },
   {
     slug: "draftkings",
@@ -44,7 +46,7 @@ export const CANONICAL_LINE_PROVIDERS: LineProviderSpec[] = [
     kind: "sportsbook",
     mark: "DK",
     accent: "#53d337",
-    notes: "Live when The Odds API key is configured.",
+    notes: "Live via PropLine / SharpAPI / The Odds API when keyed.",
   },
   {
     slug: "betmgm",
@@ -52,31 +54,31 @@ export const CANONICAL_LINE_PROVIDERS: LineProviderSpec[] = [
     kind: "sportsbook",
     mark: "MGM",
     accent: "#c4a35a",
-    notes: "Live when The Odds API key is configured.",
+    notes: "Live via PropLine / SharpAPI / The Odds API when keyed.",
   },
   {
-    slug: "caesars",
-    name: "Caesars",
+    slug: "bovada",
+    name: "Bovada",
     kind: "sportsbook",
-    mark: "CZR",
-    accent: "#c9a227",
-    notes: "Requires Caesars / Odds API book mapping.",
+    mark: "BOV",
+    accent: "#cc0000",
+    notes: "Live via PropLine when keyed.",
   },
   {
-    slug: "fanatics",
-    name: "Fanatics Sportsbook",
+    slug: "pinnacle",
+    name: "Pinnacle",
     kind: "sportsbook",
-    mark: "FAN",
-    accent: "#ef4444",
-    notes: "Requires Fanatics Sportsbook adapter.",
+    mark: "PIN",
+    accent: "#1d4ed8",
+    notes: "Live via PropLine / SharpAPI when keyed.",
   },
   {
-    slug: "espnbet",
-    name: "ESPN BET",
+    slug: "betrivers",
+    name: "BetRivers",
     kind: "sportsbook",
-    mark: "ESPN",
-    accent: "#d9782d",
-    notes: "Requires ESPN BET / Odds API book mapping.",
+    mark: "BR",
+    accent: "#dc2626",
+    notes: "Live via PropLine when keyed.",
   },
 ];
 

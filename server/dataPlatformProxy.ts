@@ -310,4 +310,30 @@ export function registerDataPlatformProxy(
       });
     }
   });
+
+  app.post("/api/jobs/sync-lines", async (_req, res) => {
+    try {
+      const upstream = await fetch(`${BASE}/api/v1/jobs/sync-lines`, {
+        method: "POST",
+        signal: AbortSignal.timeout(300_000),
+      });
+      res.status(upstream.status).json(await upstream.json());
+    } catch {
+      res.status(503).json({
+        error: "Line aggregation sync requires the Python data platform",
+        hint: "Start with: npm run data-platform",
+      });
+    }
+  });
+
+  app.get("/api/lines/providers", async (_req, res) => {
+    try {
+      const upstream = await fetch(`${BASE}/api/v1/lines/providers`, {
+        signal: AbortSignal.timeout(15_000),
+      });
+      res.status(upstream.status).json(await upstream.json());
+    } catch {
+      res.status(503).json({ error: "Data platform unavailable", adapters: [] });
+    }
+  });
 }

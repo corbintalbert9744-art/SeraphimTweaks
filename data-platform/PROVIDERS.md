@@ -9,72 +9,78 @@ never call vendor SDKs directly.
 API / Scheduler
       │
       ▼
-ingestion (nba_sync, multi_sport_sync, *_board, pipelines)
+ingestion (nba_sync, multi_sport_sync, line_aggregation_sync, *_board)
       │
       ▼
 ProviderBundle (registry.get_*_providers)
       │
-      ├─ espn-nba / espn-nfl / espn-wnba  ← live, no API key
-      ├─ nba-api (optional pip)          ← NBA Stats supplement, no key
-      ├─ nflverse / nfl_data_py (optional) ← NFL supplement, no key
-      ├─ mlb-statsapi                    ← live, no API key
-      ├─ nhl-api                         ← live, no API key
-      ├─ football-data-org               ← REQUIRES FOOTBALL_DATA_API_KEY
-      ├─ tennis-abstract                 ← REQUIRES PROVIDER SELECTION (no scrape)
-      ├─ the-odds-api                    ← live when ODDS_API_KEY is set
-      └─ catalog-comparison-lines        ← labeled placeholders until keyed
+      ├─ espn-* / mlb-statsapi / nhl-api / …
+      ├─ line-aggregator ─────────────────────────────┐
+      │     ├─ propline       (PROPLINE_API_KEY)       │ priority
+      │     ├─ sharpapi       (SHARPAPI_API_KEY)       │ + fallback
+      │     ├─ the-odds-api   (ODDS_API_KEY)           │ on 429 /
+      │     └─ antelytics     (ANTELYTICS_API_KEY)     │ unsupported
+      └─ catalog-comparison-lines ← UI operator catalog
       │
       ▼
-PostgreSQL warehouse (SQLite fallback) + provider_runs audit
+PostgreSQL warehouse (odds + line_snapshots with timestamps + source)
       │
       ▼
-Projection Engine V1 → hit rates, projections, research/confidence scores
+Projection Engine V1 → boards / prop detail (reads cache, not live vendors)
 ```
 
-Framework modules:
+## Multi-provider market lines
 
-| Module | Role |
-|--------|------|
-| `app/providers/framework.py` | DTOs, capability protocols, HTTP client w/ retries, `run_provider_job` |
-| `app/providers/base.py` | Stable re-exports |
-| `app/providers/registry.py` | League → adapter wiring |
-| `app/ingestion/multi_sport_sync.py` | Cross-league warehouse orchestrator |
-| `app/ingestion/generic_board.py` | Warehouse logs → Projection Engine V1 boards |
+| Adapter | Env var | Docs |
+|---------|---------|------|
+| **PropLine** | `PROPLINE_API_KEY` | https://prop-line.com/docs |
+| **SharpAPI** | `SHARPAPI_API_KEY` | https://docs.sharpapi.io/ |
+| **The Odds API** | `ODDS_API_KEY` | https://the-odds-api.com/ |
+| **Antelytics** | `ANTELYTICS_API_KEY` (+ optional `ANTELYTICS_BASE_URL`) | Scaffold — unavailable until keyed / schema confirmed |
 
-## Status
+Priority (override with `LINE_PROVIDER_PRIORITY`):
+
+```
+propline,sharpapi,the-odds-api,antelytics
+```
+
+Behavior:
+
+1. Query configured providers in order
+2. Skip unconfigured / unsupported leagues (clear reason, **no fabrications**)
+3. On HTTP 429 → fall through to next provider
+4. Merge duplicates by `(sportsbook, player, market, side)` — higher priority wins
+5. Persist to `odds` + `line_snapshots` with `captured_at` + `source` / `provider`
+6. Scheduler job `refresh_odds` (default every 15 min) — pages read Postgres only
+
+Manual sync: `POST /api/v1/jobs/sync-lines`  
+Status: `GET /api/v1/lines/providers`
+
+Adding a new provider: implement `LineMarketProvider` in `app/providers/<name>/`, register in `line_aggregation/factory.py`. Frontend stays unchanged when sportsbook slugs map to the canonical catalog.
+
+## Sports data status
 
 | Provider | Leagues | Live? | Config needed |
 |----------|---------|-------|---------------|
 | **espn-nba** | NBA | Yes | None |
 | **espn-nfl** | NFL | Yes | None |
 | **espn-wnba** | WNBA | Yes | None |
-| **espn-soccer** | Soccer | Yes (schedule) | None — props need events extension |
-| **espn-tennis** | ATP, WTA | Yes (schedule) | None — match props not fabricated |
-| **nba-api** | NBA (WNBA limited) | When `pip install nba_api` | Optional package |
-| **nflverse** | NFL | When `pip install nfl_data_py` | Optional package |
+| **espn-soccer** | Soccer | Yes (schedule + pick'em slate) | None |
+| **espn-tennis** | ATP, WTA | Yes (schedule + pick'em slate) | None |
 | **mlb-statsapi** | MLB | Yes | None |
 | **nhl-api** | NHL | Yes | None |
-| **football-data-org** | Soccer | When keyed | **`FOOTBALL_DATA_API_KEY`** (optional enrichment) |
-| **tennis-abstract** | ATP, WTA | No | **Not scraped** — placeholder only |
-| **the-odds-api** | Multi | When keyed | **`ODDS_API_KEY`** |
-| mock-odds / catalog-comparison-lines | all | Placeholders | Labeled until keyed |
+| **football-data-org** | Soccer | When keyed | `FOOTBALL_DATA_API_KEY` |
+| **line-aggregator** | Multi | When any line key set | See table above |
 
-### Keys that must be set (not fabricated)
+### Keys (never fabricate without them)
 
-| Env var | Required for | Without it |
-|---------|--------------|------------|
-| `ODDS_API_KEY` | Live sportsbook prop odds | Comparison catalog placeholders (`requiresIntegration` / mock -110) |
-| `FOOTBALL_DATA_API_KEY` | Soccer schedules | Soccer stays empty — **no invented fixtures** |
-| *(none)* | Tennis Abstract | ATP/WTA stay `needs_provider` until a licensed feed is chosen |
-
-Optional packages (no API keys):
-
-```bash
-pip install nba_api          # NBA Stats supplement
-pip install nfl_data_py      # NFLVerse rosters / weekly stats
-```
-
-\* ATP/WTA sport keys in The Odds API must be verified per tournament before production use.
+| Env var | Purpose |
+|---------|---------|
+| `PROPLINE_API_KEY` | Primary multi-book player props |
+| `SHARPAPI_API_KEY` | SharpAPI odds / props fallback |
+| `ODDS_API_KEY` | The Odds API fallback |
+| `ANTELYTICS_API_KEY` | Antelytics scaffold |
+| `FOOTBALL_DATA_API_KEY` | Optional soccer schedule enrichment |
 
 ## Sync entry points
 
@@ -98,7 +104,7 @@ Scheduled (when `ENABLE_SCHEDULER=true`):
 | multi_sport_sync | every 6h (`MULTI_SPORT_SYNC_HOURS`) | MLB/NHL/Soccer warehouse refresh |
 | import_games | 05:10 UTC daily | Fresh schedule |
 | update_injuries | every 30m | Injury refresh |
-| refresh_odds | every 15m | Featured props + Odds API poll |
+| refresh_odds | every 15m | Multi-provider line aggregator → odds + snapshots |
 | recalculate_analytics | every 20m | Scores / EV |
 
 Machine-readable status: `GET /api/v1/providers` and `GET /api/v1/leagues`  

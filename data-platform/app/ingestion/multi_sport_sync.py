@@ -30,7 +30,7 @@ from app.providers.mlb.statsapi import MlbStatsApiProvider
 from app.providers.nba_api.provider import NbaApiProvider, nba_api_installed
 from app.providers.nflverse.provider import NflverseProvider, nflverse_installed
 from app.providers.nhl.api import NhlApiProvider
-from app.providers.registry import get_odds_provider
+from app.providers.registry import get_odds_provider  # noqa: F401 — re-exported for callers
 from app.providers.soccer.football_data import FootballDataOrgProvider
 
 log = logging.getLogger(__name__)
@@ -203,25 +203,10 @@ def sync_tennis_warehouse(db: Session, *, tour: str = "ATP", date: Optional[str]
 
 
 def sync_odds_all_leagues(db: Session) -> dict[str, Any]:
-    _ = db
-    settings = get_settings()
-    if not settings.odds_api_key:
-        return {
-            "ok": False,
-            "provider": "the-odds-api",
-            "requiresApiKey": True,
-            "error": "ODDS_API_KEY not configured — comparison lines stay as labeled placeholders.",
-        }
-    odds = get_odds_provider()
-    out: dict[str, Any] = {"provider": "the-odds-api", "leagues": {}}
-    for league in ("NBA", "NFL", "WNBA", "MLB", "NHL", "Soccer"):
-        try:
-            quotes = odds.fetch_player_prop_odds(league)  # type: ignore[union-attr]
-            out["leagues"][league] = {"quotes": len(quotes or [])}
-        except Exception as exc:  # noqa: BLE001
-            out["leagues"][league] = {"error": str(exc)}
-    out["ok"] = True
-    return out
+    """Scheduled multi-provider line sync → Postgres cache."""
+    from app.ingestion.line_aggregation_sync import sync_aggregated_lines
+
+    return sync_aggregated_lines(db)
 
 
 def sync_nba_api_supplement(db: Session) -> dict[str, Any]:

@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     nba_sync_per_team: int = Field(default=3, alias="NBA_SYNC_PER_TEAM")
 
     odds_api_key: str | None = Field(default=None, alias="ODDS_API_KEY")
+    propline_api_key: str | None = Field(default=None, alias="PROPLINE_API_KEY")
+    sharpapi_api_key: str | None = Field(default=None, alias="SHARPAPI_API_KEY")
+    antelytics_api_key: str | None = Field(default=None, alias="ANTELYTICS_API_KEY")
+    antelytics_base_url: str = Field(
+        default="https://api.antelytics.com/v1",
+        alias="ANTELYTICS_BASE_URL",
+    )
+    # Comma-separated priority: first wins on duplicate book/player/market/side
+    line_provider_priority: str = Field(
+        default="propline,sharpapi,the-odds-api,antelytics",
+        alias="LINE_PROVIDER_PRIORITY",
+    )
     football_data_api_key: str | None = Field(default=None, alias="FOOTBALL_DATA_API_KEY")
     bootstrap_multi_sport: bool = Field(default=False, alias="BOOTSTRAP_MULTI_SPORT")
     schedule_multi_sport_hours: int = Field(default=6, alias="MULTI_SPORT_SYNC_HOURS")

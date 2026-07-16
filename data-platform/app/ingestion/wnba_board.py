@@ -528,6 +528,8 @@ def get_wnba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
             "connected": getattr(row, "connected", False),
             "requiresIntegration": getattr(row, "requires_integration", row.is_mock),
             "integrationNote": getattr(row, "notes", "") or None,
+            "sourceProvider": getattr(row, "source_provider", None),
+            "provider": getattr(row, "provider", None),
         }
 
     books: list[dict[str, Any]] = []

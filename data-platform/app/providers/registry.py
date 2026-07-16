@@ -36,10 +36,17 @@ class ProviderBundle:
 
 
 def get_odds_provider():
-    """Public odds resolver — live The Odds API when keyed, else labeled mock."""
+    """Public odds resolver — multi-provider aggregator when any key is set."""
+    from app.providers.line_aggregation.factory import get_line_aggregator
+
     settings = get_settings()
-    if settings.odds_api_key:
-        return TheOddsApiProvider(api_key=settings.odds_api_key)
+    if (
+        settings.propline_api_key
+        or settings.sharpapi_api_key
+        or settings.odds_api_key
+        or settings.antelytics_api_key
+    ):
+        return get_line_aggregator()
     return MockOddsProvider()
 
 
@@ -59,7 +66,12 @@ def provider_status() -> list[dict]:
     tennis = TennisAbstractProvider()
     nba_api = NbaApiProvider()
     nflverse = NflverseProvider()
-    odds_live = bool(settings.odds_api_key)
+    odds_live = bool(
+        settings.odds_api_key
+        or settings.propline_api_key
+        or settings.sharpapi_api_key
+        or settings.antelytics_api_key
+    )
     soccer_live = bool(settings.football_data_api_key)
 
     rows = [
@@ -187,18 +199,73 @@ def provider_status() -> list[dict]:
             "homepage": tennis.meta.homepage,
         },
         {
-            "name": "the-odds-api",
+            "name": "line-aggregator",
             "leagues": ["NBA", "NFL", "WNBA", "MLB", "NHL", "Soccer", "ATP", "WTA"],
-            "capabilities": ["odds", "props"],
+            "capabilities": ["odds", "props", "pickem"],
             "requires_api_key": True,
             "is_mock": not odds_live,
             "configured": odds_live,
             "legitimate": odds_live,
-            "envVar": "ODDS_API_KEY",
+            "envVars": [
+                "PROPLINE_API_KEY",
+                "SHARPAPI_API_KEY",
+                "ODDS_API_KEY",
+                "ANTELYTICS_API_KEY",
+            ],
+            "priority": settings.line_provider_priority,
             "notes": (
-                "Live sportsbook odds when ODDS_API_KEY is set. "
-                "Without a key, MockOddsProvider supplies clearly labeled -110 placeholders. "
-                "Tennis sport keys are tournament-specific placeholders."
+                "Multi-provider market lines (PropLine → SharpAPI → The Odds API → Antelytics). "
+                "Priority merge + rate-limit fallback. Cached in Postgres on schedule."
+            ),
+        },
+        {
+            "name": "propline",
+            "leagues": ["NBA", "WNBA", "NFL", "MLB", "NHL", "Soccer", "ATP", "WTA"],
+            "capabilities": ["odds", "props", "pickem"],
+            "requires_api_key": True,
+            "is_mock": False,
+            "configured": bool(settings.propline_api_key),
+            "legitimate": bool(settings.propline_api_key),
+            "envVar": "PROPLINE_API_KEY",
+            "notes": "Official PropLine API — multi-book player props. Docs: https://prop-line.com/docs",
+            "homepage": "https://prop-line.com/",
+        },
+        {
+            "name": "sharpapi",
+            "leagues": ["NBA", "WNBA", "NFL", "MLB", "NHL", "Soccer", "ATP", "WTA"],
+            "capabilities": ["odds", "props"],
+            "requires_api_key": True,
+            "is_mock": False,
+            "configured": bool(settings.sharpapi_api_key),
+            "legitimate": bool(settings.sharpapi_api_key),
+            "envVar": "SHARPAPI_API_KEY",
+            "notes": "SharpAPI odds aggregation. Docs: https://docs.sharpapi.io/",
+            "homepage": "https://sharpapi.io/",
+        },
+        {
+            "name": "the-odds-api",
+            "leagues": ["NBA", "NFL", "WNBA", "MLB", "NHL", "Soccer", "ATP", "WTA"],
+            "capabilities": ["odds", "props"],
+            "requires_api_key": True,
+            "is_mock": not bool(settings.odds_api_key),
+            "configured": bool(settings.odds_api_key),
+            "legitimate": bool(settings.odds_api_key),
+            "envVar": "ODDS_API_KEY",
+            "notes": "The Odds API fallback. Tennis tournament keys need verification.",
+            "homepage": "https://the-odds-api.com/",
+        },
+        {
+            "name": "antelytics",
+            "leagues": ["NBA", "WNBA", "NFL", "MLB", "NHL", "Soccer", "ATP", "WTA"],
+            "capabilities": ["odds", "props"],
+            "requires_api_key": True,
+            "is_mock": False,
+            "configured": bool(settings.antelytics_api_key),
+            "legitimate": bool(settings.antelytics_api_key),
+            "envVar": "ANTELYTICS_API_KEY",
+            "notes": (
+                "Antelytics adapter scaffold. Set ANTELYTICS_API_KEY (+ optional ANTELYTICS_BASE_URL). "
+                "Unavailable until keyed / schema confirmed — never fabricated."
             ),
         },
         {
@@ -210,9 +277,8 @@ def provider_status() -> list[dict]:
             "configured": True,
             "legitimate": False,
             "notes": (
-                "Canonical line catalog: PrizePicks, Underdog, FanDuel, DraftKings, BetMGM, "
-                "Caesars, Fanatics Sportsbook, ESPN BET. Unconnected operators show placeholders "
-                "marked requires_integration. Swap adapters without UI changes."
+                "Canonical operator catalog for the Line Comparison UI. "
+                "Live rows come from the aggregator cache; missing operators stay marked unavailable."
             ),
             "operators": [
                 "PrizePicks",
@@ -220,9 +286,9 @@ def provider_status() -> list[dict]:
                 "FanDuel",
                 "DraftKings",
                 "BetMGM",
-                "Caesars",
-                "Fanatics Sportsbook",
-                "ESPN BET",
+                "Bovada",
+                "Pinnacle",
+                "BetRivers",
             ],
         },
     ]

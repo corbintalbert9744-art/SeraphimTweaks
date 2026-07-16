@@ -16,7 +16,8 @@ export type NbaSortKey =
   | "l10"
   | "player"
   | "line"
-  | "projection";
+  | "projection"
+  | "bestValue";
 
 export interface NbaProp {
   id: string;

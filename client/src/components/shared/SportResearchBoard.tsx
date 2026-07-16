@@ -36,6 +36,12 @@ function sortProps(rows: NbaProp[], filters: NbaBoardFilters): NbaProp[] {
         return ((a.researchScore ?? a.confidence) - (b.researchScore ?? b.confidence)) * dir;
       case "projection":
         return ((a.projectedValue ?? a.line) - (b.projectedValue ?? b.line)) * dir;
+      case "bestValue": {
+        // Prefer larger positive edge (model projection vs market line)
+        const ae = a.edgeVsLine ?? 0;
+        const be = b.edgeVsLine ?? 0;
+        return (ae - be) * dir;
+      }
       case "noVig":
         return (a.noVigProb - b.noVigProb) * dir;
       case "l10":

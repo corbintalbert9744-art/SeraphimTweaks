@@ -101,6 +101,7 @@ export function NbaFiltersBar({
               { value: "confidence", label: "Confidence" },
               { value: "researchScore", label: "Research Score" },
               { value: "projection", label: "Projection" },
+              { value: "bestValue", label: "Best value (edge)" },
               { value: "noVig", label: "No-Vig" },
               { value: "l10", label: "L10" },
               { value: "player", label: "Player" },

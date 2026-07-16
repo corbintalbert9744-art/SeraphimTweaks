@@ -6,7 +6,7 @@ export type LineComparisonRow = BookQuote & {
   placeholder?: boolean;
 };
 
-/** Merge API books with the canonical 8 operators; fill placeholders when missing. */
+/** Merge API books with the canonical operators; fill unavailable when missing. */
 export function mergeLineComparison(
   books: BookQuote[],
   opts: { projected: number; modelSide: "Over" | "Under"; consensusLine: number },
@@ -30,7 +30,10 @@ export function mergeLineComparison(
         slug: hit.slug || spec.slug,
         kind: hit.kind || spec.kind,
         requiresIntegration: hit.requiresIntegration ?? hit.isMock ?? false,
-        integrationNote: hit.integrationNote ?? (hit.requiresIntegration || hit.isMock ? spec.notes : null),
+        integrationNote:
+          hit.integrationNote ??
+          (hit.requiresIntegration || hit.isMock ? spec.notes : null),
+        sourceProvider: hit.sourceProvider ?? hit.provider ?? null,
       };
     }
     const edge =
@@ -52,6 +55,7 @@ export function mergeLineComparison(
       projectedValue: opts.projected,
       modelSide: opts.modelSide,
       placeholder: true,
+      sourceProvider: null,
     };
   });
 
@@ -89,7 +93,7 @@ export function SportsbookAppSwitcher({
               key={b.slug || b.book}
               type="button"
               onClick={() => onSelectBook(b.book)}
-              title={pending ? b.integrationNote || "Requires integration" : b.book}
+              title={pending ? b.integrationNote || "Unavailable" : b.book}
               className={cn(
                 "group flex items-center gap-3 rounded-2xl border px-4 py-3 transition",
                 active
@@ -109,7 +113,7 @@ export function SportsbookAppSwitcher({
                   {b.book}
                 </span>
                 <span className="mt-0.5 block text-[11px] tabular-nums text-neutral-500">
-                  {pending ? "Connect" : `Line ${b.line}`}
+                  {pending ? "Unavailable" : `Line ${b.line}`}
                 </span>
               </span>
             </button>
@@ -118,6 +122,18 @@ export function SportsbookAppSwitcher({
       </div>
     </div>
   );
+}
+
+function sourceLabel(source: string | null | undefined): string {
+  if (!source) return "—";
+  const map: Record<string, string> = {
+    propline: "PropLine",
+    sharpapi: "SharpAPI",
+    "the-odds-api": "The Odds API",
+    antelytics: "Antelytics",
+    "line-aggregator": "Aggregator",
+  };
+  return map[source] ?? source;
 }
 
 export function LineComparison({
@@ -152,9 +168,10 @@ export function LineComparison({
     >
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-white">Compare apps</h2>
+          <h2 className="text-lg font-semibold text-white">Market comparison</h2>
           <p className="mt-1 text-sm text-neutral-500">
-            Switch books to see how their line sits vs our projection ({projected.toFixed(1)}).
+            Lines from every connected provider vs our projection ({projected.toFixed(1)}). Best value
+            highlighted.
           </p>
         </div>
         <p className="text-xs text-neutral-600">
@@ -164,6 +181,85 @@ export function LineComparison({
       </div>
 
       <SportsbookAppSwitcher rows={rows} selectedBook={selectedBook} onSelectBook={onSelectBook} />
+
+      {/* Full comparison table — source attributed per row */}
+      <div className="mt-8 overflow-x-auto rounded-2xl border border-white/[0.06]">
+        <table className="min-w-[720px] w-full text-left text-sm">
+          <thead className="bg-white/[0.02] text-[11px] uppercase tracking-wider text-neutral-500">
+            <tr>
+              <th className="px-4 py-3 font-medium">Operator</th>
+              <th className="px-4 py-3 font-medium">Line</th>
+              <th className="px-4 py-3 font-medium">Over</th>
+              <th className="px-4 py-3 font-medium">Under</th>
+              <th className="px-4 py-3 font-medium">Edge</th>
+              <th className="px-4 py-3 font-medium">Source</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/[0.04]">
+            {rows.map((row) => {
+              const unavailable = Boolean(row.requiresIntegration || row.placeholder);
+              const isBest = Boolean(row.isBestValue && !unavailable);
+              return (
+                <tr
+                  key={row.slug || row.book}
+                  className={cn(
+                    "transition",
+                    isBest && "bg-emerald-500/[0.06]",
+                    activeName === row.book && !isBest && "bg-white/[0.02]",
+                  )}
+                >
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="text-left font-medium text-neutral-100 hover:text-yellow-400"
+                      onClick={() => onSelectBook(row.book)}
+                    >
+                      {row.book}
+                      {isBest && (
+                        <span className="ml-2 rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-300">
+                          Best
+                        </span>
+                      )}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 tabular-nums text-neutral-200">
+                    {unavailable ? "—" : row.line}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums text-neutral-400">
+                    {unavailable || row.kind === "pickem" ? "—" : formatAmericanOdds(row.over)}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums text-neutral-400">
+                    {unavailable || row.kind === "pickem" ? "—" : formatAmericanOdds(row.under)}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-4 py-3 tabular-nums font-semibold",
+                      unavailable
+                        ? "text-neutral-600"
+                        : (row.edgeVsProjection ?? 0) >= 0
+                          ? "text-emerald-400"
+                          : "text-red-400",
+                    )}
+                  >
+                    {unavailable
+                      ? "—"
+                      : `${(row.edgeVsProjection ?? 0) > 0 ? "+" : ""}${(row.edgeVsProjection ?? 0).toFixed(1)}`}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-neutral-500">
+                    {unavailable ? (
+                      <span className="text-amber-300/80" title={row.integrationNote || undefined}>
+                        Unavailable
+                      </span>
+                    ) : (
+                      sourceLabel(row.sourceProvider)
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {active && (
         <div className="mt-8 grid gap-6 border-t border-white/[0.06] pt-8 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -178,17 +274,18 @@ export function LineComparison({
               <p className="text-base font-semibold text-white">{active.book}</p>
               <p className="mt-1 text-sm text-neutral-500">
                 {pending
-                  ? active.integrationNote || "Requires integration — placeholder vs projection"
+                  ? active.integrationNote || "Unavailable from configured providers"
                   : active.isBestValue
                     ? "Best value among connected books"
-                    : `${active.kind === "pickem" ? "Pick'em" : "Sportsbook"} line`}
+                    : `${active.kind === "pickem" ? "Pick'em" : "Sportsbook"} · via ${sourceLabel(active.sourceProvider)}`}
               </p>
               <p className="mt-3 text-sm text-neutral-400">
-                Edge vs projection{" "}
+                Model edge{" "}
                 <span className="tabular-nums text-neutral-200">
                   {(active.edgeVsProjection ?? 0) > 0 ? "+" : ""}
                   {(active.edgeVsProjection ?? 0).toFixed(1)}
                 </span>
+                {" · "}projection {projected.toFixed(1)} − line {active.line}
               </p>
             </div>
           </div>
@@ -196,13 +293,15 @@ export function LineComparison({
             <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
               {selectedSide} line
             </p>
-            <p className="mt-1 text-4xl font-semibold tabular-nums text-white">{active.line}</p>
-            {active.kind !== "pickem" && (
+            <p className="mt-1 text-4xl font-semibold tabular-nums text-white">
+              {pending ? "—" : active.line}
+            </p>
+            {active.kind !== "pickem" && !pending && (
               <p className="mt-1 text-sm tabular-nums text-neutral-400">{formatAmericanOdds(odds)}</p>
             )}
             {pending && (
               <p className="mt-2 text-[11px] font-medium uppercase tracking-wider text-amber-300/90">
-                Requires integration
+                Data unavailable
               </p>
             )}
           </div>

@@ -37,6 +37,8 @@ function sortProps(rows: NbaProp[], filters: NbaBoardFilters): NbaProp[] {
         return ((a.researchScore ?? a.confidence) - (b.researchScore ?? b.confidence)) * dir;
       case "projection":
         return ((a.projectedValue ?? a.line) - (b.projectedValue ?? b.line)) * dir;
+      case "bestValue":
+        return ((a.edgeVsLine ?? 0) - (b.edgeVsLine ?? 0)) * dir;
       case "noVig":
         return (a.noVigProb - b.noVigProb) * dir;
       case "l10":

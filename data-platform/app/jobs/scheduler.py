@@ -55,10 +55,12 @@ def job_import_games() -> None:
 
 def job_refresh_odds() -> None:
     def _run(db):
+        from app.ingestion.line_aggregation_sync import sync_aggregated_lines
+
         return {
             "nba": build_and_store_featured_prop(db),
             "nfl": build_and_store_featured_nfl_prop(db),
-            "odds_api": sync_odds_all_leagues(db),
+            "line_aggregator": sync_aggregated_lines(db),
         }
 
     _safe("refresh_odds", _run)
