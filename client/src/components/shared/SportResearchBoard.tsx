@@ -101,6 +101,9 @@ export function SportResearchBoard({
         count?: number;
         note?: string | null;
         platformLabel?: string | null;
+        updatedAt?: string | null;
+        propsUpdatedAt?: string | null;
+        syncedAt?: string | null;
         requiresApiKey?: boolean;
         requiresConfiguration?: boolean;
         error?: string;
@@ -191,13 +194,14 @@ export function SportResearchBoard({
     (board.data?.requiresApiKey || board.data?.requiresConfiguration) && liveProps.length === 0;
   const note = board.data?.note ?? board.data?.error;
   const platformLabel = board.data?.platformLabel ?? app?.name ?? null;
+  const updatedAt = board.data?.propsUpdatedAt ?? board.data?.updatedAt ?? board.data?.syncedAt;
 
   return (
     <div>
       <PageHeader
         eyebrow={league}
         title={title}
-        description={`${description} Showing ${app?.name ?? "selected app"} only.`}
+        description={`${description} Live ${app?.name ?? "app"} props only — model runs after the platform feed loads.`}
         actions={
           <div className="flex flex-wrap items-center gap-3">
             {headerExtra}
@@ -211,8 +215,13 @@ export function SportResearchBoard({
         }
       />
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <PickemAppSwitcher />
+        {updatedAt && (
+          <p className="text-[11px] tabular-nums text-neutral-500" data-feature="props-updated-at">
+            Props updated {new Date(updatedAt).toLocaleString()}
+          </p>
+        )}
       </div>
 
       {note && (

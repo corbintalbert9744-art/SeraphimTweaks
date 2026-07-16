@@ -38,6 +38,9 @@ export default function DashboardPage() {
         count?: number;
         note?: string | null;
         platformLabel?: string | null;
+        updatedAt?: string | null;
+        propsUpdatedAt?: string | null;
+        syncedAt?: string | null;
       }>;
     },
     staleTime: 120_000,
@@ -189,13 +192,14 @@ export default function DashboardPage() {
 
   const loading = board.isLoading && liveProps.length === 0;
   const note = board.data?.note;
+  const updatedAt = board.data?.propsUpdatedAt ?? board.data?.updatedAt ?? board.data?.syncedAt;
 
   return (
     <div>
       <PageHeader
         eyebrow="Seraphim Analytics"
         title="Research Dashboard"
-        description={`${app?.name ?? "Pick'em"} board — player, stat, line, projection, edge %, confidence.`}
+        description={`Live ${app?.name ?? "pick'em"} props → model edge. No invented lines.`}
         actions={
           <div className="flex items-center gap-2">
             <span className="rounded-full border border-[#1a1a1a] bg-[#111] px-3 py-1.5 text-xs text-neutral-400">
@@ -211,8 +215,13 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <PickemAppSwitcher />
+        {updatedAt && (
+          <p className="text-[11px] tabular-nums text-neutral-500" data-feature="props-updated-at">
+            Props updated {new Date(updatedAt).toLocaleString()}
+          </p>
+        )}
       </div>
 
       {note && (

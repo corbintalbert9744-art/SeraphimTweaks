@@ -60,17 +60,22 @@ def wnba_props(
     ),
     db: Session = Depends(get_db),
 ):
-    """Live WNBA research board — scoped to the selected pick'em platform when set."""
-    from app.ingestion.platform_board import apply_pickem_platform_filter, normalize_pickem_app
+    """WNBA board — with platform, live pick'em feed first."""
+    from app.ingestion.pickem_platform_sync import ensure_pickem_platform_board
+    from app.ingestion.platform_board import normalize_pickem_app
+
+    if platform and normalize_pickem_app(platform):
+        payload = ensure_pickem_platform_board(
+            db, league="WNBA", platform=platform, refresh=refresh
+        )
+        props = payload.get("props") or []
+        teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
+        markets = sorted({p["market"] for p in props if p.get("market")})
+        return {**payload, "teams": ["All", *teams], "markets": ["All", *markets], "live": True}
 
     payload = ensure_wnba_board(db, force=refresh)
     props = payload.get("props") or []
     players = payload.get("players") or []
-    if platform and normalize_pickem_app(platform):
-        scoped = apply_pickem_platform_filter(db, props, platform, players=players)
-        props = scoped["props"]
-        players = scoped["players"]
-        payload = {**payload, **scoped, "props": props, "players": players}
     teams = sorted({p["team"] for p in props if p.get("team")})
     markets = sorted({p["market"] for p in props if p.get("market")})
     return {
@@ -81,7 +86,7 @@ def wnba_props(
         "teams": ["All", *teams],
         "markets": ["All", *markets],
         "live": True,
-        "disclaimer": "Projections are Seraphim model estimates — only lines on the selected pick'em app are shown.",
+        "disclaimer": "Select a pick'em app for live platform lines.",
     }
 
 

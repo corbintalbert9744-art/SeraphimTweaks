@@ -75,6 +75,10 @@ export default function NbaPage() {
         count?: number;
         note?: string | null;
         platformLabel?: string | null;
+        updatedAt?: string | null;
+        propsUpdatedAt?: string | null;
+        syncedAt?: string | null;
+        requiresApiKey?: boolean;
       }>;
     },
     staleTime: 120_000,
@@ -142,13 +146,14 @@ export default function NbaPage() {
 
   const platformLabel = board.data?.platformLabel ?? app?.name ?? null;
   const note = board.data?.note;
+  const updatedAt = board.data?.propsUpdatedAt ?? board.data?.updatedAt ?? board.data?.syncedAt;
 
   return (
     <div>
       <PageHeader
         eyebrow="NBA"
         title="NBA Research Board"
-        description={`Seraphim projections vs ${app?.name ?? "your app"} lines only — players not on that board stay hidden.`}
+        description={`Live ${app?.name ?? "app"} props via PropLine → Seraphim model. Players not on that board stay hidden.`}
         actions={
           <Link
             href="/parlay-builder"
@@ -159,8 +164,13 @@ export default function NbaPage() {
         }
       />
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <PickemAppSwitcher />
+        {updatedAt && (
+          <p className="text-[11px] tabular-nums text-neutral-500" data-feature="props-updated-at">
+            Props updated {new Date(updatedAt).toLocaleString()}
+          </p>
+        )}
       </div>
 
       {note && (

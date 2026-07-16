@@ -56,11 +56,24 @@ def job_import_games() -> None:
 def job_refresh_odds() -> None:
     def _run(db):
         from app.ingestion.line_aggregation_sync import sync_aggregated_lines
+        from app.ingestion.pickem_platform_sync import sync_pickem_platform_board
+
+        pickem: dict = {}
+        for platform in ("prizepicks", "underdog", "sleeper"):
+            for league in ("NBA", "MLB", "NHL", "WNBA", "Soccer"):
+                key = f"{platform}:{league}"
+                try:
+                    pickem[key] = sync_pickem_platform_board(
+                        db, league=league, platform=platform, force=True
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    pickem[key] = {"ok": False, "error": str(exc)}
 
         return {
             "nba": build_and_store_featured_prop(db),
             "nfl": build_and_store_featured_nfl_prop(db),
             "line_aggregator": sync_aggregated_lines(db),
+            "pickem_platforms": pickem,
         }
 
     _safe("refresh_odds", _run)

@@ -146,6 +146,13 @@ class NormalizedOddsQuote:
     is_mock: bool = False
     # Which upstream adapter supplied this quote (propline, sharpapi, the-odds-api, …)
     source_provider: Optional[str] = None
+    # Upstream outcome / projection id when the provider exposes one
+    quote_external_id: Optional[str] = None
+    # Home / away team labels from the event (pick'em board context)
+    home_team: Optional[str] = None
+    away_team: Optional[str] = None
+    sport_key: Optional[str] = None
+    raw: dict[str, Any] = field(default_factory=dict)
 
 
 class ProviderRateLimitError(RuntimeError):

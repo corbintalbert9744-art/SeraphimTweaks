@@ -58,10 +58,22 @@ Behavior:
 Research dashboards require the user to pick a pick'em app first (PrizePicks,
 Underdog Fantasy, Sleeper, or Other). Selection persists in `localStorage`.
 
-Board endpoints accept `?platform=prizepicks|underdog|sleeper|other` and return
-**only** props that have a warehouse Odds row for that app's sportsbook slug.
-The platform line replaces the generic consensus line; edge % is vs that line.
-Players not on the selected app are excluded — no cross-app inventing.
+**Live flow (inverted — platform feed is the source of truth):**
+
+```
+platform selection
+  → PropLine fetch filtered to that bookmaker only (prizepicks|underdog|sleeper)
+  → upsert props from those live lines (player, sport, game, stat, line, Over/Under, projection id)
+  → Projection Engine V1 vs the platform line
+  → board with edge % + updatedAt
+```
+
+- Sportsbook odds are **never** used as pick'em substitutes
+- Players not on the selected app are **never** shown
+- Lines are **never** invented — empty board + clear note when PropLine has no current props
+- Requires `PROPLINE_API_KEY`
+- Cache TTL: 5 minutes (`propsUpdatedAt` / `updatedAt` on every board response)
+- Scheduler `refresh_odds` also refreshes PrizePicks / Underdog / Sleeper for core leagues
 
 Manual sync: `POST /api/v1/jobs/sync-lines`  
 Status: `GET /api/v1/lines/providers`

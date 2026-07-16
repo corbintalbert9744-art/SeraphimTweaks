@@ -184,6 +184,22 @@ class PropLineAdapter:
         self, league: str, date: Optional[str] = None
     ) -> list[NormalizedOddsQuote]:
         """Fetch multi-book player props for a Seraphim league."""
+        return self.fetch_pickem_prop_odds(league, platforms=None, date=date)
+
+    def fetch_pickem_prop_odds(
+        self,
+        league: str,
+        *,
+        platforms: Optional[set[str]] = None,
+        date: Optional[str] = None,
+        max_events: Optional[int] = None,
+    ) -> list[NormalizedOddsQuote]:
+        """Fetch live player props, optionally restricted to pick'em bookmaker keys.
+
+        ``platforms`` e.g. ``{"prizepicks"}`` — only those bookmakers are kept.
+        Sportsbook odds are never returned when platforms is a pick'em set.
+        Never fabricates lines.
+        """
         _ = date
         if not self.api_key:
             return []
@@ -199,25 +215,38 @@ class PropLineAdapter:
         if code == "Soccer":
             sport_keys.extend(SOCCER_EXTRA_SPORTS)
 
+        allowed = {p.lower() for p in platforms} if platforms else None
+        limit = max_events if max_events is not None else self.max_events
         out: list[NormalizedOddsQuote] = []
         for sk in sport_keys:
             try:
                 if not self.sport_is_active(sk):
                     continue
-                out.extend(self._fetch_sport_props(code, sk, markets))
+                out.extend(
+                    self._fetch_sport_props(
+                        code, sk, markets, bookmakers=allowed, max_events=limit
+                    )
+                )
             except Exception as exc:  # noqa: BLE001
                 log.warning("PropLine %s/%s failed: %s", code, sk, exc)
         return out
 
     def _fetch_sport_props(
-        self, league: str, sport_key: str, markets: list[str]
+        self,
+        league: str,
+        sport_key: str,
+        markets: list[str],
+        *,
+        bookmakers: Optional[set[str]] = None,
+        max_events: Optional[int] = None,
     ) -> list[NormalizedOddsQuote]:
         events = self._get(f"/sports/{sport_key}/events")
         if not events or not isinstance(events, list):
             return []
         out: list[NormalizedOddsQuote] = []
         markets_param = ",".join(markets)
-        for event in events[: self.max_events]:
+        limit = max_events if max_events is not None else self.max_events
+        for event in events[:limit]:
             eid = event.get("id")
             if eid is None:
                 continue
@@ -231,16 +260,36 @@ class PropLineAdapter:
                 continue
             if not payload:
                 continue
-            out.extend(self._parse_event_odds(league, str(eid), payload))
+            # Prefer event-level team names when odds payload omits them
+            if isinstance(payload, dict):
+                payload.setdefault("home_team", event.get("home_team"))
+                payload.setdefault("away_team", event.get("away_team"))
+                payload.setdefault("sport_key", sport_key)
+            out.extend(
+                self._parse_event_odds(
+                    league, str(eid), payload, bookmakers=bookmakers, sport_key=sport_key
+                )
+            )
         return out
 
     def _parse_event_odds(
-        self, league: str, event_id: str, payload: dict[str, Any]
+        self,
+        league: str,
+        event_id: str,
+        payload: dict[str, Any],
+        *,
+        bookmakers: Optional[set[str]] = None,
+        sport_key: Optional[str] = None,
     ) -> list[NormalizedOddsQuote]:
         now = datetime.now(timezone.utc)
         out: list[NormalizedOddsQuote] = []
+        home = payload.get("home_team")
+        away = payload.get("away_team")
+        sk = sport_key or payload.get("sport_key")
         for book in payload.get("bookmakers") or []:
             slug = str(book.get("key") or "").lower()
+            if bookmakers is not None and slug not in bookmakers:
+                continue
             title = str(book.get("title") or PROPLINE_BOOKMAKERS.get(slug, {}).get("name") or slug)
             for market in book.get("markets") or []:
                 mkey = str(market.get("key") or "")
@@ -276,6 +325,12 @@ class PropLineAdapter:
                         continue
                     price = outcome.get("price")
                     american = int(price) if price is not None else (100 if slug in PICKEM_SLUGS else -110)
+                    outcome_id = outcome.get("id") or outcome.get("outcome_id") or outcome.get("projection_id")
+                    quote_id = (
+                        str(outcome_id)
+                        if outcome_id is not None
+                        else f"{event_id}:{slug}:{mkey}:{player}:{point}:{side}"
+                    )
                     out.append(
                         NormalizedOddsQuote(
                             league=league,
@@ -291,6 +346,15 @@ class PropLineAdapter:
                             captured_at=captured,
                             is_mock=False,
                             source_provider="propline",
+                            quote_external_id=quote_id,
+                            home_team=str(home) if home else None,
+                            away_team=str(away) if away else None,
+                            sport_key=str(sk) if sk else None,
+                            raw={
+                                "dfs_odds_type": dfs_type,
+                                "payout_multiplier": outcome.get("payout_multiplier"),
+                                "market_key": mkey,
+                            },
                         )
                     )
         return out

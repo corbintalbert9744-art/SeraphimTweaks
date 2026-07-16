@@ -1,0 +1,831 @@
+"""Live pick'em platform boards — PropLine feed first, then model.
+
+Workflow (required):
+  platform selection → live PropLine pick'em quotes → upsert props from those
+  lines only → run Projection Engine vs the platform line → return board.
+
+Never invents lines. Never substitutes sportsbook odds for pick'em lines.
+Players not on the selected app are excluded.
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+import uuid
+from datetime import datetime, timedelta, timezone
+from statistics import mean
+from typing import Any, Optional
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.analytics.engine import expected_value, home_away_split, rest_days, streak
+from app.analytics.factors.base import PredictionContext
+from app.analytics.prediction import predict_prop
+from app.config import get_settings
+from app.db.models import Game, Injury, Player, PlayerGameLog, Prop, PropAnalytics
+from app.ingestion.nba_pipeline import _market_values
+from app.ingestion.platform_board import (
+    PICKEM_APP_LABELS,
+    normalize_pickem_app,
+    slugs_for_app,
+)
+from app.ingestion.warehouse import insert_odds, upsert_player
+from app.providers.base import NormalizedOddsQuote, NormalizedPlayer, run_provider_job
+from app.providers.propline.adapter import PropLineAdapter
+from app.providers.propline.markets import normalize_league
+
+log = logging.getLogger(__name__)
+
+# Serve cached platform board if last sync is newer than this.
+PLATFORM_CACHE_TTL = timedelta(minutes=5)
+
+# Leagues we poll for a given board request. Board endpoint passes one league;
+# sync only that league's PropLine sport.
+MIN_LOGS_FOR_MODEL = 3
+
+
+def _slugify(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:48] or "player"
+
+
+def _find_player_by_name(db: Session, league: str, name: str) -> Optional[Player]:
+    code = normalize_league(league)
+    target = name.lower().strip()
+    rows = (
+        db.execute(select(Player).where(Player.league == code)).scalars().all()
+    )
+    for p in rows:
+        if (p.full_name or "").lower().strip() == target:
+            return p
+    # Soft match: last name + first initial
+    parts = target.split()
+    if len(parts) >= 2:
+        last = parts[-1]
+        first = parts[0][0]
+        for p in rows:
+            pn = (p.full_name or "").lower().split()
+            if len(pn) >= 2 and pn[-1] == last and pn[0].startswith(first):
+                return p
+    return None
+
+
+def _ensure_platform_player(db: Session, league: str, name: str, platform: str) -> Player:
+    existing = _find_player_by_name(db, league, name)
+    if existing:
+        return existing
+    code = normalize_league(league)
+    ext = f"pickem:{platform}:{_slugify(name)}"
+    return upsert_player(
+        db,
+        NormalizedPlayer(
+            external_id=ext,
+            league=code,
+            full_name=name,
+            short_name=name.split()[-1] if name.split() else name,
+            position=None,
+            team_external_id=None,
+        ),
+    )
+
+
+def _group_platform_quotes(
+    quotes: list[NormalizedOddsQuote],
+) -> list[dict[str, Any]]:
+    """Collapse Over/Under sides into one board row per player+market+line."""
+    buckets: dict[tuple[str, str, float], dict[str, Any]] = {}
+    for q in quotes:
+        key = (q.player_name.lower().strip(), q.market.lower().strip(), float(q.line))
+        bucket = buckets.setdefault(
+            key,
+            {
+                "player_name": q.player_name,
+                "market": q.market,
+                "line": float(q.line),
+                "league": q.league,
+                "game_external_id": q.game_external_id,
+                "home_team": q.home_team,
+                "away_team": q.away_team,
+                "sport_key": q.sport_key,
+                "sportsbook_slug": q.sportsbook_slug,
+                "sportsbook_name": q.sportsbook_name,
+                "source_provider": q.source_provider,
+                "captured_at": q.captured_at,
+                "over": None,
+                "under": None,
+                "projection_ids": [],
+            },
+        )
+        if q.side == "Over":
+            bucket["over"] = q
+        elif q.side == "Under":
+            bucket["under"] = q
+        if q.quote_external_id:
+            bucket["projection_ids"].append(q.quote_external_id)
+        if q.captured_at and (
+            bucket["captured_at"] is None or q.captured_at > bucket["captured_at"]
+        ):
+            bucket["captured_at"] = q.captured_at
+        if not bucket.get("home_team") and q.home_team:
+            bucket["home_team"] = q.home_team
+            bucket["away_team"] = q.away_team
+    return list(buckets.values())
+
+
+def _game_label(row: dict[str, Any]) -> str:
+    home = row.get("home_team")
+    away = row.get("away_team")
+    if home and away:
+        return f"{away} @ {home}"
+    return "TBD"
+
+
+def _opponent_guess(row: dict[str, Any], team_hint: Optional[str]) -> tuple[str, str]:
+    """Return (team, opponent) best-effort from event labels."""
+    home = row.get("home_team") or ""
+    away = row.get("away_team") or ""
+    if not home and not away:
+        return ("—", "TBD")
+    if team_hint:
+        th = team_hint.lower()
+        if th in home.lower():
+            return (home, away or "TBD")
+        if th in away.lower():
+            return (away, home or "TBD")
+    return (away or home, home if away else "TBD")
+
+
+def _build_prediction_for_player(
+    db: Session,
+    *,
+    league: str,
+    player: Player,
+    market: str,
+    platform_line: float,
+) -> tuple[Optional[Any], list[float], list[bool], list, list]:
+    logs = (
+        db.execute(
+            select(PlayerGameLog)
+            .where(PlayerGameLog.player_id == player.id)
+            .order_by(PlayerGameLog.played_at.desc())
+            .limit(40)
+        )
+        .scalars()
+        .all()
+    )
+    values = _market_values(logs, market)
+    if len(values) < MIN_LOGS_FOR_MODEL:
+        return None, values, [], [], []
+
+    homes = [bool(r.home) for r in logs[: len(values)]]
+    minutes = [r.minutes for r in logs[: len(values)]]
+    played_at = [r.played_at for r in logs[: len(values)]]
+    injury = "None"
+    inj = (
+        db.execute(
+            select(Injury)
+            .where(Injury.player_id == player.id)
+            .order_by(Injury.reported_at.desc())
+            .limit(1)
+        )
+        .scalar_one_or_none()
+    )
+    if inj:
+        injury = inj.status or "None"
+
+    mins_clean = [m for m in minutes if m is not None and m > 0]
+    expected_minutes = mean(mins_clean[:5]) if len(mins_clean) >= 3 else (mean(mins_clean) if mins_clean else None)
+
+    ctx = PredictionContext(
+        league=normalize_league(league),
+        market=market,
+        values=values,
+        homes=homes if len(homes) == len(values) else [True] * len(values),
+        played_at=played_at
+        if len(played_at) == len(values)
+        else [datetime.now(timezone.utc)] * len(values),
+        minutes=minutes,
+        injury_status=injury,
+        is_home=True,
+        opponent_abbr=None,
+        tipoff_at=None,
+        expected_minutes=expected_minutes,
+        vs_opponent_values=[],
+    )
+    prediction = predict_prop(ctx, comparison_line=platform_line)
+    return prediction, values, homes, minutes, played_at
+
+
+def _upsert_platform_prop(
+    db: Session,
+    *,
+    league: str,
+    platform: str,
+    player: Player,
+    market: str,
+    side: str,
+    line: float,
+    game_id: Optional[str],
+) -> Prop:
+    """Stable prop id keyed by platform + player + market (line updates in place)."""
+    pid = (
+        f"{normalize_league(league).lower()}:pickem:{platform}:"
+        f"{(player.id or 'x').split(':')[-1]}:{market.lower().replace(' ', '')}"
+    )
+    row = db.get(Prop, pid)
+    if not row:
+        row = Prop(id=pid, league=normalize_league(league), market=market, side=side, line=line)
+        db.add(row)
+    row.game_id = game_id
+    row.player_id = player.id
+    row.market = market
+    row.side = side
+    row.line = line
+    row.status = "open"
+    row.updated_at = datetime.now(timezone.utc)
+    return row
+
+
+def sync_pickem_platform_board(
+    db: Session,
+    *,
+    league: str,
+    platform: str,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Fetch live pick'em lines for ``platform`` and build the research board.
+
+    Returns props + players + updatedAt. Empty props when the key is missing
+    or PropLine has no current lines for that app — never fabricates.
+    """
+    app = normalize_pickem_app(platform)
+    label = PICKEM_APP_LABELS.get(app or "", platform)
+    code = normalize_league(league)
+    settings = get_settings()
+
+    if not app:
+        return {
+            "ok": False,
+            "league": code,
+            "platform": None,
+            "platformLabel": None,
+            "props": [],
+            "players": [],
+            "count": 0,
+            "updatedAt": None,
+            "propsUpdatedAt": None,
+            "dataSource": None,
+            "requiresApiKey": False,
+            "note": "Select a pick'em app to load that platform's live board.",
+        }
+
+    if app == "other":
+        return {
+            "ok": False,
+            "league": code,
+            "platform": app,
+            "platformLabel": label,
+            "props": [],
+            "players": [],
+            "count": 0,
+            "updatedAt": None,
+            "propsUpdatedAt": None,
+            "dataSource": f"pickem:{app}",
+            "requiresApiKey": False,
+            "note": (
+                "Other pick'em platforms (ParlayPlay, Dabble, …) are not available "
+                "via the live PropLine feed yet. Choose PrizePicks, Underdog, or Sleeper."
+            ),
+            "unavailable": True,
+        }
+
+    if not settings.propline_api_key:
+        return {
+            "ok": False,
+            "league": code,
+            "platform": app,
+            "platformLabel": label,
+            "props": [],
+            "players": [],
+            "count": 0,
+            "updatedAt": None,
+            "propsUpdatedAt": None,
+            "dataSource": f"pickem:{app}",
+            "requiresApiKey": True,
+            "envVar": "PROPLINE_API_KEY",
+            "note": (
+                f"Live {label} props require PROPLINE_API_KEY. "
+                "We do not invent pick'em lines or substitute sportsbook odds."
+            ),
+        }
+
+    slugs = slugs_for_app(app)
+    # Cache hit: recent platform odds already in warehouse for this league
+    if not force:
+        cached = _list_cached_platform_board(db, league=code, platform=app, slugs=slugs)
+        if cached is not None:
+            return cached
+
+    adapter = PropLineAdapter(api_key=settings.propline_api_key or "", max_events=16)
+    with run_provider_job(db, provider="propline-pickem", league=code, job=f"sync_{app}") as job:
+        try:
+            quotes = adapter.fetch_pickem_prop_odds(
+                code, platforms=set(slugs), max_events=16
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.exception("pickem sync %s/%s failed", app, code)
+            job.error = str(exc)
+            return {
+                "ok": False,
+                "league": code,
+                "platform": app,
+                "platformLabel": label,
+                "props": [],
+                "players": [],
+                "count": 0,
+                "updatedAt": None,
+                "propsUpdatedAt": None,
+                "dataSource": f"pickem:{app}",
+                "error": str(exc),
+                "note": f"Failed to fetch live {label} lines: {exc}",
+            }
+
+        if not quotes:
+            support = adapter.league_support(code)
+            reason = support.get("reason") or (
+                f"PropLine returned no current {label} player props for {code}."
+            )
+            job.rows_written = 0
+            db.commit()
+            return {
+                "ok": True,
+                "league": code,
+                "platform": app,
+                "platformLabel": label,
+                "props": [],
+                "players": [],
+                "count": 0,
+                "updatedAt": datetime.now(timezone.utc).isoformat(),
+                "propsUpdatedAt": None,
+                "dataSource": f"pickem:{app}",
+                "live": True,
+                "note": (
+                    f"{reason} Only players currently listed on {label} are shown — "
+                    "we never invent lines or pull from a generic projection DB."
+                ),
+            }
+
+        groups = _group_platform_quotes(quotes)
+        board_rows: list[dict[str, Any]] = []
+        seen_prop_ids: set[str] = set()
+        latest_capture: Optional[datetime] = None
+
+        for g in groups:
+            player = _ensure_platform_player(db, code, g["player_name"], app)
+            db.flush()
+            platform_line = float(g["line"])
+            over_q: Optional[NormalizedOddsQuote] = g.get("over")
+            under_q: Optional[NormalizedOddsQuote] = g.get("under")
+            # Need at least one side from the live feed
+            seed = over_q or under_q
+            if seed is None:
+                continue
+
+            prediction, values, homes, minutes, played_at = _build_prediction_for_player(
+                db,
+                league=code,
+                player=player,
+                market=g["market"],
+                platform_line=platform_line,
+            )
+
+            if prediction is not None:
+                side = "Over" if prediction.projected_value >= platform_line else "Under"
+                projected = float(prediction.projected_value)
+                edge = float(prediction.edge_vs_line) if prediction.edge_vs_line is not None else round(
+                    projected - platform_line, 2
+                )
+                edge_pct = (
+                    round((edge / platform_line) * 100, 2) if abs(platform_line) > 1e-9 else None
+                )
+                confidence = int(prediction.confidence_score)
+                research = int(prediction.research_score)
+                over_p = float(prediction.over_probability)
+                under_p = float(prediction.under_probability)
+                explain = list(prediction.explanation)
+                influential = list(prediction.influential_factors or [])
+                model_version = prediction.model_version
+                l5, l10, l20, season = prediction.l5, prediction.l10, prediction.l20, prediction.season
+                ev = expected_value(
+                    over_p if side == "Over" else under_p,
+                    (over_q.american_odds if over_q else 100)
+                    if side == "Over"
+                    else (under_q.american_odds if under_q else 100),
+                )
+            else:
+                # Live platform line only — model withheld until enough gamelogs
+                side = "Over"
+                projected = None
+                edge = None
+                edge_pct = None
+                confidence = 0
+                research = 0
+                over_p = 0.5
+                under_p = 0.5
+                explain = [
+                    f"Live {label} line {platform_line}.",
+                    "Seraphim model pending — not enough warehouse gamelog samples for this player/stat yet.",
+                ]
+                influential = []
+                model_version = None
+                l5 = l10 = l20 = season = None
+                ev = 0.0
+
+            game_row = None
+            if g.get("game_external_id"):
+                # Prefer existing game rows; do not invent schedule rows
+                game_row = db.execute(
+                    select(Game).where(Game.external_id == str(g["game_external_id"]))
+                ).scalar_one_or_none()
+                if game_row is None:
+                    # Try prefixed ids used by ESPN warehouse
+                    for prefix in (f"{code.lower()}:game:", "nba:game:", "wnba:game:", ""):
+                        game_row = db.get(Game, f"{prefix}{g['game_external_id']}")
+                        if game_row:
+                            break
+
+            prop = _upsert_platform_prop(
+                db,
+                league=code,
+                platform=app,
+                player=player,
+                market=g["market"],
+                side=side,
+                line=platform_line,
+                game_id=game_row.id if game_row else None,
+            )
+            db.flush()
+            seen_prop_ids.add(prop.id)
+
+            for q in (over_q, under_q):
+                if q is not None:
+                    insert_odds(db, q, prop.id, provider_name=q.source_provider or "propline")
+
+            analytics = db.execute(
+                select(PropAnalytics).where(PropAnalytics.prop_id == prop.id)
+            ).scalar_one_or_none()
+            if not analytics:
+                analytics = PropAnalytics(id=str(uuid.uuid4()), prop_id=prop.id, league=code)
+                db.add(analytics)
+            analytics.league = code
+            analytics.projected_value = projected
+            analytics.comparison_line = platform_line
+            analytics.edge_vs_line = edge
+            analytics.over_probability = over_p
+            analytics.under_probability = under_p
+            analytics.no_vig_prob = over_p if side == "Over" else under_p
+            analytics.ev_percent = round(ev, 2) if prediction else 0.0
+            analytics.confidence_score = confidence
+            analytics.research_score = research
+            analytics.data_quality_score = (
+                prediction.data_quality_score if prediction else 20
+            )
+            analytics.model_version = model_version
+            analytics.explain_bullets = explain
+            analytics.influential_factors = influential
+            analytics.matchup_note = _game_label(g)
+            analytics.is_model_estimate = prediction is not None
+            analytics.odds_are_mock = False
+            analytics.disclaimer = settings.model_disclaimer
+            analytics.computed_at = datetime.now(timezone.utc)
+            if prediction and l5 and l10 and l20 and season:
+                analytics.l5_hits, analytics.l5_samples, analytics.l5_rate = (
+                    l5.hits,
+                    l5.samples,
+                    l5.rate,
+                )
+                analytics.l10_hits, analytics.l10_samples, analytics.l10_rate = (
+                    l10.hits,
+                    l10.samples,
+                    l10.rate,
+                )
+                analytics.l20_hits, analytics.l20_samples, analytics.l20_rate = (
+                    l20.hits,
+                    l20.samples,
+                    l20.rate,
+                )
+                analytics.season_hits, analytics.season_samples, analytics.season_rate = (
+                    season.hits,
+                    season.samples,
+                    season.rate,
+                )
+                if values and homes:
+                    analytics.home_rate, analytics.away_rate = home_away_split(
+                        values, homes, platform_line, side
+                    )
+                    analytics.rest_days = rest_days(played_at) if played_at else None
+                    analytics.streak = streak(values, platform_line, side)
+
+            team, opponent = _opponent_guess(g, None)
+            captured = g.get("captured_at") or datetime.now(timezone.utc)
+            if latest_capture is None or captured > latest_capture:
+                latest_capture = captured
+
+            board_rows.append(
+                {
+                    "id": prop.id,
+                    "playerId": player.external_id or player.id,
+                    "playerWarehouseId": player.id,
+                    "player": player.full_name,
+                    "team": team,
+                    "opponent": opponent,
+                    "position": player.position or "",
+                    "market": g["market"],
+                    "stat": g["market"],
+                    "side": side,
+                    "line": platform_line,
+                    "platformLine": platform_line,
+                    "overLine": platform_line,
+                    "underLine": platform_line,
+                    "overOdds": over_q.american_odds if over_q else 100,
+                    "underOdds": under_q.american_odds if under_q else 100,
+                    "americanOdds": (
+                        over_q.american_odds
+                        if side == "Over" and over_q
+                        else under_q.american_odds
+                        if under_q
+                        else 100
+                    ),
+                    "projectedValue": projected,
+                    "edgeVsLine": edge,
+                    "edgePercent": edge_pct,
+                    "confidence": confidence,
+                    "researchScore": research,
+                    "evPercent": round(ev, 2) if prediction else 0.0,
+                    "noVigProb": over_p if side == "Over" else under_p,
+                    "l5": f"{l5.hits}/{l5.samples}" if l5 else "—",
+                    "l10": f"{l10.hits}/{l10.samples}" if l10 else "—",
+                    "l20": f"{l20.hits}/{l20.samples}" if l20 else "—",
+                    "season": f"{season.hits}/{season.samples}" if season else "—",
+                    "game": _game_label(g),
+                    "sport": code,
+                    "league": code,
+                    "projectionId": (g.get("projection_ids") or [None])[0],
+                    "projectionIds": g.get("projection_ids") or [],
+                    "platform": app,
+                    "platformSlug": g["sportsbook_slug"],
+                    "platformName": g["sportsbook_name"] or label,
+                    "sourceProvider": g.get("source_provider") or "propline",
+                    "oddsAreMock": False,
+                    "oddsRole": "platform-live",
+                    "isModelEstimate": prediction is not None,
+                    "modelPending": prediction is None,
+                    "explanation": explain,
+                    "tipTime": game_row.tipoff_at.isoformat() if game_row else None,
+                    "injury": "None",
+                    "projectedMinutes": (
+                        mean([m for m in minutes if m is not None][:5])
+                        if minutes and any(m is not None for m in minutes)
+                        else None
+                    ),
+                    "lineUpdatedAt": captured.isoformat()
+                    if hasattr(captured, "isoformat")
+                    else str(captured),
+                    "headshot": player.headshot_url,
+                }
+            )
+
+        # Close platform props that disappeared from the live feed
+        stale = (
+            db.execute(
+                select(Prop).where(
+                    Prop.league == code,
+                    Prop.status == "open",
+                    Prop.id.like(f"{code.lower()}:pickem:{app}:%"),
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for prop in stale:
+            if prop.id not in seen_prop_ids:
+                prop.status = "closed"
+
+        job.rows_written = len(board_rows)
+        db.commit()
+
+    board_rows.sort(
+        key=lambda r: (
+            -(r.get("edgePercent") if r.get("edgePercent") is not None else -999),
+            r.get("player") or "",
+        )
+    )
+    updated = (latest_capture or datetime.now(timezone.utc)).isoformat()
+    players = _players_from_board(board_rows, label)
+
+    return {
+        "ok": True,
+        "league": code,
+        "platform": app,
+        "platformLabel": label,
+        "props": board_rows,
+        "players": players,
+        "count": len(board_rows),
+        "updatedAt": updated,
+        "propsUpdatedAt": updated,
+        "syncedAt": datetime.now(timezone.utc).isoformat(),
+        "dataSource": f"pickem:{app}",
+        "live": True,
+        "source": "propline",
+        "note": None
+        if board_rows
+        else f"No current {label} props for {code} after sync.",
+        "disclaimer": (
+            f"Lines are live {label} props via PropLine. "
+            "Projections are Seraphim model estimates vs those lines — not invented lines."
+        ),
+    }
+
+
+def _players_from_board(props: list[dict[str, Any]], label: str) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for p in props:
+        pid = str(p.get("playerId") or "")
+        if not pid or pid in seen:
+            continue
+        seen.add(pid)
+        name = str(p.get("player") or "")
+        initials = "".join(part[0] for part in name.split()[:2] if part).upper() or "?"
+        out.append(
+            {
+                "id": pid,
+                "name": name,
+                "team": p.get("team") or "",
+                "opponent": p.get("opponent") or "",
+                "position": p.get("position") or "",
+                "headshotInitials": initials,
+                "confidence": p.get("confidence") or 0,
+                "researchScore": p.get("researchScore") or 0,
+                "matchupNote": p.get("game") or f"{p.get('market')} · {label}",
+                "topPropId": p.get("id"),
+                "topMarket": p.get("market"),
+                "topSide": p.get("side"),
+                "topLine": p.get("line"),
+                "topLean": f"{p.get('side')} {p.get('line')}",
+            }
+        )
+    return out
+
+
+def _list_cached_platform_board(
+    db: Session,
+    *,
+    league: str,
+    platform: str,
+    slugs: frozenset[str],
+) -> Optional[dict[str, Any]]:
+    """Return a recently synced platform board without calling PropLine again."""
+    from app.db.models import Odds, Sportsbook
+
+    code = normalize_league(league)
+    label = PICKEM_APP_LABELS.get(platform, platform)
+    prefix = f"{code.lower()}:pickem:{platform}:"
+    props = (
+        db.execute(
+            select(Prop, PropAnalytics, Player)
+            .join(PropAnalytics, PropAnalytics.prop_id == Prop.id)
+            .outerjoin(Player, Player.id == Prop.player_id)
+            .where(Prop.league == code, Prop.status == "open", Prop.id.like(f"{prefix}%"))
+            .order_by(PropAnalytics.research_score.desc())
+        )
+        .all()
+    )
+    if not props:
+        return None
+
+    # Freshness: newest odds capture for this platform
+    prop_ids = [p.id for p, _, _ in props]
+    odds_rows = (
+        db.execute(
+            select(Odds, Sportsbook)
+            .join(Sportsbook, Sportsbook.id == Odds.sportsbook_id)
+            .where(Odds.prop_id.in_(prop_ids), Sportsbook.slug.in_(list(slugs)))
+            .order_by(Odds.captured_at.desc())
+        )
+        .all()
+    )
+    if not odds_rows:
+        return None
+    newest = odds_rows[0][0].captured_at
+    if newest.tzinfo is None:
+        newest = newest.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - newest
+    if age > PLATFORM_CACHE_TTL:
+        return None
+
+    # Rebuild board rows from warehouse (already platform-scoped)
+    odds_by_prop: dict[str, list] = {}
+    for o, book in odds_rows:
+        odds_by_prop.setdefault(o.prop_id, []).append((o, book))
+
+    board: list[dict[str, Any]] = []
+    for prop, analytics, player in props:
+        hits = odds_by_prop.get(prop.id) or []
+        if not hits:
+            continue  # must have live platform odds
+        over = next((o for o, _ in hits if (o.side or "").lower() == "over"), hits[0][0])
+        under = next((o for o, _ in hits if (o.side or "").lower() == "under"), None)
+        line = float(over.line)
+        projected = analytics.projected_value
+        edge = analytics.edge_vs_line
+        edge_pct = (
+            round((float(edge) / line) * 100, 2)
+            if edge is not None and abs(line) > 1e-9
+            else None
+        )
+        board.append(
+            {
+                "id": prop.id,
+                "playerId": (player.external_id if player else None) or (player.id if player else ""),
+                "playerWarehouseId": player.id if player else None,
+                "player": player.full_name if player else "Player",
+                "team": "—",
+                "opponent": "TBD",
+                "position": (player.position if player else None) or "",
+                "market": prop.market,
+                "stat": prop.market,
+                "side": prop.side,
+                "line": line,
+                "platformLine": line,
+                "americanOdds": over.american_odds,
+                "overOdds": over.american_odds,
+                "underOdds": under.american_odds if under else 100,
+                "projectedValue": projected,
+                "edgeVsLine": edge,
+                "edgePercent": edge_pct,
+                "confidence": analytics.confidence_score or 0,
+                "researchScore": analytics.research_score or 0,
+                "evPercent": analytics.ev_percent or 0,
+                "noVigProb": analytics.no_vig_prob or 0.5,
+                "l5": f"{analytics.l5_hits or 0}/{analytics.l5_samples or 0}",
+                "l10": f"{analytics.l10_hits or 0}/{analytics.l10_samples or 0}",
+                "l20": f"{analytics.l20_hits or 0}/{analytics.l20_samples or 0}",
+                "season": f"{analytics.season_hits or 0}/{analytics.season_samples or 0}",
+                "game": analytics.matchup_note or "TBD",
+                "sport": code,
+                "league": code,
+                "platform": platform,
+                "platformSlug": hits[0][1].slug,
+                "platformName": hits[0][1].name or label,
+                "sourceProvider": over.provider,
+                "oddsAreMock": False,
+                "oddsRole": "platform-live",
+                "isModelEstimate": bool(analytics.is_model_estimate),
+                "modelPending": analytics.projected_value is None,
+                "explanation": analytics.explain_bullets or [],
+                "lineUpdatedAt": newest.isoformat(),
+                "headshot": player.headshot_url if player else None,
+                "injury": "None",
+            }
+        )
+
+    if not board:
+        return None
+
+    updated = newest.isoformat()
+    return {
+        "ok": True,
+        "league": code,
+        "platform": platform,
+        "platformLabel": label,
+        "props": board,
+        "players": _players_from_board(board, label),
+        "count": len(board),
+        "updatedAt": updated,
+        "propsUpdatedAt": updated,
+        "syncedAt": updated,
+        "dataSource": f"pickem:{platform}",
+        "live": True,
+        "cached": True,
+        "source": "propline-cache",
+        "note": None,
+        "disclaimer": (
+            f"Cached live {label} props (refreshed within {int(PLATFORM_CACHE_TTL.total_seconds() // 60)}m). "
+            "Projections are Seraphim estimates vs those lines."
+        ),
+    }
+
+
+def ensure_pickem_platform_board(
+    db: Session,
+    *,
+    league: str,
+    platform: str,
+    refresh: bool = False,
+) -> dict[str, Any]:
+    """Public entry used by board API routes."""
+    return sync_pickem_platform_board(
+        db, league=league, platform=platform, force=refresh
+    )

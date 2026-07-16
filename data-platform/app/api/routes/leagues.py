@@ -50,20 +50,33 @@ def _players_from_props(props: list[dict]) -> list[dict]:
 
 
 def _scope_to_platform(
-    db: Session, props: list[dict], platform: str | None
+    db: Session, props: list[dict], platform: str | None, *, league: str, refresh: bool = False
 ) -> tuple[list[dict], list[dict], dict]:
-    """Filter board to selected pick'em app; return props, players, meta."""
-    from app.ingestion.platform_board import apply_pickem_platform_filter, normalize_pickem_app
+    """Live pick'em board for the selected app (PropLine → model)."""
+    from app.ingestion.pickem_platform_sync import ensure_pickem_platform_board
+    from app.ingestion.platform_board import normalize_pickem_app
 
     if not platform or not normalize_pickem_app(platform):
         players = _players_from_props(props)
         return props, players, {}
-    scoped = apply_pickem_platform_filter(db, props, platform, players=_players_from_props(props))
-    return scoped["props"], scoped["players"], {
+    scoped = ensure_pickem_platform_board(
+        db, league=league, platform=platform, refresh=refresh
+    )
+    return scoped.get("props") or [], scoped.get("players") or [], {
         "platform": scoped.get("platform"),
         "platformLabel": scoped.get("platformLabel"),
         "dataSource": scoped.get("dataSource"),
         "note": scoped.get("note"),
+        "updatedAt": scoped.get("updatedAt"),
+        "propsUpdatedAt": scoped.get("propsUpdatedAt"),
+        "syncedAt": scoped.get("syncedAt"),
+        "requiresApiKey": scoped.get("requiresApiKey"),
+        "envVar": scoped.get("envVar"),
+        "disclaimer": scoped.get("disclaimer"),
+        "live": scoped.get("live", True),
+        "ok": scoped.get("ok", True),
+        "source": scoped.get("source"),
+        "cached": scoped.get("cached"),
     }
 
 router = APIRouter(tags=["leagues"])
@@ -108,6 +121,27 @@ def mlb_props(
     platform: str | None = Query(None, description="Pick'em app: prizepicks|underdog|sleeper|other"),
     db: Session = Depends(get_db),
 ):
+    from app.ingestion.platform_board import normalize_pickem_app
+
+    if platform and normalize_pickem_app(platform):
+        props, players, meta = _scope_to_platform(
+            db, [], platform, league="MLB", refresh=refresh
+        )
+        teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
+        markets = sorted({p["market"] for p in props if p.get("market")})
+        return {
+            "ok": True,
+            "league": "MLB",
+            "props": props,
+            "players": players,
+            "count": len(props),
+            "teams": ["All", *teams],
+            "markets": ["All", *markets],
+            "live": True,
+            "source": meta.get("source") or "propline",
+            **meta,
+        }
+
     if refresh:
         sync_mlb_warehouse(db)
     else:
@@ -115,7 +149,7 @@ def mlb_props(
         if not existing:
             sync_mlb_warehouse(db)
     props = list_league_props(db, "MLB")
-    props, players, meta = _scope_to_platform(db, props, platform)
+    players = _players_from_props(props)
     teams = sorted({p["team"] for p in props if p.get("team")})
     markets = sorted({p["market"] for p in props if p.get("market")})
     return {
@@ -128,8 +162,7 @@ def mlb_props(
         "markets": ["All", *markets],
         "live": True,
         "source": "mlb-statsapi",
-        "disclaimer": "Only props with a live line on the selected pick'em app are shown.",
-        **meta,
+        "disclaimer": "Select a pick'em app for live platform lines.",
     }
 
 
@@ -160,6 +193,27 @@ def nhl_props(
     platform: str | None = Query(None, description="Pick'em app: prizepicks|underdog|sleeper|other"),
     db: Session = Depends(get_db),
 ):
+    from app.ingestion.platform_board import normalize_pickem_app
+
+    if platform and normalize_pickem_app(platform):
+        props, players, meta = _scope_to_platform(
+            db, [], platform, league="NHL", refresh=refresh
+        )
+        teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
+        markets = sorted({p["market"] for p in props if p.get("market")})
+        return {
+            "ok": True,
+            "league": "NHL",
+            "props": props,
+            "players": players,
+            "count": len(props),
+            "teams": ["All", *teams],
+            "markets": ["All", *markets],
+            "live": True,
+            "source": meta.get("source") or "propline",
+            **meta,
+        }
+
     if refresh:
         sync_nhl_warehouse(db)
     else:
@@ -167,7 +221,7 @@ def nhl_props(
         if not existing:
             sync_nhl_warehouse(db)
     props = list_league_props(db, "NHL")
-    props, players, meta = _scope_to_platform(db, props, platform)
+    players = _players_from_props(props)
     teams = sorted({p["team"] for p in props if p.get("team")})
     markets = sorted({p["market"] for p in props if p.get("market")})
     return {
@@ -180,8 +234,7 @@ def nhl_props(
         "markets": ["All", *markets],
         "live": True,
         "source": "nhl-api",
-        "disclaimer": "Only props with a live line on the selected pick'em app are shown.",
-        **meta,
+        "disclaimer": "Select a pick'em app for live platform lines.",
     }
 
 
@@ -236,10 +289,34 @@ def soccer_props(
     platform: str | None = Query(None, description="Pick'em app: prizepicks|underdog|sleeper|other"),
     db: Session = Depends(get_db),
 ):
+    from app.ingestion.platform_board import normalize_pickem_app
+
+    if platform and normalize_pickem_app(platform):
+        props, players, meta = _scope_to_platform(
+            db, [], platform, league="Soccer", refresh=refresh
+        )
+        teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
+        markets = sorted({p["market"] for p in props if p.get("market")})
+        settings = get_settings()
+        return {
+            "ok": True,
+            "league": "Soccer",
+            "props": props,
+            "players": players,
+            "count": len(props),
+            "teams": ["All", *teams],
+            "markets": ["All", *markets],
+            "live": True,
+            "requiresApiKey": bool(meta.get("requiresApiKey")),
+            "footballDataConfigured": bool(settings.football_data_api_key),
+            "source": meta.get("source") or "propline",
+            **meta,
+        }
+
     if refresh or not list_league_props(db, "Soccer"):
         ensure_soccer_pickem_board(db)
     props = list_league_props(db, "Soccer")
-    props, players, meta = _scope_to_platform(db, props, platform)
+    players = _players_from_props(props)
     teams = sorted({p["team"] for p in props if p.get("team")})
     markets = sorted({p["market"] for p in props if p.get("market")})
     settings = get_settings()
@@ -255,14 +332,12 @@ def soccer_props(
         "source": "espn-soccer",
         "requiresApiKey": False,
         "footballDataConfigured": bool(settings.football_data_api_key),
-        "note": meta.get("note")
-        or (
+        "note": (
             None
             if props
             else "No soccer roster athletes on the current ESPN slate — try refresh after fixtures post."
         ),
-        "disclaimer": "Only props with a live line on the selected pick'em app are shown.",
-        **{k: v for k, v in meta.items() if k != "note"},
+        "disclaimer": "Select a pick'em app for live PrizePicks/Underdog/Sleeper lines.",
     }
 
 
@@ -297,11 +372,32 @@ def tennis_props(
     platform: str | None = Query(None, description="Pick'em app: prizepicks|underdog|sleeper|other"),
     db: Session = Depends(get_db),
 ):
+    from app.ingestion.platform_board import normalize_pickem_app
+
     code = "WTA" if tour.upper() == "WTA" else "ATP"
+    if platform and normalize_pickem_app(platform):
+        props, players, meta = _scope_to_platform(
+            db, [], platform, league=code, refresh=refresh
+        )
+        teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
+        markets = sorted({p["market"] for p in props if p.get("market")})
+        return {
+            "ok": True,
+            "league": code,
+            "props": props,
+            "players": players,
+            "count": len(props),
+            "teams": ["All", *teams],
+            "markets": ["All", *markets],
+            "live": True,
+            "source": meta.get("source") or "propline",
+            **meta,
+        }
+
     if refresh or not list_league_props(db, code):
         ensure_tennis_pickem_board(db, tour=code)
     props = list_league_props(db, code)
-    props, players, meta = _scope_to_platform(db, props, platform)
+    players = _players_from_props(props)
     teams = sorted({p["team"] for p in props if p.get("team")})
     markets = sorted({p["market"] for p in props if p.get("market")})
     return {
@@ -315,14 +411,12 @@ def tennis_props(
         "live": True,
         "source": "espn-tennis",
         "requiresConfiguration": False,
-        "note": meta.get("note")
-        or (
+        "note": (
             None
             if props
             else f"No {code} singles on the current ESPN scoreboard — try refresh when tournaments are live."
         ),
-        "disclaimer": "Only props with a live line on the selected pick'em app are shown.",
-        **{k: v for k, v in meta.items() if k != "note"},
+        "disclaimer": "Select a pick'em app for live PrizePicks/Underdog/Sleeper lines.",
     }
 
 
