@@ -29,4 +29,4 @@ A gaming tweaks product website built with Express + Vite + React (TypeScript). 
 
 ## Recent Changes
 - 2026-02-11: Imported project from GitHub. Moved files from SeraphimTweaks-1/ subdirectory to workspace root. Configured workflow and deployment for Replit environment.
-- 2026-04-28: Added dedicated `/pricing` page (`client/src/pages/Pricing.tsx`) showing all product boxes. Home page nav "Pricing" link and all "Buy Now" buttons now navigate to `/pricing` instead of scrolling. Pricing data extracted to shared `pricingPlans` export in `client/src/lib/products.ts`. Updated all Discord links sitewide to `https://discord.gg/yP4uBqNyrP`.
+- 2026-04-28: Added dedicated `/pricing` page (`client/src/pages/Pricing.tsx`) showing all product boxes. Home page nav "Pricing" link and all "Buy Now" buttons now navigate to `/pricing` instead of scrolling. Pricing data extracted to shared `pricingPlans` export in `client/src/lib/products.ts`. Updated all Discord links sitewide to `https://discord.gg/zFZxh9RKdC`.
