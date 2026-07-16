@@ -116,9 +116,8 @@ export default function NbaPage() {
       ? 0
       : filtered.reduce((sum, p) => sum + p.evPercent, 0) / filtered.length;
 
-  const visiblePlayers = livePlayers.filter((card) =>
-    filtered.some((p) => p.playerId === card.id),
-  );
+  // Always list every slate player with a parlay lean; filters apply to the prop table only.
+  const boardPlayers = livePlayers;
 
   return (
     <div>
@@ -245,10 +244,7 @@ export default function NbaPage() {
       {!board.isLoading && !board.isError && (
         <>
           <div className="mt-6">
-            <NbaPlayerCards
-              players={visiblePlayers.length ? visiblePlayers : livePlayers}
-              props={liveProps}
-            />
+            <NbaPlayerCards players={boardPlayers} props={liveProps} />
           </div>
           <div className="mt-6">
             {filtered.length === 0 ? (

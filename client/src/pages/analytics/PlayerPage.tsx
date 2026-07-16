@@ -4,85 +4,24 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Check, Info } from "lucide-react";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
-import { getPlayerProfile } from "@/data/playersMock";
 import { propIdToBuilderLeg } from "@/lib/addPropToBuilder";
 import {
   asNbaPropFromApi,
   cacheNbaBoardProps,
   getCachedNbaProp,
 } from "@/lib/nbaLiveCache";
+import {
+  asLivePlayerResearch,
+  getMockPlayerResearch,
+  type ChartGame,
+  type PlayerResearchProfile,
+} from "@/lib/playerResearchProfile";
 import { cn } from "@/lib/utils";
 import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
 import type { NbaProp } from "@/data/nbaMock";
-
-type HitWindow = {
-  key: string;
-  label: string;
-  average: number | null;
-  hitRate: number;
-  hitPct: number;
-  hits: string;
-};
-
-type ChartGame = {
-  date: string;
-  label: string;
-  opponent: string;
-  home: boolean;
-  value: number;
-  minutes: number;
-  hit: boolean;
-};
-
-type PlayerMarket = {
-  propId: string;
-  market: string;
-  side: "Over" | "Under" | string;
-  line: number;
-  americanOdds: number;
-  projectedValue: number;
-  edgeVsLine: number;
-  edgePercent: number;
-  overProbability?: number;
-  underProbability?: number;
-  researchScore: number;
-  confidence: number;
-  evPercent: number;
-  explanation: string[];
-  why: string;
-  hitWindows: HitWindow[];
-  chartGames: ChartGame[];
-};
-
-type LivePlayer = {
-  id: string;
-  name: string;
-  league: string;
-  team: string;
-  opponent: string;
-  position: string;
-  initials: string;
-  injury: string;
-  tipTime: string;
-  researchScore: number;
-  dataQualityScore: number;
-  aiExplain: { verdict: string; headline: string; body: string };
-  matchup: { title: string; defenseRank: string; bullets: string[] };
-  homeSplit: { label: string; samples: number; averages: Record<string, number> };
-  awaySplit: { label: string; samples: number; averages: Record<string, number> };
-  recentLogs: Array<{
-    date: string;
-    opponent: string;
-    home: boolean;
-    stats: Record<string, number>;
-    minutesOrSnaps: number;
-  }>;
-  markets: PlayerMarket[];
-  live?: boolean;
-};
 
 type Tab = "chart" | "lines" | "matchup" | "log";
 
@@ -120,7 +59,7 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
           <span className="h-2.5 w-2.5 rounded-sm bg-red-500/70" /> Under
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-px w-4 border-t border-dashed border-yellow-400" /> Minutes
+          <span className="h-px w-4 border-t border-dashed border-yellow-400" /> Minutes / snaps
         </span>
         <span className="tabular-nums text-neutral-400">Line {line}</span>
       </div>
@@ -173,10 +112,17 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
   );
 }
 
+function logStatKeys(profile: PlayerResearchProfile): string[] {
+  const first = profile.recentLogs[0]?.stats ?? {};
+  const keys = Object.keys(first);
+  if (keys.length) return keys.slice(0, 4);
+  return ["pts", "reb", "ast"];
+}
+
 export default function PlayerPage() {
   const [, params] = useRoute("/player/:id");
   const playerId = params?.id ?? "";
-  const mockProfile = getPlayerProfile(playerId);
+  const mockProfile = useMemo(() => (playerId ? getMockPlayerResearch(playerId) : null), [playerId]);
   const looksLive = !mockProfile || /^\d+$/.test(playerId) || playerId.includes(":");
 
   const live = useQuery({
@@ -186,9 +132,11 @@ export default function PlayerPage() {
       const res = await fetch(`/api/nba/players/${encodeURIComponent(playerId)}`);
       if (!res.ok) throw new Error("player");
       const data = await res.json();
-      return (data.player ?? data) as LivePlayer;
+      const raw = (data.player ?? data) as PlayerResearchProfile;
+      return asLivePlayerResearch(raw);
     },
     staleTime: 120_000,
+    retry: 1,
   });
 
   const boardProps = useQuery({
@@ -202,7 +150,7 @@ export default function PlayerPage() {
     staleTime: 120_000,
   });
 
-  const profile = live.data;
+  const profile = live.data ?? mockProfile;
   const { addLeg, hasLeg } = useParlayDraft();
   const [tab, setTab] = useState<Tab>("chart");
   const [marketIdx, setMarketIdx] = useState(0);
@@ -230,27 +178,8 @@ export default function PlayerPage() {
     [market, windowKey],
   );
 
-  if (live.isLoading && !profile && !mockProfile) {
+  if (live.isLoading && looksLive && !profile) {
     return <CardSkeleton rows={5} />;
-  }
-
-  // Fallback: old mock profile path (other leagues) — keep simple redirect-style page
-  if (!profile && mockProfile) {
-    return (
-      <div>
-        <Link href="/players" className="mb-4 inline-flex items-center gap-2 text-sm text-neutral-400 hover:text-yellow-400">
-          <ArrowLeft className="h-4 w-4" /> Player Profiles
-        </Link>
-        <h1 className="text-2xl font-semibold text-white">{mockProfile.name}</h1>
-        <p className="mt-2 text-sm text-neutral-400">
-          Live research UI is wired for NBA warehouse players. This mock profile is available for{" "}
-          {mockProfile.league}.
-        </p>
-        <Link href={`/${mockProfile.league.toLowerCase()}`} className="mt-4 inline-block text-sm text-yellow-400 hover:underline">
-          Open {mockProfile.league} board
-        </Link>
-      </div>
-    );
   }
 
   if (!profile || !market) {
@@ -258,40 +187,42 @@ export default function PlayerPage() {
       <div className="mt-6">
         <EmptyState
           title="Player not found"
-          description="Open the NBA board and pick a player card."
+          description="Open a sport board and pick a player card."
         />
         <div className="mt-4 text-center">
           <Link href="/nba" className="text-sm text-yellow-400 hover:underline">
-            Back to NBA board
+            Back to boards
           </Link>
         </div>
       </div>
     );
   }
 
+  const boardHref = profile.boardHref || "/nba";
   const added = hasLeg(market.propId);
+  const logKeys = logStatKeys(profile);
 
   function addCurrent(overrideSide?: "Over" | "Under") {
     const s = overrideSide ?? selectedSide;
-    let leg = propIdToBuilderLeg(market.propId);
+    let leg = propIdToBuilderLeg(market!.propId);
     if (!leg) {
-      const cached = getCachedNbaProp(market.propId);
+      const cached = getCachedNbaProp(market!.propId);
       const row: NbaProp =
         cached ??
         ({
-          id: market.propId,
+          id: market!.propId,
           playerId: profile!.id,
           player: profile!.name,
           team: profile!.team,
           opponent: profile!.opponent,
           position: profile!.position,
-          market: market.market as NbaProp["market"],
-          side: market.side === "Under" ? "Under" : "Over",
-          line: market.line,
-          americanOdds: market.americanOdds,
-          noVigProb: market.overProbability ?? 0.5,
-          evPercent: market.evPercent,
-          confidence: market.confidence,
+          market: market!.market as NbaProp["market"],
+          side: market!.side === "Under" ? "Under" : "Over",
+          line: market!.line,
+          americanOdds: market!.americanOdds,
+          noVigProb: market!.overProbability ?? 0.5,
+          evPercent: market!.evPercent,
+          confidence: market!.confidence,
           l5: "0/0",
           l10: "0/0",
           l20: "0/0",
@@ -310,9 +241,12 @@ export default function PlayerPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-        <Link href="/nba" className="inline-flex items-center gap-2 text-neutral-400 transition hover:text-yellow-400">
+        <Link
+          href={boardHref}
+          className="inline-flex items-center gap-2 text-neutral-400 transition hover:text-yellow-400"
+        >
           <ArrowLeft className="h-4 w-4" />
-          NBA board
+          {profile.league} board
         </Link>
         <span className="text-neutral-700">·</span>
         <Link href="/players" className="text-neutral-500 hover:text-yellow-400">
@@ -320,7 +254,6 @@ export default function PlayerPage() {
         </Link>
       </div>
 
-      {/* Header */}
       <div className="card-3d rounded-2xl border border-[#1a1a1a] p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -398,7 +331,6 @@ export default function PlayerPage() {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="mt-5 flex gap-1 border-b border-[#1a1a1a]">
           {(
             [
@@ -513,9 +445,11 @@ export default function PlayerPage() {
                     <th className="pb-3 font-medium">Date</th>
                     <th className="pb-3 font-medium">Opp</th>
                     <th className="pb-3 font-medium">H/A</th>
-                    <th className="pb-3 font-medium">PTS</th>
-                    <th className="pb-3 font-medium">REB</th>
-                    <th className="pb-3 font-medium">AST</th>
+                    {logKeys.map((k) => (
+                      <th key={k} className="pb-3 font-medium">
+                        {k}
+                      </th>
+                    ))}
                     <th className="pb-3 font-medium">Min</th>
                   </tr>
                 </thead>
@@ -525,9 +459,11 @@ export default function PlayerPage() {
                       <td className="py-2.5 text-neutral-300">{log.date}</td>
                       <td className="py-2.5 text-neutral-200">{log.opponent}</td>
                       <td className="py-2.5 text-neutral-500">{log.home ? "H" : "A"}</td>
-                      <td className="py-2.5 tabular-nums text-neutral-200">{log.stats.pts}</td>
-                      <td className="py-2.5 tabular-nums text-neutral-200">{log.stats.reb}</td>
-                      <td className="py-2.5 tabular-nums text-neutral-200">{log.stats.ast}</td>
+                      {logKeys.map((k) => (
+                        <td key={k} className="py-2.5 tabular-nums text-neutral-200">
+                          {log.stats[k] ?? "—"}
+                        </td>
+                      ))}
                       <td className="py-2.5 tabular-nums text-neutral-400">{log.minutesOrSnaps}</td>
                     </tr>
                   ))}
@@ -538,7 +474,6 @@ export default function PlayerPage() {
         </div>
       </div>
 
-      {/* Hit windows */}
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
         {(market.hitWindows ?? []).map((w) => (
           <button
@@ -567,13 +502,8 @@ export default function PlayerPage() {
         </p>
       )}
 
-      {/* Projection grid */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Metric
-          label="Our Projection"
-          value={market.projectedValue.toFixed(1)}
-          hint="Seraphim model"
-        />
+        <Metric label="Our Projection" value={market.projectedValue.toFixed(1)} hint="Seraphim model" />
         <Metric
           label="Projection Edge"
           value={`${market.edgeVsLine > 0 ? "+" : ""}${market.edgeVsLine.toFixed(1)}`}
@@ -603,7 +533,9 @@ export default function PlayerPage() {
       >
         <section className="card-3d mt-4 rounded-2xl border border-[#1a1a1a] p-5">
           <h2 className="text-sm font-semibold text-white">Why · {market.market}</h2>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-300">{market.why || profile.aiExplain.headline}</p>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+            {market.why || profile.aiExplain.headline}
+          </p>
           <ul className="mt-3 space-y-1.5">
             {(market.explanation.length ? market.explanation : [profile.aiExplain.body]).map((line) => (
               <li key={line} className="text-xs leading-relaxed text-neutral-500">

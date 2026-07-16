@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { NflFiltersBar, type NflBoardFilters } from "@/components/nfl/NflFiltersBar";
 import { NflPropTable } from "@/components/nfl/NflPropTable";
-import { NflPlayerCards } from "@/components/nfl/NflPlayerCards";
+import { SportPlayerCards } from "@/components/shared/SportPlayerCards";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import {
   mockNflPlayerCards,
@@ -12,6 +12,7 @@ import {
   parseHitRate,
   type NflProp,
 } from "@/data/nflMock";
+import { buildSportPlayerCards } from "@/lib/playerResearchProfile";
 
 const defaultFilters: NflBoardFilters = {
   query: "",
@@ -72,8 +73,24 @@ export default function NflPage() {
       ? 0
       : filtered.reduce((sum, p) => sum + p.evPercent, 0) / filtered.length;
 
-  const visiblePlayers = mockNflPlayerCards.filter((card) =>
-    filtered.some((p) => p.playerId === card.id),
+  const playerCards = useMemo(
+    () =>
+      buildSportPlayerCards(mockNflProps, {
+        league: "NFL",
+        cards: mockNflPlayerCards.map((c) => ({
+          id: c.id,
+          name: c.name,
+          team: c.team,
+          opponent: c.opponent,
+          position: c.position,
+          headshotInitials: c.headshotInitials,
+          confidence: c.confidence,
+          matchupNote: c.matchupNote,
+          topPropId: c.topPropId,
+          seasonAvg: c.seasonAvg,
+        })),
+      }),
+    [],
   );
 
   return (
@@ -130,7 +147,7 @@ export default function NflPage() {
       </div>
 
       <div className="mt-6">
-        <NflPlayerCards players={visiblePlayers.length ? visiblePlayers : mockNflPlayerCards} />
+        <SportPlayerCards players={playerCards} />
       </div>
 
       <div className="mt-6">

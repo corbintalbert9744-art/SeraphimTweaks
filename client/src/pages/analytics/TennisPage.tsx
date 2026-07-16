@@ -4,6 +4,7 @@ import { Search, Plus, Check } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
+import { SportPlayerCards } from "@/components/shared/SportPlayerCards";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import {
   formatAmericanOdds,
@@ -15,6 +16,7 @@ import {
   type TennisMarket,
   type TennisProp,
 } from "@/data/tennisMock";
+import { buildSportPlayerCards } from "@/lib/playerResearchProfile";
 import { cn } from "@/lib/utils";
 
 type SortKey = "ev" | "confidence" | "noVig" | "l10" | "player" | "line";
@@ -29,7 +31,7 @@ interface Filters {
 }
 
 export default function TennisPage({ tour }: { tour: "ATP" | "WTA" }) {
-  const { legs, addLeg, hasLeg } = useParlayDraft();
+  const { legs } = useParlayDraft();
   const [filters, setFilters] = useState<Filters>({
     query: "",
     market: "All",
@@ -74,7 +76,28 @@ export default function TennisPage({ tour }: { tour: "ATP" | "WTA" }) {
     });
   }, [filters, tour]);
 
-  const cards = mockTennisPlayerCards.filter((c) => c.league === tour);
+  const playerCards = useMemo(() => {
+    const tourProps = mockTennisProps.filter((p) => p.league === tour);
+    return buildSportPlayerCards(tourProps, {
+      league: tour,
+      cards: mockTennisPlayerCards
+        .filter((c) => c.league === tour)
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          team: c.country,
+          opponent: c.opponent,
+          position: `#${c.ranking}`,
+          initials: c.initials,
+          confidence: c.confidence,
+          matchupNote: c.matchupNote,
+          topPropId: c.topPropId,
+          form: c.form,
+          ranking: c.ranking,
+          surface: c.surface,
+        })),
+    });
+  }, [tour]);
   const avgEv =
     filtered.length === 0
       ? 0
@@ -193,58 +216,9 @@ export default function TennisPage({ tour }: { tour: "ATP" | "WTA" }) {
         </div>
       </section>
 
-      <section className="mt-6">
-        <h2 className="mb-4 text-base font-semibold text-white">Featured players</h2>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {cards.map((card) => {
-            const top = mockTennisProps.find((p) => p.id === card.topPropId);
-            const added = top ? hasLeg(top.id) : false;
-            return (
-              <article key={card.id} className="card-3d rounded-2xl border border-[#1a1a1a] p-5">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-yellow-500/25 bg-yellow-500/10 text-sm font-semibold text-yellow-300">
-                    {card.initials}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-semibold text-white">{card.name}</h3>
-                        <p className="text-xs text-neutral-500">
-                          #{card.ranking} · vs {card.opponent} · {card.surface}
-                        </p>
-                      </div>
-                      <ResearchScoreBadge score={card.confidence} size="sm" />
-                    </div>
-                  </div>
-                </div>
-                <p className="mt-3 text-xs text-neutral-400">{card.matchupNote}</p>
-                <p className="mt-2 text-[11px] text-neutral-500">Form · {card.form}</p>
-                {top && (
-                  <div className="mt-4 flex items-center justify-between border-t border-[#151515] pt-4">
-                    <Link href={`/prop/${top.id}`} className="text-sm text-neutral-200 hover:text-yellow-400">
-                      {top.market} · +{top.evPercent.toFixed(1)}%
-                    </Link>
-                    <button
-                      type="button"
-                      disabled={added}
-                      onClick={() => addLeg(tennisToBuilderLeg(top))}
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium",
-                        added
-                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                          : "border-yellow-500/30 bg-yellow-500/10 text-yellow-300",
-                      )}
-                    >
-                      {added ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-                      {added ? "Added" : "Add"}
-                    </button>
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      </section>
+      <div className="mt-6">
+        <SportPlayerCards players={playerCards} />
+      </div>
 
       <TennisTable rows={filtered} />
     </div>
@@ -285,7 +259,9 @@ function TennisTable({ rows }: { rows: TennisProp[] }) {
               return (
                 <tr key={row.id} className="hover:bg-yellow-500/[0.03]">
                   <td className="px-4 py-3.5">
-                    <p className="font-medium text-neutral-100">{row.player}</p>
+                    <Link href={`/player/${row.playerId}`} className="font-medium text-neutral-100 hover:text-yellow-400">
+                      {row.player}
+                    </Link>
                     <p className="text-xs text-neutral-500">
                       vs {row.opponent} · {row.tournament} · {row.surface}
                     </p>
