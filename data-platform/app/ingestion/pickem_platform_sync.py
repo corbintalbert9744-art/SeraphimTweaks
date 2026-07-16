@@ -1,11 +1,14 @@
-"""Live pick'em platform boards — PropLine feed first, then model.
+"""Live pick'em platform boards — multi-API fallthrough, then model.
 
 Workflow (required):
-  platform selection → live PropLine pick'em quotes → upsert props from those
-  lines only → run Projection Engine vs the platform line → return board.
+  platform selection → live pick'em quotes (PropLine → SharpAPI → Odds API) →
+  upsert props from those lines only → run Projection Engine vs the platform
+  line → return board.
 
-Never invents lines. Never substitutes sportsbook odds for pick'em lines.
-Players not on the selected app are excluded.
+Short-circuits on the first provider that returns non-empty pick'em quotes so
+one exhausted daily quota does not blank every board. Never invents lines.
+Never substitutes sportsbook odds for pick'em lines. Players not on the
+selected app are excluded.
 """
 
 from __future__ import annotations
@@ -34,9 +37,9 @@ from app.ingestion.platform_board import (
 )
 from app.ingestion.slate_times import enrich_and_filter_upcoming_props
 from app.ingestion.warehouse import insert_odds, upsert_gamelog, upsert_player
-from app.providers.base import NormalizedOddsQuote, NormalizedPlayer, ProviderRateLimitError, run_provider_job
+from app.providers.base import NormalizedOddsQuote, NormalizedPlayer, run_provider_job
+from app.providers.line_aggregation.factory import get_pickem_aggregator
 from app.providers.propline import rate_limit as propline_rate_limit
-from app.providers.propline.adapter import PropLineAdapter
 from app.providers.propline.markets import normalize_league
 
 log = logging.getLogger(__name__)
@@ -459,8 +462,9 @@ def sync_pickem_platform_board(
 ) -> dict[str, Any]:
     """Fetch live pick'em lines for ``platform`` and build the research board.
 
-    Returns props + players + updatedAt. Empty props when the key is missing
-    or PropLine has no current lines for that app — never fabricates.
+    Tries PropLine → SharpAPI → The Odds API (short-circuit). Returns props +
+    players + updatedAt. Empty props when no keyed provider has lines for that
+    app — never fabricates.
     """
     app = normalize_pickem_app(platform)
     label = PICKEM_APP_LABELS.get(app or "", platform)
@@ -503,7 +507,12 @@ def sync_pickem_platform_board(
             "unavailable": True,
         }
 
-    if not settings.propline_api_key:
+    keyed = [
+        ("PROPLINE_API_KEY", bool(settings.propline_api_key)),
+        ("SHARPAPI_API_KEY", bool(settings.sharpapi_api_key)),
+        ("ODDS_API_KEY", bool(settings.odds_api_key)),
+    ]
+    if not any(configured for _, configured in keyed):
         return {
             "ok": False,
             "league": code,
@@ -517,8 +526,10 @@ def sync_pickem_platform_board(
             "dataSource": f"pickem:{app}",
             "requiresApiKey": True,
             "envVar": "PROPLINE_API_KEY",
+            "requiresAdditionalKeys": ["SHARPAPI_API_KEY", "ODDS_API_KEY"],
             "note": (
-                f"Live {label} props require PROPLINE_API_KEY. "
+                f"Live {label} props need at least one odds key "
+                "(PROPLINE_API_KEY, SHARPAPI_API_KEY, or ODDS_API_KEY). "
                 "We do not invent pick'em lines or substitute sportsbook odds."
             ),
         }
@@ -532,7 +543,12 @@ def sync_pickem_platform_board(
         if cached is not None:
             return cached
 
-    def _stale_or_rate_limit_empty(exc: BaseException | str, *, rate_limited: bool = False) -> dict[str, Any]:
+    def _stale_or_rate_limit_empty(
+        exc: BaseException | str,
+        *,
+        rate_limited: bool = False,
+        attempts: Optional[list[dict[str, Any]]] = None,
+    ) -> dict[str, Any]:
         msg = str(exc)
         limited = rate_limited or (
             "429" in msg
@@ -550,6 +566,12 @@ def sync_pickem_platform_board(
             max_age=timedelta(days=2),
         )
         until = propline_rate_limit.blocked_until()
+        missing = [name for name, ok in keyed if not ok]
+        extra_hint = (
+            f" Add {', '.join(missing)} so boards can fall through when PropLine is exhausted."
+            if limited and missing
+            else ""
+        )
         reset_hint = (
             f" PropLine daily free-tier limit hit — new lines (including tomorrow's PrizePicks slate) "
             f"resume after {until.strftime('%b %d %H:%M UTC') if until else 'the next UTC day'}."
@@ -558,12 +580,14 @@ def sync_pickem_platform_board(
         )
         if stale is not None:
             stale["note"] = (
-                f"Showing last live {label} lines from warehouse.{reset_hint} "
+                f"Showing last live {label} lines from warehouse.{reset_hint}{extra_hint} "
                 "Projections are Seraphim estimates vs those lines."
             )
             stale["cached"] = True
             stale["refreshError"] = msg
             stale["rateLimited"] = limited
+            if attempts is not None:
+                stale["pickemAttempts"] = attempts
             return stale
         return {
             "ok": False,
@@ -578,52 +602,60 @@ def sync_pickem_platform_board(
             "dataSource": f"pickem:{app}",
             "error": msg,
             "rateLimited": limited,
+            "requiresAdditionalKeys": missing or None,
+            "pickemAttempts": attempts,
             "note": (
-                f"No cached {label} lines for {code}.{reset_hint} "
+                f"No cached {label} lines for {code}.{reset_hint}{extra_hint} "
                 "We only show players currently listed on the app — never invented lines."
             ).strip(),
         }
 
-    # Circuit open: skip PropLine entirely (scheduler was burning the daily quota)
-    if propline_rate_limit.is_blocked():
-        return _stale_or_rate_limit_empty(
-            propline_rate_limit.last_message() or "propline daily limit reached",
-            rate_limited=True,
-        )
-
-    adapter = PropLineAdapter(api_key=settings.propline_api_key or "", max_events=24)
-    with run_provider_job(db, provider="propline-pickem", league=code, job=f"sync_{app}") as job:
+    aggregator = get_pickem_aggregator()
+    with run_provider_job(db, provider="pickem-aggregator", league=code, job=f"sync_{app}") as job:
         try:
             # Upcoming slate window (today + tomorrow) so Jul 17 PrizePicks tips
-            # appear when browsing on Jul 16.
-            quotes = adapter.fetch_pickem_prop_odds(
+            # appear when browsing on Jul 16. Aggregator short-circuits on first
+            # non-empty pick'em batch so we do not burn every API quota.
+            fetch = aggregator.fetch(
                 code,
                 platforms=set(slugs),
                 max_events=24,
                 horizon_hours=48,
             )
-        except ProviderRateLimitError as exc:
-            log.warning("pickem sync %s/%s rate limited: %s", app, code, exc)
-            job.error = str(exc)
-            return _stale_or_rate_limit_empty(exc, rate_limited=True)
+            quotes = fetch.quotes
+            attempt_meta = [
+                {
+                    "source": a.source,
+                    "status": a.status,
+                    "quotes": a.quotes,
+                    "detail": a.detail,
+                }
+                for a in fetch.attempts
+            ]
         except Exception as exc:  # noqa: BLE001
             log.exception("pickem sync %s/%s failed", app, code)
             job.error = str(exc)
             return _stale_or_rate_limit_empty(exc)
 
         if not quotes:
-            support = adapter.league_support(code)
-            reason = support.get("reason") or (
-                f"PropLine returned no current {label} player props for {code}."
+            all_limited = bool(fetch.attempts) and all(
+                a.status in {"rate_limited", "cooldown", "skipped"} for a in fetch.attempts
             )
-            if (
-                "429" in reason
-                or "daily limit" in reason.lower()
-                or "daily_limit" in reason.lower()
-                or "rate" in reason.lower()
-                or propline_rate_limit.is_blocked()
-            ):
-                return _stale_or_rate_limit_empty(reason, rate_limited=True)
+            any_limited = any(
+                a.status in {"rate_limited", "cooldown"} for a in fetch.attempts
+            )
+            reason = (
+                f"No live {label} player props for {code} from configured providers "
+                f"({', '.join(a.source for a in fetch.attempts) or 'none'})."
+            )
+            job.rows_written = 0
+            db.commit()
+            if all_limited or any_limited or propline_rate_limit.is_blocked():
+                return _stale_or_rate_limit_empty(
+                    reason,
+                    rate_limited=True,
+                    attempts=attempt_meta,
+                )
             stale = _list_cached_platform_board(
                 db,
                 league=code,
@@ -632,14 +664,14 @@ def sync_pickem_platform_board(
                 allow_stale=True,
                 max_age=timedelta(days=2),
             )
-            job.rows_written = 0
-            db.commit()
             if stale is not None:
                 stale["note"] = (
-                    f"{reason} Showing last warehouse {label} lines until the feed recovers."
+                    f"{reason} Showing last warehouse {label} lines until a feed recovers."
                 )
                 stale["cached"] = True
+                stale["pickemAttempts"] = attempt_meta
                 return stale
+            missing = [name for name, ok in keyed if not ok]
             return {
                 "ok": True,
                 "league": code,
@@ -652,9 +684,16 @@ def sync_pickem_platform_board(
                 "propsUpdatedAt": None,
                 "dataSource": f"pickem:{app}",
                 "live": True,
+                "pickemAttempts": attempt_meta,
+                "requiresAdditionalKeys": missing or None,
                 "note": (
                     f"{reason} Only players currently listed on {label} are shown — "
                     "we never invent lines or pull from a generic projection DB."
+                    + (
+                        f" Configure {', '.join(missing)} for fallthrough capacity."
+                        if missing
+                        else ""
+                    )
                 ),
             }
 
@@ -906,7 +945,14 @@ def sync_pickem_platform_board(
         _mirror_tennis_sibling_board(db, source_league=code, platform=app, board_rows=board_rows)
 
     updated = (latest_capture or datetime.now(timezone.utc)).isoformat()
-    return _finalize_platform_board(
+    source = fetch.source or "pickem-aggregator"
+    source_labels = {
+        "propline": "PropLine",
+        "sharpapi": "SharpAPI",
+        "the-odds-api": "The Odds API",
+    }
+    source_label = source_labels.get(source, source)
+    result = _finalize_platform_board(
         db,
         league=code,
         platform=app,
@@ -914,13 +960,19 @@ def sync_pickem_platform_board(
         board_rows=board_rows,
         updated=updated,
         syncedAt=datetime.now(timezone.utc).isoformat(),
-        source="propline",
+        source=source,
         note=None if board_rows else f"No current {label} props for {code} after sync.",
         disclaimer=(
-            f"Lines are live {label} props via PropLine. "
+            f"Lines are live {label} props via {source_label}. "
             "Projections are Seraphim model estimates vs those lines — not invented lines."
         ),
     )
+    result["pickemSource"] = source
+    result["pickemAttempts"] = attempt_meta
+    missing = [name for name, ok in keyed if not ok]
+    if missing:
+        result["requiresAdditionalKeys"] = missing
+    return result
 
 
 def _mirror_tennis_sibling_board(

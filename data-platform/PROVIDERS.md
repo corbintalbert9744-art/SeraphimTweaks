@@ -62,17 +62,22 @@ Underdog Fantasy, Sleeper, or Other). Selection persists in `localStorage`.
 
 ```
 platform selection
-  → PropLine fetch filtered to that bookmaker only (prizepicks|underdog|sleeper)
-  → upsert props from those live lines (player, sport, game, stat, line, Over/Under, projection id)
+  → pickem-aggregator short-circuit:
+        PropLine → SharpAPI → The Odds API (us_dfs)
+        stop on first non-empty pick'em batch (do not burn every quota)
+  → filter to that bookmaker only (prizepicks|underdog|sleeper)
+  → upsert props from those live lines
   → Projection Engine V1 vs the platform line
-  → board with edge % + updatedAt
+  → board with edge % + updatedAt + pickemSource / pickemAttempts
 ```
 
 - Sportsbook odds are **never** used as pick'em substitutes
 - Players not on the selected app are **never** shown
-- Lines are **never** invented — empty board + clear note when PropLine has no current props
-- Requires `PROPLINE_API_KEY`
-- Cache TTL: 5 minutes (`propsUpdatedAt` / `updatedAt` on every board response)
+- Lines are **never** invented — empty board + clear note when no provider has props
+- Needs **at least one** of `PROPLINE_API_KEY` / `SHARPAPI_API_KEY` / `ODDS_API_KEY`
+  (configure multiple so a single free-tier daily limit cannot blank boards)
+- The Odds API pick'em path uses `regions=us_dfs` (PrizePicks / Underdog; not Sleeper)
+- Cache TTL: 30 minutes; PropLine circuit opens on daily_limit and aggregator falls through
 - Scheduler `refresh_odds` also refreshes PrizePicks / Underdog / Sleeper for core leagues
 
 Manual sync: `POST /api/v1/jobs/sync-lines`  

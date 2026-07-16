@@ -48,7 +48,12 @@ BOOK_TITLES = {
     "bovada": "Bovada",
     "prizepicks": "PrizePicks",
     "underdog": "Underdog",
+    "underdogfantasy": "Underdog",
+    "sleeper": "Sleeper",
 }
+
+# SharpAPI may mix sportsbooks and DFS apps — pick'em boards keep only these.
+PICKEM_BOOK_SLUGS = frozenset({"prizepicks", "underdog", "underdogfantasy", "sleeper"})
 
 
 def _norm_league(league: str) -> str:
@@ -63,12 +68,13 @@ class SharpApiAdapter:
     meta = ProviderMeta(
         name="sharpapi",
         leagues=list(LEAGUE_PARAMS.keys()),
-        capabilities=["odds", "props"],
+        capabilities=["odds", "props", "pickem"],
         requires_api_key=True,
         is_mock=False,
         notes=(
             "SharpAPI (https://docs.sharpapi.io/) — multi-book odds + player props when "
-            "SHARPAPI_API_KEY is set. Used as fallback / complement to PropLine."
+            "SHARPAPI_API_KEY is set. Used as PropLine fallback for sportsbook compare "
+            "and pick'em boards (PrizePicks / Underdog / Sleeper when present)."
         ),
         homepage="https://sharpapi.io/",
     )
@@ -112,6 +118,41 @@ class SharpApiAdapter:
 
     def fetch_player_prop_odds(
         self, league: str, date: Optional[str] = None
+    ) -> list[NormalizedOddsQuote]:
+        return self._fetch_prop_rows(league, date=date, allowed_books=None)
+
+    def fetch_pickem_prop_odds(
+        self,
+        league: str,
+        *,
+        platforms: Optional[set[str]] = None,
+        date: Optional[str] = None,
+        max_events: Optional[int] = None,
+        horizon_hours: int = 48,
+    ) -> list[NormalizedOddsQuote]:
+        """Return only PrizePicks / Underdog / Sleeper quotes — never sportsbooks."""
+        _ = max_events
+        _ = horizon_hours
+        platforms_l = {p.lower() for p in platforms} if platforms else set(PICKEM_BOOK_SLUGS)
+        # Map underdogfantasy → underdog for platform filter matching
+        wanted: set[str] = set()
+        for p in platforms_l:
+            if p in PICKEM_BOOK_SLUGS:
+                wanted.add(p)
+            if p == "underdog":
+                wanted.add("underdogfantasy")
+            if p == "underdogfantasy":
+                wanted.add("underdog")
+        if not wanted:
+            return []
+        return self._fetch_prop_rows(league, date=date, allowed_books=wanted)
+
+    def _fetch_prop_rows(
+        self,
+        league: str,
+        *,
+        date: Optional[str] = None,
+        allowed_books: Optional[set[str]] = None,
     ) -> list[NormalizedOddsQuote]:
         _ = date
         support = self.supports_league(league)
@@ -172,12 +213,20 @@ class SharpApiAdapter:
             )
             if not player:
                 continue
-            slug = str(row.get("sportsbook") or "book").lower()
+            slug = str(row.get("sportsbook") or row.get("book") or "book").lower()
+            if allowed_books is not None and slug not in allowed_books:
+                continue
+            # Normalize Underdog Fantasy slug for warehouse / board filters
+            board_slug = "underdog" if slug == "underdogfantasy" else slug
             american = row.get("odds_american")
             if american is None and isinstance(row.get("odds"), dict):
                 american = row["odds"].get("american")
             if american is None:
-                continue
+                # Pick'em apps often omit american price — use even money placeholder
+                if board_slug in {"prizepicks", "underdog", "sleeper"}:
+                    american = 100
+                else:
+                    continue
             market_label = _market_label(row)
             captured = _parse_ts(row.get("timestamp")) or now
             out.append(
@@ -189,8 +238,8 @@ class SharpApiAdapter:
                     side=side,
                     line=float(point),
                     american_odds=int(american),
-                    sportsbook_slug=slug,
-                    sportsbook_name=BOOK_TITLES.get(slug, slug.title()),
+                    sportsbook_slug=board_slug,
+                    sportsbook_name=BOOK_TITLES.get(slug, BOOK_TITLES.get(board_slug, slug.title())),
                     game_external_id=str(row.get("event_id") or "") or None,
                     captured_at=captured,
                     is_mock=False,
