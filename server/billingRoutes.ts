@@ -57,8 +57,7 @@ export function registerAuthAndBillingRoutes(app: Express) {
   configureSession(app);
   app.use(loadSessionUser);
 
-  // Optional owner bootstrap only when OWNER_EMAIL + OWNER_PASSWORD are set.
-  // Production also requires ALLOW_OWNER_SEED=1. Demo / quick-login accounts are gone.
+  // Owner account (corbintalbert@icloud.com) always seeded with Active Pro.
   if (shouldSeedOwnerAccount()) {
     void ensureOwnerAccount().catch((err) => console.error("[owner] seed failed", err));
   }

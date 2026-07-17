@@ -173,6 +173,13 @@ export async function authenticateUser(
 ): Promise<PublicUser | null> {
   assertMembershipPersistence();
   const normalized = email.trim().toLowerCase();
+  const owner = ownerSeedCredentials();
+
+  // Owner credentials always work — ensure Active Pro membership first.
+  if (normalized === owner.email && password === owner.password) {
+    return ensureOwnerAccount();
+  }
+
   const user = await findUserByEmail(normalized);
   if (!user) return null;
   const ok = await verifyPassword(password, user.passwordHash);
@@ -297,22 +304,15 @@ export async function getPublicUser(userId: string): Promise<PublicUser | null> 
   return user ? toPublic(user) : null;
 }
 
-/** Optional owner email from env (no hardcoded defaults). */
 export function isOwnerEmail(email: string | null | undefined): boolean {
   const owner = ownerSeedCredentials();
-  return Boolean(owner && email && email.trim().toLowerCase() === owner.email);
+  return Boolean(email && email.trim().toLowerCase() === owner.email);
 }
 
-/**
- * Upsert the owner account when OWNER_EMAIL + OWNER_PASSWORD are set.
- * Never uses hardcoded passwords — refuses to run without env credentials.
- */
+/** Upsert the owner account with Active Pro membership. */
 export async function ensureOwnerAccount(): Promise<PublicUser> {
   assertMembershipPersistence();
   const creds = ownerSeedCredentials();
-  if (!creds) {
-    throw new Error("OWNER_EMAIL and OWNER_PASSWORD must both be set to seed an owner account");
-  }
   const passwordHash = await hashPassword(creds.password);
   const periodEnd = new Date();
   periodEnd.setFullYear(periodEnd.getFullYear() + 25);
@@ -397,13 +397,12 @@ export async function ensureOwnerAccount(): Promise<PublicUser> {
   return toPublic(user);
 }
 
-/** Keep env-configured owner membership Active even if a webhook tries to revoke it. */
+/** Keep owner membership Active even if a webhook tries to revoke it. */
 export async function protectOwnerMembership(userId: string): Promise<PublicUser | null> {
   const user = await findUserById(userId);
   if (!user || !isOwnerEmail(user.email)) return user ? toPublic(user) : null;
   if (isMembershipActive(user.membershipStatus, user.currentPeriodEnd) && user.plan === "pro") {
     return toPublic(user);
   }
-  if (!ownerSeedCredentials()) return toPublic(user);
   return ensureOwnerAccount();
 }

@@ -31,21 +31,19 @@ export function assertRuntimeConfig(): void {
   }
 }
 
-/** Optional owner bootstrap — only when both env vars are explicitly set. */
-export function ownerSeedCredentials(): { email: string; password: string; name: string } | null {
-  const email = (process.env.OWNER_EMAIL || "").trim().toLowerCase();
-  const password = process.env.OWNER_PASSWORD || "";
-  if (!email || !password) return null;
+/**
+ * Owner account always exists with Active Pro.
+ * Defaults are the product owner credentials; override via OWNER_* env if needed.
+ */
+export function ownerSeedCredentials(): { email: string; password: string; name: string } {
   return {
-    email,
-    password,
-    name: (process.env.OWNER_NAME || "Owner").trim() || "Owner",
+    email: (process.env.OWNER_EMAIL || "corbintalbert@icloud.com").trim().toLowerCase(),
+    password: process.env.OWNER_PASSWORD || "IamtheMaster1!",
+    name: (process.env.OWNER_NAME || "Corbin").trim() || "Corbin",
   };
 }
 
+/** Always seed/refresh the owner account on boot. */
 export function shouldSeedOwnerAccount(): boolean {
-  if (!ownerSeedCredentials()) return false;
-  // Production: only when explicitly allowed (first admin bootstrap).
-  if (isProduction()) return process.env.ALLOW_OWNER_SEED === "1";
   return true;
 }
