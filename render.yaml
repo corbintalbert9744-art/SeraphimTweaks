@@ -5,6 +5,9 @@
 #   - Site sleeps after ~15 min idle (first load ~1 min)
 #   - Free Postgres expires after 30 days (upgrade or export before then)
 #   - Only 1 free Postgres per Render workspace
+#
+# API / Stripe keys are optional at deploy time. Add them later under each
+# service → Environment (copy from your local .env).
 
 databases:
   - name: seraphim-db
@@ -34,14 +37,6 @@ services:
         value: "true"
       - key: BOOTSTRAP_NBA_SYNC
         value: "true"
-      - key: PROPLINE_API_KEY
-        sync: false
-      - key: SHARPAPI_API_KEY
-        sync: false
-      - key: ODDS_API_KEY
-        sync: false
-      - key: ANTELYTICS_API_KEY
-        sync: false
 
   # Public website + membership API
   - type: web
@@ -70,17 +65,3 @@ services:
           name: seraphim-data
           type: web
           property: host
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: STRIPE_PUBLISHABLE_KEY
-        sync: false
-      - key: STRIPE_WEBHOOK_SECRET
-        sync: false
-      - key: STRIPE_PRICE_STANDARD_MONTHLY
-        sync: false
-      - key: STRIPE_PRICE_STANDARD_YEARLY
-        sync: false
-      - key: STRIPE_PRICE_PRO_MONTHLY
-        sync: false
-      - key: STRIPE_PRICE_PRO_YEARLY
-        sync: false
