@@ -1,13 +1,15 @@
 import { cn } from "@/lib/utils";
 import { hitToneClass, parseHitRate } from "./hitRate";
 
-/** Color-coded hit % chip matching research-desk refs (green / gold / red bordered). */
+/** Color-coded hit % chip (OddsIQ-style pill + underline bar). Seraphim gold mid-band. */
 export function HitPctChip({
   value,
   className,
+  compact = false,
 }: {
   value?: string | number | null;
   className?: string;
+  compact?: boolean;
 }) {
   const pct =
     typeof value === "number"
@@ -18,22 +20,25 @@ export function HitPctChip({
 
   const tone =
     pct >= 70
-      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+      ? { chip: "bg-emerald-500/15 text-emerald-300", bar: "bg-emerald-400" }
       : pct >= 50
-        ? "border-yellow-500/35 bg-yellow-500/10 text-yellow-300"
+        ? { chip: "bg-yellow-500/15 text-yellow-300", bar: "bg-yellow-400" }
         : pct > 0
-          ? "border-red-500/35 bg-red-500/10 text-red-300"
-          : "border-[#2a2a2a] bg-[#111] text-neutral-600";
+          ? { chip: "bg-red-500/15 text-red-300", bar: "bg-red-400" }
+          : { chip: "bg-[#151515] text-neutral-600", bar: "bg-transparent" };
 
   return (
-    <span
-      className={cn(
-        "inline-flex min-w-[2.75rem] items-center justify-center rounded-md border px-1.5 py-1 text-xs font-semibold tabular-nums",
-        tone,
-        className,
-      )}
-    >
-      {pct > 0 ? `${pct}%` : "—"}
+    <span className={cn("inline-flex flex-col items-center gap-0.5", className)}>
+      <span
+        className={cn(
+          "inline-flex items-center justify-center rounded font-semibold tabular-nums",
+          compact ? "min-w-[2.4rem] px-1 py-0.5 text-[11px]" : "min-w-[2.75rem] px-1.5 py-1 text-xs",
+          tone.chip,
+        )}
+      >
+        {pct > 0 ? `${pct}%` : "—"}
+      </span>
+      <span className={cn("h-0.5 w-full max-w-[2.4rem] rounded-full", tone.bar)} />
     </span>
   );
 }

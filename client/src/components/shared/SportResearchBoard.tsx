@@ -2,16 +2,14 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { StatCard } from "@/components/dashboard/StatCard";
 import { NbaFiltersBar, type NbaBoardFilters } from "@/components/nba/NbaFiltersBar";
 import { NbaPropTable } from "@/components/nba/NbaPropTable";
-import { NbaPlayerCards } from "@/components/nba/NbaPlayerCards";
 import { PickemAppGate, PickemAppSwitcher } from "@/components/shared/PickemAppGate";
 import { usePickemApp } from "@/context/PickemAppContext";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CardSkeleton } from "@/components/shared/Skeleton";
-import { parseHitRate, type NbaPlayerCard, type NbaProp } from "@/data/nbaMock";
+import { parseHitRate, type NbaProp } from "@/data/nbaMock";
 import { asNbaPropFromApi, cacheNbaBoardProps } from "@/lib/nbaLiveCache";
 
 const defaultFilters: NbaBoardFilters = {
@@ -95,7 +93,7 @@ export function SportResearchBoard({
       if (!res.ok) throw new Error("board");
       return res.json() as Promise<{
         props: Record<string, unknown>[];
-        players?: NbaPlayerCard[];
+        players?: unknown[];
         live?: boolean;
         source?: string;
         count?: number;
@@ -124,7 +122,6 @@ export function SportResearchBoard({
     return rows;
   }, [board.data?.props]);
 
-  const livePlayers = board.data?.players ?? [];
   const isFallback = Boolean(board.data?.fallback);
 
   const marketOptions = useMemo(() => {
@@ -161,13 +158,6 @@ export function SportResearchBoard({
     return sortProps(rows, filters);
   }, [filters, liveProps]);
 
-  const avgEdgePct =
-    filtered.length === 0
-      ? 0
-      : filtered.reduce((sum, p) => {
-          const pct = p.edgePercent ?? 0;
-          return sum + pct;
-        }, 0) / filtered.length;
   const overCount = filtered.filter((p) => p.side === "Over").length;
   const underCount = filtered.filter((p) => p.side === "Under").length;
 
@@ -214,141 +204,89 @@ export function SportResearchBoard({
 
   return (
     <div>
-      <PageHeader
-        eyebrow={league}
-        title={title}
-        description={
-          isFallback
-            ? `${description} Research slate active while live ${app?.name ?? "app"} lines sync.`
-            : `${description} Live ${app?.name ?? "app"} props only — model runs after the platform feed loads.`
-        }
-        actions={
-          <div className="flex flex-wrap items-center gap-3">
-            {headerExtra}
-            <Link
-              href="/parlay-builder"
-              className="btn-3d rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-4 py-2 text-sm font-semibold text-black"
-            >
-              Parlay Builder{legs.length > 0 ? ` (${legs.length})` : ""}
-            </Link>
-          </div>
-        }
-      />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-yellow-500/80">
+            {league}
+          </p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">
+            {title}
+          </h1>
+          <p className="mt-1 max-w-2xl text-xs text-neutral-500 sm:text-sm">
+            {isFallback
+              ? "Research slate · live platform lines refresh when available"
+              : `Live ${app?.name ?? "app"} props · Seraphim projections`}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {headerExtra}
+          <Link
+            href="/parlay-builder"
+            className="rounded-lg bg-yellow-400 px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-yellow-300"
+          >
+            Parlay{legs.length > 0 ? ` · ${legs.length}` : ""}
+          </Link>
+        </div>
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <PickemAppSwitcher />
         {updatedAt && (
           <p className="text-[11px] tabular-nums text-neutral-500" data-feature="props-updated-at">
-            Props updated {new Date(updatedAt).toLocaleString()}
+            Updated {new Date(updatedAt).toLocaleString()}
           </p>
         )}
       </div>
 
       {note && liveProps.length > 0 && (
-        <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs text-neutral-400">
+        <p className="mt-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs text-neutral-400">
           {note}
         </p>
       )}
 
       {loading ? (
-        <div className="mt-6">
+        <div className="mt-4">
           <CardSkeleton rows={4} />
         </div>
       ) : needsConfig ? (
-        <div className="mt-6">
+        <div className="mt-4">
           <EmptyState title={`No ${app?.name ?? "platform"} lines yet`} description={memberEmpty} />
         </div>
       ) : board.isError ? (
-        <div className="mt-6">
+        <div className="mt-4">
           <EmptyState
             title={`${league} board unavailable`}
             description="This board is temporarily unavailable. Please try again in a few minutes."
           />
         </div>
+      ) : liveProps.length === 0 ? (
+        <div className="mt-4">
+          <EmptyState
+            title={`No ${app?.name ?? "platform"} lines yet`}
+            description={memberEmpty}
+          />
+        </div>
       ) : (
         <>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              card={{
-                id: `${league}-props`,
-                label: isFallback ? "Research props" : `${app?.shortName ?? "App"} props`,
-                value: String(filtered.length),
-                delta: board.isFetching
-                  ? "Refreshing…"
-                  : isFallback
-                    ? "Research slate"
-                    : `${liveProps.length} on platform`,
-                deltaTone: "neutral",
-                hint: isFallback ? "Research slate" : platformLabel || "Platform board",
-              }}
-            />
-            <StatCard
-              card={{
-                id: `${league}-edge`,
-                label: "Avg edge %",
-                value: `${avgEdgePct >= 0 ? "+" : ""}${avgEdgePct.toFixed(1)}%`,
-                delta: "vs platform line",
-                deltaTone: avgEdgePct >= 0 ? "up" : "down",
-                hint: "Seraphim estimate",
-              }}
-            />
-            <StatCard
-              card={{
-                id: `${league}-over`,
-                label: "OVER leans",
-                value: String(overCount),
-                delta: "Green",
-                deltaTone: "up",
-                hint: "Model recommends Over",
-              }}
-            />
-            <StatCard
-              card={{
-                id: `${league}-under`,
-                label: "UNDER leans",
-                value: String(underCount),
-                delta: "Red",
-                deltaTone: "down",
-                hint: "Model recommends Under",
-              }}
+          <div className="mt-4">
+            <NbaFiltersBar
+              filters={filters}
+              onChange={setFilters}
+              resultCount={filtered.length}
+              marketOptions={marketOptions}
+              teamOptions={teamOptions}
+              leagueLabel={league}
+              minConfidenceFloor={0}
             />
           </div>
-
-          {liveProps.length === 0 ? (
-            <div className="mt-6">
-              <EmptyState
-                title={`No ${app?.name ?? "platform"} lines yet`}
-                description={memberEmpty}
-              />
-            </div>
-          ) : (
-            <>
-              <div className="mt-6">
-                <NbaFiltersBar
-                  filters={filters}
-                  onChange={setFilters}
-                  resultCount={filtered.length}
-                  marketOptions={marketOptions}
-                  teamOptions={teamOptions}
-                  leagueLabel={league}
-                  minConfidenceFloor={0}
-                />
-              </div>
-              {livePlayers.length > 0 && (
-                <div className="mt-6">
-                  <NbaPlayerCards players={livePlayers} props={liveProps} />
-                </div>
-              )}
-              <div className="mt-6">
-                <NbaPropTable
-                  rows={filtered}
-                  title={`${league} · ${app?.shortName ?? "App"} board`}
-                  subtitle="Player · stat · line · projection · edge % · confidence"
-                  platformLabel={platformLabel}
-                />
-              </div>
-            </>
-          )}
+          <div className="mt-3">
+            <NbaPropTable
+              rows={filtered}
+              title={`${league} Props`}
+              subtitle={`${filtered.length} props · ${overCount} OVER · ${underCount} UNDER`}
+              platformLabel={platformLabel}
+            />
+          </div>
         </>
       )}
     </div>
