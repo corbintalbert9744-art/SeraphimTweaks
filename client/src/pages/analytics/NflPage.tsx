@@ -148,10 +148,7 @@ export default function NflPage() {
       : filtered.reduce(
           (sum, p) =>
             sum +
-            (p.edgePercent ??
-              (p.projectedValue != null && p.line
-                ? ((p.projectedValue - p.line) / p.line) * 100
-                : 0)),
+            (p.edgePercent ?? 0),
           0,
         ) / filtered.length;
 

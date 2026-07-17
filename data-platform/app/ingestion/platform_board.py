@@ -129,11 +129,25 @@ def apply_pickem_platform_filter(
         projected_f = float(projected) if projected is not None else None
         side = str(row.get("side") or "Over")
         if projected_f is not None:
+            from app.analytics.prediction import estimate_side_probabilities, model_edge_percent
+
             # Re-lean vs this app's line
             model_side = "Over" if projected_f >= platform_line else "Under"
             edge = round(projected_f - platform_line, 2)
-            edge_pct = (
-                round((edge / platform_line) * 100, 2) if abs(platform_line) > 1e-9 else None
+            sigma = float(row.get("residualSigma") or row.get("sigma") or 1.25)
+            over_p, under_p = estimate_side_probabilities(projected_f, platform_line, sigma)
+            if row.get("overProbability") is not None:
+                try:
+                    over_p = float(row["overProbability"])
+                    under_p = float(row.get("underProbability") or (1.0 - over_p))
+                except (TypeError, ValueError):
+                    pass
+            edge_pct = model_edge_percent(
+                projected=projected_f,
+                line=platform_line,
+                over_probability=over_p,
+                under_probability=under_p,
+                side=model_side,
             )
         else:
             model_side = side

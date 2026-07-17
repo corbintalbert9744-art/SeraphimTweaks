@@ -919,7 +919,15 @@ def _markets_payload(
         line = float(p.get("line") or 0)
         side = str(p.get("side") or "Over")
         edge = float(p.get("edgeVsLine") if p.get("edgeVsLine") is not None else (projected - line))
-        edge_pct = round((edge / line) * 100, 1) if line else 0.0
+        from app.analytics.prediction import model_edge_percent
+
+        edge_pct = model_edge_percent(
+            projected=projected,
+            line=line,
+            over_probability=float(p.get("overProbability") or 0.5),
+            under_probability=float(p.get("underProbability") or 0.5),
+            side=side,
+        )
         markets.append(
             {
                 "propId": p["id"],

@@ -126,6 +126,41 @@ def estimate_side_probabilities(
     return over, under
 
 
+def model_edge_percent(
+    *,
+    projected: float,
+    line: float,
+    over_probability: float,
+    under_probability: float,
+    side: Optional[str] = None,
+) -> float:
+    """Display / rank edge % that stays coherent with pick'em lines.
+
+    PrizePicks-style 0.5 / 1.5 markets are yes/no steps. Using
+    ``(proj - line) / line`` there produces absurd values (e.g. 2.3 TB vs
+    0.5 → +360%). For those lines we report the model probability edge vs
+    a fair 50/50. For larger continuous lines we use a capped relative gap.
+    """
+    lean = side if side in ("Over", "Under") else ("Over" if projected >= line else "Under")
+    lean_p = over_probability if lean == "Over" else under_probability
+    try:
+        lean_p = float(lean_p)
+    except (TypeError, ValueError):
+        lean_p = 0.5
+    lean_p = min(0.99, max(0.01, lean_p))
+
+    unit_edge = (projected - line) if lean == "Over" else (line - projected)
+
+    # Step markets (Hits 0.5, Total Bases 0.5, Runs 0.5, …)
+    if abs(float(line)) < 2.0 - 1e-9:
+        return round((lean_p - 0.5) * 100.0, 2)
+
+    if abs(float(line)) < 1e-9:
+        return 0.0
+    rel = (unit_edge / abs(float(line))) * 100.0
+    return round(max(-75.0, min(75.0, rel)), 2)
+
+
 def _research_from_factors(
     factors: Sequence[FactorResult],
     l10: HitWindow,

@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ConfidenceBadge } from "@/components/shared/ConfidenceBadge";
 import { playerProfilePath, propResearchPath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
+import { modelEdgePercent } from "@/lib/playerResearchProfile";
 import { EvPlusBadge, HitPctChip } from "./DeskPrimitives";
 import { parseHitRate } from "./hitRate";
 
@@ -31,13 +32,22 @@ export type DensePropRow = {
   season?: string;
 };
 
-/** Prefer true pricing EV% for the +EV badge; fall back to projection edge %. */
+/** Prefer true pricing EV% for the +EV badge; fall back to coherent model edge %. */
 function evForBadge(row: DensePropRow): number | null {
   if (row.evPercent != null && Number.isFinite(row.evPercent)) return row.evPercent;
   if (row.edgePercent != null && Number.isFinite(row.edgePercent)) return row.edgePercent;
   const proj = row.projectedValue;
   if (proj == null || !row.line) return null;
-  return ((proj - row.line) / row.line) * 100;
+  const lean = row.side === "Under" ? "Under" : "Over";
+  const leanP = row.noVigProb ?? 0.55;
+  const overP = lean === "Over" ? leanP : 1 - leanP;
+  return modelEdgePercent({
+    projected: proj,
+    line: row.line,
+    overProbability: overP,
+    underProbability: 1 - overP,
+    side: lean,
+  });
 }
 
 function initials(name: string): string {

@@ -12,6 +12,7 @@ from app.db.models import Player, PlayerGameLog, Prop, PropAnalytics
 from app.ingestion.pickem_platform_sync import _market_samples
 from app.ingestion.platform_board import normalize_pickem_app
 from app.ingestion.slate_times import format_gamelog_date, format_gamelog_time
+from app.analytics.prediction import estimate_side_probabilities, model_edge_percent
 from app.ingestion.player_markets import prop_source_rank
 from app.providers.propline.markets import normalize_league
 
@@ -178,7 +179,13 @@ def _research_combo_markets(
                 "americanOdds": -110,
                 "projectedValue": round(projected, 2),
                 "edgeVsLine": round(edge, 2),
-                "edgePercent": round((edge / line) * 100, 2) if line else 0.0,
+                "edgePercent": model_edge_percent(
+                    projected=projected,
+                    line=line,
+                    over_probability=estimate_side_probabilities(projected, line, 1.25)[0],
+                    under_probability=estimate_side_probabilities(projected, line, 1.25)[1],
+                    side=side,
+                ),
                 "overProbability": None,
                 "underProbability": None,
                 "researchScore": int(by_label.get("points", {}).get("researchScore") or 70),
@@ -340,6 +347,9 @@ def get_multisport_player_profile(
         projected = analytics.projected_value
         edge = analytics.edge_vs_line
         line = float(prop.line)
+        proj_f = float(projected) if projected is not None else line
+        over_p = float(analytics.over_probability or 0.5)
+        under_p = float(analytics.under_probability or (1.0 - over_p))
         markets.append(
             {
                 "propId": prop.id,
@@ -347,12 +357,14 @@ def get_multisport_player_profile(
                 "side": prop.side,
                 "line": line,
                 "americanOdds": -110,
-                "projectedValue": float(projected) if projected is not None else line,
-                "edgeVsLine": float(edge) if edge is not None else 0.0,
-                "edgePercent": (
-                    round((float(edge) / line) * 100, 2)
-                    if edge is not None and abs(line) > 1e-9
-                    else 0.0
+                "projectedValue": proj_f,
+                "edgeVsLine": float(edge) if edge is not None else round(proj_f - line, 2),
+                "edgePercent": model_edge_percent(
+                    projected=proj_f,
+                    line=line,
+                    over_probability=over_p,
+                    under_probability=under_p,
+                    side=prop.side,
                 ),
                 "overProbability": analytics.over_probability,
                 "underProbability": analytics.under_probability,

@@ -121,10 +121,7 @@ export default function DashboardPage() {
       : liveProps.reduce(
           (s, p) =>
             s +
-            (p.edgePercent ??
-              (p.projectedValue != null && p.line
-                ? ((p.projectedValue - p.line) / p.line) * 100
-                : 0)),
+            (p.edgePercent ?? 0),
           0,
         ) / liveProps.length;
   const avgRs =

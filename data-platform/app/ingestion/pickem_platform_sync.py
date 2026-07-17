@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.analytics.engine import expected_value, home_away_split, rest_days, streak
 from app.analytics.factors.base import PredictionContext
-from app.analytics.prediction import predict_prop
+from app.analytics.prediction import model_edge_percent, predict_prop
 from app.config import get_settings
 from app.db.models import Game, Injury, Player, PlayerGameLog, Prop, PropAnalytics
 from app.ingestion.generic_board import market_values_from_logs
@@ -822,13 +822,17 @@ def sync_pickem_platform_board(
                 edge = float(prediction.edge_vs_line) if prediction.edge_vs_line is not None else round(
                     projected - platform_line, 2
                 )
-                edge_pct = (
-                    round((edge / platform_line) * 100, 2) if abs(platform_line) > 1e-9 else None
+                over_p = float(prediction.over_probability)
+                under_p = float(prediction.under_probability)
+                edge_pct = model_edge_percent(
+                    projected=projected,
+                    line=platform_line,
+                    over_probability=over_p,
+                    under_probability=under_p,
+                    side=side,
                 )
                 confidence = int(prediction.confidence_score)
                 research = int(prediction.research_score)
-                over_p = float(prediction.over_probability)
-                under_p = float(prediction.under_probability)
                 explain = list(prediction.explanation)
                 influential = list(prediction.influential_factors or [])
                 model_version = prediction.model_version
@@ -1314,12 +1318,16 @@ def _apply_prediction_to_analytics(
         if prediction.edge_vs_line is not None
         else round(projected - platform_line, 2)
     )
-    edge_pct = (
-        round((edge / platform_line) * 100, 2) if abs(platform_line) > 1e-9 else None
-    )
     over_p = float(prediction.over_probability)
     under_p = float(prediction.under_probability)
     lean_side = "Over" if projected >= platform_line else "Under"
+    edge_pct = model_edge_percent(
+        projected=projected,
+        line=platform_line,
+        over_probability=over_p,
+        under_probability=under_p,
+        side=lean_side,
+    )
     ev = expected_value(
         over_p if lean_side == "Over" else under_p,
         over_odds if lean_side == "Over" else under_odds,
@@ -1529,11 +1537,18 @@ def _list_cached_platform_board(
         line = float(over.line)
         projected = analytics.projected_value
         edge = analytics.edge_vs_line
-        edge_pct = (
-            round((float(edge) / line) * 100, 2)
-            if edge is not None and abs(line) > 1e-9
-            else None
-        )
+        over_p = float(analytics.over_probability or 0.5)
+        under_p = float(analytics.under_probability or (1.0 - over_p))
+        if projected is not None:
+            edge_pct = model_edge_percent(
+                projected=float(projected),
+                line=line,
+                over_probability=over_p,
+                under_probability=under_p,
+                side=prop.side,
+            )
+        else:
+            edge_pct = None
         team, opponent = _team_opponent_from_matchup_note(analytics.matchup_note)
         board.append(
             {

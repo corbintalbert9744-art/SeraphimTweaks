@@ -70,6 +70,37 @@ function normalCdf(x: number): number {
   return 0.5 * (1 + erf(x / Math.SQRT2));
 }
 
+/**
+ * Display edge % that stays coherent with pick'em 0.5 / 1.5 step markets.
+ * Relative (proj-line)/line explodes on Hits/TB 0.5 — use probability edge there.
+ */
+export function modelEdgePercent(opts: {
+  projected: number;
+  line: number;
+  overProbability: number;
+  underProbability: number;
+  side?: "Over" | "Under" | string | null;
+}): number {
+  const lean =
+    opts.side === "Over" || opts.side === "Under"
+      ? opts.side
+      : opts.projected >= opts.line
+        ? "Over"
+        : "Under";
+  const leanP = Math.min(
+    0.99,
+    Math.max(0.01, lean === "Over" ? opts.overProbability : opts.underProbability),
+  );
+  const unitEdge =
+    lean === "Over" ? opts.projected - opts.line : opts.line - opts.projected;
+  if (Math.abs(opts.line) < 2 - 1e-9) {
+    return Number(((leanP - 0.5) * 100).toFixed(2));
+  }
+  if (Math.abs(opts.line) < 1e-9) return 0;
+  const rel = (unitEdge / Math.abs(opts.line)) * 100;
+  return Number(Math.max(-75, Math.min(75, rel)).toFixed(2));
+}
+
 function invNormalCdf(p: number): number {
   const target = Math.min(0.999999, Math.max(1e-6, p));
   let lo = -8;
@@ -145,7 +176,13 @@ export function applyLineOverride(market: PlayerMarket, line: number): PlayerMar
   const leanSide: "Over" | "Under" = over >= under ? "Over" : "Under";
   const edgeVsLine =
     leanSide === "Over" ? market.projectedValue - next : next - market.projectedValue;
-  const edgePercent = next ? (edgeVsLine / next) * 100 : 0;
+  const edgePercent = modelEdgePercent({
+    projected: market.projectedValue,
+    line: next,
+    overProbability: over,
+    underProbability: under,
+    side: leanSide,
+  });
   const chartGames = market.chartGames.map((g) => ({
     ...g,
     hit: leanSide === "Over" ? g.value > next : g.value < next,
@@ -240,6 +277,7 @@ type BoardProp = {
   season: string;
   tipTime: string;
   projectedValue?: number;
+  edgePercent?: number;
   researchScore?: number;
   injury?: string;
   league: string;
@@ -341,7 +379,18 @@ function marketFromProp(prop: BoardProp, insight?: string): PlayerMarket {
   const projectedValue = estimateProjection(prop);
   const edgeVsLine =
     prop.side === "Over" ? projectedValue - prop.line : prop.line - projectedValue;
-  const edgePercent = prop.line ? (edgeVsLine / prop.line) * 100 : 0;
+  const overProbability = prop.side === "Over" ? prop.noVigProb : 1 - prop.noVigProb;
+  const underProbability = prop.side === "Under" ? prop.noVigProb : 1 - prop.noVigProb;
+  const edgePercent =
+    prop.edgePercent != null && Number.isFinite(prop.edgePercent)
+      ? Number(prop.edgePercent)
+      : modelEdgePercent({
+          projected: projectedValue,
+          line: prop.line,
+          overProbability,
+          underProbability,
+          side: prop.side,
+        });
   const researchScore = prop.researchScore ?? Math.min(99, prop.confidence + 4);
   const chartGames = synthesizeChart(prop);
   const why =
@@ -357,8 +406,8 @@ function marketFromProp(prop: BoardProp, insight?: string): PlayerMarket {
     projectedValue,
     edgeVsLine: Number(edgeVsLine.toFixed(2)),
     edgePercent: Number(edgePercent.toFixed(1)),
-    overProbability: prop.side === "Over" ? prop.noVigProb : 1 - prop.noVigProb,
-    underProbability: prop.side === "Under" ? prop.noVigProb : 1 - prop.noVigProb,
+    overProbability,
+    underProbability,
     researchScore,
     confidence: prop.confidence,
     evPercent: prop.evPercent,

@@ -9,12 +9,22 @@ import { nbaToBuilderLeg } from "@/lib/builderMappers";
 import { leanTextClass } from "@/lib/leanTheme";
 import { playerProfilePath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
+import { modelEdgePercent } from "@/lib/playerResearchProfile";
 
 function edgePercentOf(prop: NbaProp | undefined): number | null {
   if (!prop) return null;
   if (prop.edgePercent != null && Number.isFinite(prop.edgePercent)) return prop.edgePercent;
   if (prop.projectedValue == null || !prop.line) return null;
-  return ((prop.projectedValue - prop.line) / prop.line) * 100;
+  const lean = prop.side === "Under" ? "Under" : "Over";
+  const leanP = prop.noVigProb ?? 0.55;
+  const overP = lean === "Over" ? leanP : 1 - leanP;
+  return modelEdgePercent({
+    projected: prop.projectedValue,
+    line: prop.line,
+    overProbability: overP,
+    underProbability: 1 - overP,
+    side: lean,
+  });
 }
 
 /** Player cards for research boards — show platform line + model projection (not basketball PTS/REB/AST). */

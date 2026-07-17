@@ -166,11 +166,7 @@ export function SportResearchBoard({
     filtered.length === 0
       ? 0
       : filtered.reduce((sum, p) => {
-          const pct =
-            p.edgePercent ??
-            (p.projectedValue != null && p.line
-              ? ((p.projectedValue - p.line) / p.line) * 100
-              : 0);
+          const pct = p.edgePercent ?? 0;
           return sum + pct;
         }, 0) / filtered.length;
   const overCount = filtered.filter((p) => p.side === "Over").length;
