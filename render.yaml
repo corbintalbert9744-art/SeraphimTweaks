@@ -37,6 +37,8 @@ services:
         value: "true"
       - key: BOOTSTRAP_NBA_SYNC
         value: "true"
+      - key: BOOTSTRAP_MULTI_SPORT
+        value: "true"
 
   # Public website + membership API
   - type: web
