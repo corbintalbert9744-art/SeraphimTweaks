@@ -87,9 +87,14 @@ def nba_props(
         )
         props = payload.get("props") or []
         if not props:
-            from app.ingestion.cursor_board_seed import load_cursor_board_seed
+            from app.ingestion.cursor_board_seed import (
+                load_cursor_board_seed,
+                materialize_cursor_seed_to_warehouse,
+            )
 
-            seed = load_cursor_board_seed("NBA", platform)
+            seed = materialize_cursor_seed_to_warehouse(
+                db, league="NBA", platform=platform
+            ) or load_cursor_board_seed("NBA", platform)
             if seed is not None:
                 props = seed.get("props") or []
                 teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})

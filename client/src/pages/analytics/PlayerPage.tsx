@@ -57,13 +57,13 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-neutral-500">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-yellow-400/85" /> Game log
+          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/85" /> Over line
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-red-500/80" /> Under line
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="h-px w-4 border-t border-dashed border-red-400" /> Line
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-red-400" /> Under
         </span>
         <span className="tabular-nums text-neutral-400">Line {line}</span>
       </div>
@@ -86,13 +86,19 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
           const raw = Number.isFinite(g.value) ? g.value : 0;
           const barH = (Math.abs(raw) / maxStat) * innerH;
           const y = padT + innerH - barH;
-          const under = raw < line;
+          const over = raw > line;
           return (
             <g key={`${g.label}-${i}`}>
               <defs>
                 <linearGradient id={`bar-${i}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgb(250, 204, 21)" />
-                  <stop offset="100%" stopColor="rgb(180, 130, 10)" />
+                  <stop
+                    offset="0%"
+                    stopColor={over ? "rgb(52, 211, 153)" : "rgb(248, 113, 113)"}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={over ? "rgb(5, 150, 105)" : "rgb(185, 28, 28)"}
+                  />
                 </linearGradient>
               </defs>
               <rect
@@ -102,11 +108,8 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
                 height={Math.max(3, barH)}
                 rx={3}
                 fill={`url(#bar-${i})`}
-                opacity={0.9}
+                opacity={0.92}
               />
-              {under ? (
-                <circle cx={cx} cy={padT + innerH + 4} r={2.5} className="fill-red-400" />
-              ) : null}
               <text
                 x={cx}
                 y={Math.max(14, y - 5)}
@@ -127,7 +130,7 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
                 x={cx}
                 y={h - 2}
                 textAnchor="middle"
-                className={g.home ? "fill-yellow-400/80" : "fill-neutral-500"}
+                className={g.home ? "fill-emerald-400/80" : "fill-neutral-500"}
                 fontSize="8"
               >
                 {g.home ? "H" : "A"}

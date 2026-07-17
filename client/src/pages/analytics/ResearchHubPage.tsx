@@ -228,8 +228,7 @@ export default function ResearchHubPage() {
                   <th className="px-3 py-2.5 font-medium">Proj</th>
                   <th className="px-3 py-2.5 font-medium">Line</th>
                   <th className="px-3 py-2.5 font-medium">Model edge</th>
-                  <th className="px-3 py-2.5 font-medium">P(Over)</th>
-                  <th className="px-3 py-2.5 font-medium">P(Under)</th>
+                  <th className="px-3 py-2.5 font-medium">P(Over/Under)</th>
                   <th className="px-3 py-2.5 font-medium">Conf</th>
                   <th className="px-3 py-2.5 font-medium">RS</th>
                   <th className="px-3 py-2.5 font-medium">EV</th>
@@ -279,11 +278,27 @@ export default function ResearchHubPage() {
                         {summary.modelEdge > 0 ? "+" : ""}
                         {summary.modelEdge.toFixed(1)}
                       </td>
-                      <td className="px-3 py-2.5 tabular-nums text-emerald-300/90">
-                        {overPct == null ? "—" : `${overPct.toFixed(1)}%`}
-                      </td>
-                      <td className="px-3 py-2.5 tabular-nums text-red-300/90">
-                        {underPct == null ? "—" : `${underPct.toFixed(1)}%`}
+                      <td className="px-3 py-2.5">
+                        {overPct == null || underPct == null ? (
+                          <span className="text-neutral-600">—</span>
+                        ) : (
+                          <div className="min-w-[7rem]">
+                            <div className="flex h-1.5 overflow-hidden rounded-full bg-[#1a1a1a]">
+                              <div
+                                className="h-full bg-emerald-500/85"
+                                style={{ width: `${Math.min(100, Math.max(0, overPct))}%` }}
+                              />
+                              <div
+                                className="h-full bg-red-500/80"
+                                style={{ width: `${Math.min(100, Math.max(0, underPct))}%` }}
+                              />
+                            </div>
+                            <div className="mt-1 flex justify-between text-[10px] tabular-nums">
+                              <span className="text-emerald-400">{overPct.toFixed(0)}%</span>
+                              <span className="text-red-400">{underPct.toFixed(0)}%</span>
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 tabular-nums text-neutral-300">
                         {summary.confidence != null ? Math.round(summary.confidence) : "—"}

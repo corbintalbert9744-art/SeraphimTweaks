@@ -228,6 +228,18 @@ def get_multisport_player_profile(
     if not player:
         return None
 
+    # Pull ESPN/provider gamelogs when warehouse is cold (seed / new pick'em athletes).
+    try:
+        from app.ingestion.pickem_platform_sync import _hydrate_player_logs
+
+        player = _hydrate_player_logs(db, league=code, player=player)
+        db.commit()
+    except Exception:  # noqa: BLE001
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
     peer_ids = _peer_player_ids(db, player)
 
     logs = list(

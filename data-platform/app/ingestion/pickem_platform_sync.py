@@ -687,9 +687,14 @@ def sync_pickem_platform_board(
                 stale["pickemAttempts"] = attempts
             return stale
         # Prefer the Cursor-exported PrizePicks snapshot over a blank board.
-        from app.ingestion.cursor_board_seed import load_cursor_board_seed
+        from app.ingestion.cursor_board_seed import (
+            load_cursor_board_seed,
+            materialize_cursor_seed_to_warehouse,
+        )
 
-        seed = load_cursor_board_seed(code, app)
+        seed = materialize_cursor_seed_to_warehouse(db, league=code, platform=app) or load_cursor_board_seed(
+            code, app
+        )
         if seed is not None:
             seed["refreshError"] = f"{msg}; {ops_detail}"
             if attempts is not None:

@@ -133,9 +133,14 @@ def mlb_props(
             db, [], platform, league="MLB", refresh=refresh
         )
         if not props:
-            from app.ingestion.cursor_board_seed import load_cursor_board_seed
+            from app.ingestion.cursor_board_seed import (
+                load_cursor_board_seed,
+                materialize_cursor_seed_to_warehouse,
+            )
 
-            seed = load_cursor_board_seed("MLB", platform)
+            seed = materialize_cursor_seed_to_warehouse(
+                db, league="MLB", platform=platform
+            ) or load_cursor_board_seed("MLB", platform)
             if seed is not None:
                 props = seed.get("props") or []
                 players = seed.get("players") or []
@@ -244,9 +249,14 @@ def nhl_props(
             db, [], platform, league="NHL", refresh=refresh
         )
         if not props:
-            from app.ingestion.cursor_board_seed import load_cursor_board_seed
+            from app.ingestion.cursor_board_seed import (
+                load_cursor_board_seed,
+                materialize_cursor_seed_to_warehouse,
+            )
 
-            seed = load_cursor_board_seed("NHL", platform)
+            seed = materialize_cursor_seed_to_warehouse(
+                db, league="NHL", platform=platform
+            ) or load_cursor_board_seed("NHL", platform)
             if seed is not None:
                 props = seed.get("props") or []
                 players = seed.get("players") or []

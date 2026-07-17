@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -42,6 +43,34 @@ def _prop_base(db: Session, prop_id: str, league: str | None) -> tuple[dict, str
     Prefer board rows + build_live_odds_comparison over full detail builders so a
     secondary research-detail bug cannot blank the entire Live Odds table.
     """
+    from app.db.models import Player, Prop, PropAnalytics
+
+    # Direct warehouse hit (includes materialized pick'em / seed props).
+    prop_row = db.get(Prop, prop_id)
+    if prop_row is not None:
+        analytics = db.execute(
+            select(PropAnalytics).where(PropAnalytics.prop_id == prop_id)
+        ).scalar_one_or_none()
+        player = db.get(Player, prop_row.player_id) if prop_row.player_id else None
+        resolved = prop_row.league or _infer_league(prop_id, league) or "NBA"
+        return (
+            {
+                "id": prop_row.id,
+                "player": player.full_name if player else "Player",
+                "playerId": (player.external_id if player else None) or "",
+                "playerWarehouseId": player.id if player else prop_row.player_id,
+                "market": prop_row.market,
+                "side": prop_row.side,
+                "line": prop_row.line,
+                "league": resolved,
+                "projectedValue": (
+                    analytics.projected_value if analytics and analytics.projected_value is not None else prop_row.line
+                ),
+                "recommendation": prop_row.side,
+            },
+            resolved,
+        )
+
     inferred = _infer_league(prop_id, league)
     order = (
         [inferred]

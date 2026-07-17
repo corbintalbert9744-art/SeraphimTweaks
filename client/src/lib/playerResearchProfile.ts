@@ -338,41 +338,9 @@ function hitWindowsFor(prop: BoardProp, projected: number): HitWindow[] {
   });
 }
 
-function synthesizeChart(prop: BoardProp, n = 10): ChartGame[] {
-  const parsed = parseHits(prop.l10);
-  const count = Math.min(n, parsed.samples || n);
-  const hitTarget = parsed.hits || Math.round(count * 0.6);
-  const rand = seeded(`${prop.id}:${prop.line}`);
-  const outcomes = Array.from({ length: count }, (_, i) => i < hitTarget);
-  for (let i = outcomes.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [outcomes[i], outcomes[j]] = [outcomes[j], outcomes[i]];
-  }
-  const opponents = ["WAS", "LAS", "CHI", "PHX", "SEA", "ATL", "MIN", "DAL", "NYK", "BOS"];
-  return outcomes.map((hit, i) => {
-    const overHit = prop.side === "Over" ? hit : !hit;
-    const delta = (0.35 + rand() * 0.9) * Math.max(1, prop.line * 0.12);
-    const value = Number(
-      (overHit ? prop.line + delta : Math.max(0, prop.line - delta)).toFixed(1),
-    );
-    const minutes = Math.round(22 + rand() * 18);
-    const opp = opponents[i % opponents.length];
-    const home = i % 2 === 0;
-    const month = 6;
-    const day = 10 + i;
-    return {
-      date: `${month}/${day}`,
-      label: `${month}/${day} ${home ? "" : "@"}${opp}`,
-      opponent: opp,
-      home,
-      value,
-      minutes,
-      hit: overHit === (prop.side === "Over") ? hit : hit,
-    };
-  }).map((g) => ({
-    ...g,
-    hit: prop.side === "Over" ? g.value > prop.line : g.value < prop.line,
-  }));
+function synthesizeChart(_prop: BoardProp, _n = 10): ChartGame[] {
+  // Never invent game bars — live gamelogs come from the player desk API.
+  return [];
 }
 
 function marketFromProp(prop: BoardProp, insight?: string): PlayerMarket {
