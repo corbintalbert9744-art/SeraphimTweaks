@@ -5,7 +5,15 @@
  */
 import type { Express, Request, Response } from "express";
 
-const BASE = process.env.DATA_PLATFORM_URL || "http://127.0.0.1:8000";
+function resolveDataPlatformBase(): string {
+  const raw = (process.env.DATA_PLATFORM_URL || "http://127.0.0.1:8000").trim();
+  if (!raw) return "http://127.0.0.1:8000";
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw.replace(/\/$/, "");
+  // Render fromService "host" is hostname-only (e.g. seraphim-data.onrender.com)
+  return `https://${raw.replace(/\/$/, "")}`;
+}
+
+const BASE = resolveDataPlatformBase();
 const ENABLED = process.env.DATA_PLATFORM_PROXY !== "0";
 
 async function proxyGet(

@@ -5,7 +5,14 @@ import { registerAuthAndBillingRoutes } from "./billingRoutes";
 import { registerDataPlatformProxy } from "./dataPlatformProxy";
 import { requireActiveMembership, requireAuth } from "./auth";
 
-const DATA_PLATFORM_URL = process.env.DATA_PLATFORM_URL || "http://127.0.0.1:8000";
+function resolveDataPlatformUrl(): string {
+  const raw = (process.env.DATA_PLATFORM_URL || "http://127.0.0.1:8000").trim();
+  if (!raw) return "http://127.0.0.1:8000";
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw.replace(/\/$/, "");
+  return `https://${raw.replace(/\/$/, "")}`;
+}
+
+const DATA_PLATFORM_URL = resolveDataPlatformUrl();
 
 /** Member-only sports / research APIs (auth + active membership). */
 const MEMBER_API_PREFIXES = [
