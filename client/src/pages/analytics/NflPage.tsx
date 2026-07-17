@@ -252,7 +252,7 @@ export default function NflPage() {
         <div className="mt-6">
           <EmptyState
             title="Live NFL board unavailable"
-            description="Start the data platform (`npm run data-platform`) and refresh."
+            description="This board is temporarily unavailable. Please try again in a few minutes."
           />
         </div>
       )}

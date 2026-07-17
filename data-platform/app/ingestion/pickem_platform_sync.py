@@ -622,10 +622,10 @@ def sync_pickem_platform_board(
             "requiresApiKey": True,
             "envVar": "PROPLINE_API_KEY",
             "requiresAdditionalKeys": ["SHARPAPI_API_KEY", "ODDS_API_KEY"],
+            # Member-facing copy only — never expose env var / vendor limit details.
             "note": (
-                f"Live {label} props need at least one odds key "
-                "(PROPLINE_API_KEY, SHARPAPI_API_KEY, or ODDS_API_KEY). "
-                "We do not invent pick'em lines or substitute sportsbook odds."
+                f"{label} lines for {code} aren’t available right now. "
+                "Check back shortly — we only show live platform lines."
             ),
         }
 
@@ -662,24 +662,26 @@ def sync_pickem_platform_board(
         )
         until = propline_rate_limit.blocked_until()
         missing = [name for name, ok in keyed if not ok]
-        extra_hint = (
-            f" Add {', '.join(missing)} so boards can fall through when PropLine is exhausted."
-            if limited and missing
-            else ""
+        # Ops-only detail (logs / refreshError). Never put vendor limits in `note`.
+        ops_detail = (
+            f"provider refresh blocked until "
+            f"{until.strftime('%Y-%m-%d %H:%M UTC') if until else 'reset'}; "
+            f"missing fallbacks: {', '.join(missing) if missing else 'none'}"
         )
-        reset_hint = (
-            f" PropLine daily free-tier limit hit — new lines (including tomorrow's PrizePicks slate) "
-            f"resume after {until.strftime('%b %d %H:%M UTC') if until else 'the next UTC day'}."
+        member_note = (
+            f"Showing the latest saved {label} lines while tonight’s feed refreshes. "
+            "Projections are Seraphim estimates vs those lines."
             if limited
-            else ""
+            else f"Showing the latest saved {label} lines. Projections are Seraphim estimates vs those lines."
+        )
+        member_empty = (
+            f"{label} lines for {code} aren’t loaded yet. "
+            "Check back shortly — we only show players currently listed on the app."
         )
         if stale is not None:
-            stale["note"] = (
-                f"Showing last live {label} lines from warehouse.{reset_hint}{extra_hint} "
-                "Projections are Seraphim estimates vs those lines."
-            )
+            stale["note"] = member_note
             stale["cached"] = True
-            stale["refreshError"] = msg
+            stale["refreshError"] = f"{msg}; {ops_detail}"
             stale["rateLimited"] = limited
             if attempts is not None:
                 stale["pickemAttempts"] = attempts
@@ -695,14 +697,12 @@ def sync_pickem_platform_board(
             "updatedAt": None,
             "propsUpdatedAt": None,
             "dataSource": f"pickem:{app}",
-            "error": msg,
+            "error": None,
+            "refreshError": f"{msg}; {ops_detail}",
             "rateLimited": limited,
             "requiresAdditionalKeys": missing or None,
             "pickemAttempts": attempts,
-            "note": (
-                f"No cached {label} lines for {code}.{reset_hint}{extra_hint} "
-                "We only show players currently listed on the app — never invented lines."
-            ).strip(),
+            "note": member_empty,
         }
 
     aggregator = get_pickem_aggregator()

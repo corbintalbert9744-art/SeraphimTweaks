@@ -125,7 +125,6 @@ export function SportResearchBoard({
   }, [board.data?.props]);
 
   const livePlayers = board.data?.players ?? [];
-  const rateLimited = Boolean(board.data?.rateLimited);
   const isFallback = Boolean(board.data?.fallback);
 
   const marketOptions = useMemo(() => {
@@ -194,7 +193,22 @@ export function SportResearchBoard({
   const loading = board.isLoading && liveProps.length === 0;
   const needsConfig =
     (board.data?.requiresApiKey || board.data?.requiresConfiguration) && liveProps.length === 0;
-  const note = board.data?.note ?? board.data?.error;
+  const rateLimited = Boolean(board.data?.rateLimited);
+  // Member-safe copy only — never surface vendor names, API keys, or quota text.
+  const memberEmpty =
+    emptyHint ||
+    `${app?.name ?? "Platform"} lines for ${league} aren’t available right now. Check back shortly.`;
+  const note = rateLimited
+    ? liveProps.length > 0
+      ? `Showing the latest saved ${app?.name ?? "platform"} lines while the live feed refreshes.`
+      : memberEmpty
+    : needsConfig
+      ? memberEmpty
+      : board.data?.note && !/API_KEY|PropLine|free-tier|ODDS_|SHARPAPI|PROPLINE/i.test(board.data.note)
+        ? board.data.note
+        : liveProps.length === 0
+          ? memberEmpty
+          : null;
   const platformLabel = board.data?.platformLabel ?? app?.name ?? null;
   const updatedAt = board.data?.propsUpdatedAt ?? board.data?.updatedAt ?? board.data?.syncedAt;
 
@@ -230,22 +244,9 @@ export function SportResearchBoard({
         )}
       </div>
 
-      {note && (
-        <p
-          className={
-            rateLimited
-              ? "mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-100"
-              : "mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-200/90"
-          }
-        >
-          {rateLimited ? (
-            <>
-              <span className="font-semibold text-amber-200">PropLine daily limit reached. </span>
-              {note}
-            </>
-          ) : (
-            note
-          )}
+      {note && liveProps.length > 0 && (
+        <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs text-neutral-400">
+          {note}
         </p>
       )}
 
@@ -255,20 +256,13 @@ export function SportResearchBoard({
         </div>
       ) : needsConfig ? (
         <div className="mt-6">
-          <EmptyState
-            title="Provider configuration required"
-            description={
-              emptyHint ||
-              note ||
-              `${league} needs a configured data provider. We do not fabricate live data.`
-            }
-          />
+          <EmptyState title={`No ${app?.name ?? "platform"} lines yet`} description={memberEmpty} />
         </div>
       ) : board.isError ? (
         <div className="mt-6">
           <EmptyState
             title={`${league} board unavailable`}
-            description="Start the data platform (`npm run data-platform`) so providers can sync."
+            description="This board is temporarily unavailable. Please try again in a few minutes."
           />
         </div>
       ) : (
@@ -324,11 +318,7 @@ export function SportResearchBoard({
             <div className="mt-6">
               <EmptyState
                 title={`No ${app?.name ?? "platform"} lines yet`}
-                description={
-                  note ||
-                  emptyHint ||
-                  `Sync market lines for ${app?.name ?? "this app"}, then refresh. We only show players available on that platform.`
-                }
+                description={memberEmpty}
               />
             </div>
           ) : (

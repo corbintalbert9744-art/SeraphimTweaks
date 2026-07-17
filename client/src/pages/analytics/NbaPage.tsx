@@ -141,7 +141,12 @@ export default function NbaPage() {
   }
 
   const platformLabel = board.data?.platformLabel ?? app?.name ?? null;
-  const note = board.data?.note;
+  const rawNote = board.data?.note ?? "";
+  const memberSafeNote =
+    rawNote && !/API_KEY|PropLine|free-tier|ODDS_|SHARPAPI|PROPLINE/i.test(rawNote)
+      ? rawNote
+      : null;
+  const memberEmpty = `${app?.name ?? "Platform"} lines aren’t available right now. Check back shortly.`;
   const updatedAt = board.data?.propsUpdatedAt ?? board.data?.updatedAt ?? board.data?.syncedAt;
 
   return (
@@ -149,7 +154,7 @@ export default function NbaPage() {
       <PageHeader
         eyebrow="NBA"
         title="NBA Research Board"
-        description={`Live ${app?.name ?? "app"} props via PropLine → Seraphim model. Players not on that board stay hidden.`}
+        description={`Live ${app?.name ?? "app"} props with Seraphim projections. Players not on that board stay hidden.`}
         actions={
           <Link
             href="/parlay-builder"
@@ -169,9 +174,9 @@ export default function NbaPage() {
         )}
       </div>
 
-      {note && (
-        <p className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-200/90">
-          {note}
+      {memberSafeNote && liveProps.length > 0 && (
+        <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs text-neutral-400">
+          {memberSafeNote}
         </p>
       )}
 
@@ -224,7 +229,7 @@ export default function NbaPage() {
         <div className="mt-6">
           <EmptyState
             title="Live board unavailable"
-            description="Start the data platform (`npm run data-platform`) and refresh."
+            description="This board is temporarily unavailable. Please try again in a few minutes."
           />
         </div>
       )}
@@ -240,10 +245,7 @@ export default function NbaPage() {
             {filtered.length === 0 ? (
               <EmptyState
                 title={`No ${app?.name ?? "platform"} props`}
-                description={
-                  note ||
-                  "Sync market lines for this app, then refresh. We never invent pick'em boards from another database."
-                }
+                description={memberSafeNote || memberEmpty}
               />
             ) : (
               <NbaPropTable

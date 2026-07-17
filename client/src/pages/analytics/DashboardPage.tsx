@@ -232,7 +232,7 @@ export default function DashboardPage() {
       ) : board.isError ? (
         <EmptyState
           title="Live dashboard unavailable"
-          description="Start the data platform (`npm run data-platform`) so the board can load."
+          description="This board is temporarily unavailable. Please try again in a few minutes."
         />
       ) : (
         <>
