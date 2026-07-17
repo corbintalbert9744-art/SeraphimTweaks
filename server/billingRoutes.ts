@@ -17,11 +17,14 @@ import {
 } from "./membershipStore";
 import {
   appBaseUrl,
+  buildPaymentLinkCheckoutUrl,
   confirmCheckoutSession,
   constructWebhookEvent,
   createCheckoutSession,
+  getStripePaymentLinkUrl,
   handleStripeEvent,
   isStripeConfigured,
+  paymentLinksConfigured,
 } from "./stripeBilling";
 import { isBillingInterval, isMembershipPlan, normalizeBillingInterval } from "@shared/membership";
 import { shouldSeedOwnerAccount } from "./runtimeConfig";
@@ -129,12 +132,6 @@ export function registerAuthAndBillingRoutes(app: Express) {
 
   app.post("/api/checkout/session", requireAuth, async (req: AuthedRequest, res) => {
     try {
-      if (!isStripeConfigured()) {
-        return res.status(503).json({
-          error:
-            "Stripe is not configured. Set STRIPE_SECRET_KEY and STRIPE_PRICE_* environment variables.",
-        });
-      }
       const body = checkoutSchema.parse(req.body);
       if (!isMembershipPlan(body.plan) || !isBillingInterval(body.interval)) {
         return res.status(400).json({ error: "Invalid plan or interval" });
@@ -143,6 +140,25 @@ export function registerAuthAndBillingRoutes(app: Express) {
       const user = req.user!;
       if (user.membershipActive) {
         return res.status(409).json({ error: "Membership is already active" });
+      }
+
+      // Prefer hosted Payment Links (Corbin's live buy.stripe.com pages).
+      if (getStripePaymentLinkUrl(body.plan, interval)) {
+        return res.json(
+          buildPaymentLinkCheckoutUrl({
+            plan: body.plan,
+            interval,
+            userId: user.id,
+            email: user.email,
+          }),
+        );
+      }
+
+      if (!isStripeConfigured()) {
+        return res.status(503).json({
+          error:
+            "Stripe is not configured. Set STRIPE_SECRET_KEY and STRIPE_PRICE_* or STRIPE_PAYMENT_LINK_* variables.",
+        });
       }
       const session = await createCheckoutSession({
         userId: user.id,
@@ -188,6 +204,7 @@ export function registerAuthAndBillingRoutes(app: Express) {
   app.get("/api/billing/config", (_req, res) => {
     res.json({
       stripeConfigured: isStripeConfigured(),
+      paymentLinksConfigured: paymentLinksConfigured(),
       webhookConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET?.trim() && !process.env.STRIPE_WEBHOOK_SECRET.includes("...")),
       intervals: ["monthly", "yearly"],
       plans: ["standard", "pro"],
@@ -197,6 +214,16 @@ export function registerAuthAndBillingRoutes(app: Express) {
           process.env.STRIPE_PRICE_PRO_MONTHLY &&
           process.env.STRIPE_PRICE_PRO_YEARLY,
       ),
+      paymentLinks: {
+        standard: {
+          monthly: getStripePaymentLinkUrl("standard", "monthly"),
+          yearly: getStripePaymentLinkUrl("standard", "yearly"),
+        },
+        pro: {
+          monthly: getStripePaymentLinkUrl("pro", "monthly"),
+          yearly: getStripePaymentLinkUrl("pro", "yearly"),
+        },
+      },
     });
   });
 

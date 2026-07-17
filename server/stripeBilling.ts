@@ -39,6 +39,60 @@ function priceEnvKey(plan: MembershipPlan, interval: BillingInterval): string {
   return `STRIPE_PRICE_${p}_${i}`;
 }
 
+/** Live Stripe Payment Links from Corbin (override via STRIPE_PAYMENT_LINK_* env). */
+const DEFAULT_PAYMENT_LINKS: Record<MembershipPlan, Record<BillingInterval, string>> = {
+  standard: {
+    monthly: "https://buy.stripe.com/8x27sN54F2lz0NefgC9k400",
+    yearly: "https://buy.stripe.com/dRmcN7eFf3pDbrSd8u9k401",
+  },
+  pro: {
+    monthly: "https://buy.stripe.com/bJe6oJcx7f8l2VmfgC9k402",
+    yearly: "https://buy.stripe.com/bJe3cx1Stf8l7bC6K69k403",
+  },
+};
+
+function paymentLinkEnvKey(plan: MembershipPlan, interval: BillingInterval): string {
+  const i = interval === "yearly" ? "YEARLY" : "MONTHLY";
+  const p = plan === "pro" ? "PRO" : "STANDARD";
+  return `STRIPE_PAYMENT_LINK_${p}_${i}`;
+}
+
+export function getStripePaymentLinkUrl(
+  plan: MembershipPlan,
+  interval: BillingInterval,
+): string | null {
+  const envKey = paymentLinkEnvKey(plan, interval);
+  const fromEnv = process.env[envKey]?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  return DEFAULT_PAYMENT_LINKS[plan][interval] || null;
+}
+
+export function paymentLinksConfigured(): boolean {
+  return (["standard", "pro"] as const).every((plan) =>
+    (["monthly", "yearly"] as const).every((interval) => Boolean(getStripePaymentLinkUrl(plan, interval))),
+  );
+}
+
+/** Build a Payment Link URL with buyer identity for webhook / success confirm. */
+export function buildPaymentLinkCheckoutUrl(input: {
+  plan: MembershipPlan;
+  interval: BillingInterval;
+  userId: string;
+  email: string;
+}): { url: string; sessionId: string } {
+  const base = getStripePaymentLinkUrl(input.plan, input.interval);
+  if (!base) {
+    throw Object.assign(new Error("Payment link not configured for this plan"), { status: 503 });
+  }
+  const url = new URL(base);
+  url.searchParams.set("client_reference_id", input.userId);
+  if (input.email) url.searchParams.set("prefilled_email", input.email);
+  // Helps ops / support; Stripe ignores unknown params on the hosted page.
+  url.searchParams.set("utm_source", "seraphim_iq");
+  url.searchParams.set("utm_content", `${input.plan}_${input.interval}`);
+  return { url: url.toString(), sessionId: "" };
+}
+
 export function getStripePriceId(plan: MembershipPlan, interval: BillingInterval): string {
   const envKey = priceEnvKey(plan, interval);
   const priceId = process.env[envKey]?.trim();
@@ -96,6 +150,17 @@ export async function createCheckoutSession(input: {
   interval: BillingInterval;
   baseUrl: string;
 }): Promise<{ url: string; sessionId: string }> {
+  // Prefer Corbin's hosted Payment Links so buyers hit the exact Stripe Checkout pages.
+  const paymentLink = getStripePaymentLinkUrl(input.plan, input.interval);
+  if (paymentLink) {
+    return buildPaymentLinkCheckoutUrl({
+      plan: input.plan,
+      interval: input.interval,
+      userId: input.userId,
+      email: input.email,
+    });
+  }
+
   const stripe = getStripe();
   const priceId = getStripePriceId(input.plan, input.interval);
   const customerId = await getOrCreateStripeCustomer({
@@ -192,6 +257,82 @@ function intervalFromMetadata(meta: Stripe.Metadata | null | undefined): Billing
   return isBillingInterval(interval) ? normalizeBillingInterval(interval) : null;
 }
 
+function planFromPriceId(priceId: string | null | undefined): MembershipPlan | null {
+  if (!priceId) return null;
+  for (const plan of ["standard", "pro"] as const) {
+    for (const interval of ["monthly", "yearly"] as const) {
+      const envId = process.env[priceEnvKey(plan, interval)]?.trim();
+      if (envId && envId === priceId) return plan;
+    }
+  }
+  return null;
+}
+
+function intervalFromPriceId(priceId: string | null | undefined): BillingInterval | null {
+  if (!priceId) return null;
+  for (const plan of ["standard", "pro"] as const) {
+    for (const interval of ["monthly", "yearly"] as const) {
+      const envId = process.env[priceEnvKey(plan, interval)]?.trim();
+      if (envId && envId === priceId) return interval;
+    }
+  }
+  return null;
+}
+
+function planFromProductName(name: string | null | undefined): MembershipPlan | null {
+  if (!name) return null;
+  const n = name.toLowerCase();
+  if (n.includes("standard")) return "standard";
+  if (/\bpro\b/.test(n) || n.includes("iq pro")) return "pro";
+  return null;
+}
+
+/** Infer plan + interval from Checkout Session (Payment Links often omit our metadata). */
+async function resolvePlanAndInterval(
+  session: Stripe.Checkout.Session,
+): Promise<{ plan: MembershipPlan | null; interval: BillingInterval | null }> {
+  let plan = planFromMetadata(session.metadata);
+  let interval = intervalFromMetadata(session.metadata);
+  if (plan && interval) return { plan, interval };
+
+  try {
+    const stripe = getStripe();
+    const full = await stripe.checkout.sessions.retrieve(session.id, {
+      expand: ["line_items.data.price.product", "subscription"],
+    });
+    const item = full.line_items?.data?.[0];
+    const price = item?.price;
+    const priceId = typeof price === "string" ? price : price?.id;
+    const recurring = typeof price === "object" && price ? price.recurring : null;
+    if (!interval && recurring?.interval === "year") interval = "yearly";
+    if (!interval && recurring?.interval === "month") interval = "monthly";
+    if (!plan) plan = planFromPriceId(priceId);
+    if (!interval) interval = intervalFromPriceId(priceId);
+
+    const product = typeof price === "object" && price ? price.product : null;
+    const productName =
+      typeof product === "object" && product && "name" in product
+        ? String((product as Stripe.Product).name || "")
+        : typeof price === "object" && price
+          ? price.nickname || ""
+          : "";
+    if (!plan) plan = planFromProductName(productName);
+
+    const sub =
+      typeof full.subscription === "object" && full.subscription
+        ? full.subscription
+        : null;
+    if (sub) {
+      if (!plan) plan = planFromMetadata(sub.metadata);
+      if (!interval) interval = intervalFromMetadata(sub.metadata);
+    }
+  } catch (err) {
+    console.warn("[stripe] could not infer plan/interval from session line items", err);
+  }
+
+  return { plan, interval };
+}
+
 export async function applySubscriptionToUser(sub: Stripe.Subscription): Promise<void> {
   const userId = await resolveUserIdFromSubscription(sub);
   if (!userId) {
@@ -225,8 +366,9 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
   const subscriptionId =
     typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
 
-  const plan = planFromMetadata(session.metadata);
-  const interval = intervalFromMetadata(session.metadata);
+  const inferred = await resolvePlanAndInterval(session);
+  const plan = inferred.plan ?? planFromMetadata(session.metadata);
+  const interval = inferred.interval ?? intervalFromMetadata(session.metadata);
 
   await updateUserMembership(userId, {
     stripeCustomerId: customerId ?? undefined,
@@ -238,6 +380,27 @@ export async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Se
 
   if (subscriptionId) {
     const sub = await stripe.subscriptions.retrieve(subscriptionId);
+    // Stamp plan/interval onto subscription metadata when Payment Links omit them.
+    if ((plan || interval) && (!sub.metadata?.plan || !sub.metadata?.billingInterval)) {
+      try {
+        await stripe.subscriptions.update(subscriptionId, {
+          metadata: {
+            ...sub.metadata,
+            userId,
+            ...(plan ? { plan } : {}),
+            ...(interval ? { billingInterval: interval } : {}),
+          },
+        });
+        sub.metadata = {
+          ...sub.metadata,
+          userId,
+          ...(plan ? { plan } : {}),
+          ...(interval ? { billingInterval: interval } : {}),
+        };
+      } catch (err) {
+        console.warn("[stripe] could not stamp subscription metadata", err);
+      }
+    }
     await applySubscriptionToUser(sub);
   }
 }
@@ -376,13 +539,14 @@ export async function confirmCheckoutSession(input: {
     await applySubscriptionToUser(sub);
   } else {
     // Still mark active from completed checkout if subscription expand failed
+    const inferred = await resolvePlanAndInterval(session);
     await updateUserMembership(userId, {
       membershipStatus: "active",
       stripeCustomerId: customerId,
       stripeSubscriptionId:
         typeof session.subscription === "string" ? session.subscription : session.subscription?.id || undefined,
-      plan: session.metadata?.plan || undefined,
-      billingInterval: session.metadata?.billingInterval || undefined,
+      plan: inferred.plan ?? (session.metadata?.plan || undefined),
+      billingInterval: inferred.interval ?? (session.metadata?.billingInterval || undefined),
     });
   }
 

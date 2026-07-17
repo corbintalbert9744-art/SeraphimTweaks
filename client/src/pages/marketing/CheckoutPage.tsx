@@ -147,8 +147,8 @@ export default function CheckoutPage() {
                   <span className="text-base font-medium text-neutral-500"> {SHORT[interval]}</span>
                 </p>
                 <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-                  You will be redirected to Stripe Checkout. Access unlocks after webhook
-                  confirmation, not from the browser alone.
+                  You will be redirected to Stripe Checkout to pay securely. After payment you
+                  return here and membership unlocks automatically.
                 </p>
               </div>
 
