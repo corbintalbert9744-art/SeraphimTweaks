@@ -16,6 +16,22 @@ export function resolveAppUrl(): string | undefined {
   return `https://${raw.replace(/\/$/, "")}`;
 }
 
+/**
+ * Python warehouse base URL.
+ * Render Blueprint `fromService.property: host` often injects the bare service
+ * name (e.g. `seraphim-data`) — expand that to `*.onrender.com` in production.
+ */
+export function resolveDataPlatformUrl(): string {
+  const raw = (process.env.DATA_PLATFORM_URL || "http://127.0.0.1:8000").trim();
+  if (!raw) return "http://127.0.0.1:8000";
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw.replace(/\/$/, "");
+  let host = raw.replace(/\/$/, "");
+  if (!host.includes(".") && (process.env.RENDER || process.env.NODE_ENV === "production")) {
+    host = `${host}.onrender.com`;
+  }
+  return `https://${host}`;
+}
+
 export function assertRuntimeConfig(): void {
   const problems: string[] = [];
 

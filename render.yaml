@@ -63,8 +63,6 @@ services:
         generateValue: true
       - key: DATA_PLATFORM_PROXY
         value: "1"
+      # Public onrender hostname (Blueprint "host" alone is often just the service name)
       - key: DATA_PLATFORM_URL
-        fromService:
-          name: seraphim-data
-          type: web
-          property: host
+        value: https://seraphim-data.onrender.com

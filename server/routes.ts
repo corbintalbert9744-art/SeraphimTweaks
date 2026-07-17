@@ -4,13 +4,7 @@ import { buildCommandCenterPayload, buildFeaturedNbaProp, getNbaGames } from "./
 import { registerAuthAndBillingRoutes } from "./billingRoutes";
 import { registerDataPlatformProxy } from "./dataPlatformProxy";
 import { requireActiveMembership, requireAuth } from "./auth";
-
-function resolveDataPlatformUrl(): string {
-  const raw = (process.env.DATA_PLATFORM_URL || "http://127.0.0.1:8000").trim();
-  if (!raw) return "http://127.0.0.1:8000";
-  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw.replace(/\/$/, "");
-  return `https://${raw.replace(/\/$/, "")}`;
-}
+import { resolveDataPlatformUrl } from "./runtimeConfig";
 
 const DATA_PLATFORM_URL = resolveDataPlatformUrl();
 
