@@ -8,6 +8,7 @@
  *   node scripts/start-stack.mjs --dev    # npm run dev + uvicorn --reload
  */
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -68,9 +69,16 @@ run(
   { cwd: path.join(root, "data-platform"), env: pyEnv },
 );
 
-console.log(`[stack] starting app :${process.env.PORT || 5000} (${isDev ? "dev" : "prod"})`);
+const port = process.env.PORT || "5000";
+console.log(`[stack] starting app :${port} (${isDev ? "dev" : "prod"})`);
 if (isDev) {
   run("app", "npm", ["run", "dev"]);
 } else {
-  run("app", "node", ["--env-file=.env", "dist/index.cjs"]);
+  // Render / Docker inject env vars — only use --env-file when a local .env exists.
+  const envFile = path.join(root, ".env");
+  if (existsSync(envFile)) {
+    run("app", "node", ["--env-file=.env", "dist/index.cjs"]);
+  } else {
+    run("app", "node", ["dist/index.cjs"]);
+  }
 }

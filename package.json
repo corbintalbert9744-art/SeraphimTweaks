@@ -19,7 +19,8 @@
     "start": "NODE_ENV=production node --env-file=.env dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "db:migrate": "psql \"$DATABASE_URL\" -f migrations/0001_seraphim_full_schema.sql && psql \"$DATABASE_URL\" -f migrations/0002_session_store.sql",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:migrate:psql": "psql \"$DATABASE_URL\" -f migrations/0001_seraphim_full_schema.sql && psql \"$DATABASE_URL\" -f migrations/0002_session_store.sql",
     "db:generate": "drizzle-kit generate",
     "stripe:bootstrap": "tsx --env-file=.env scripts/bootstrap-stripe-prices.mjs"
   },

@@ -52,7 +52,13 @@ export function getStripePriceId(plan: MembershipPlan, interval: BillingInterval
 }
 
 export function appBaseUrl(req?: { protocol?: string; get?: (h: string) => string | undefined }) {
-  if (process.env.APP_URL?.trim()) return process.env.APP_URL.replace(/\/$/, "");
+  const fromEnv = (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || "").trim();
+  if (fromEnv) {
+    if (fromEnv.startsWith("http://") || fromEnv.startsWith("https://")) {
+      return fromEnv.replace(/\/$/, "");
+    }
+    return `https://${fromEnv.replace(/\/$/, "")}`;
+  }
   if (req?.get) {
     const host = req.get("host");
     if (host) {

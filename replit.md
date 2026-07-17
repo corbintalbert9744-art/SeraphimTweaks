@@ -24,23 +24,23 @@ A gaming tweaks product website built with Express + Vite + React (TypeScript). 
 
 ## Deployment (public internet)
 
-Cursor does **not** host the live site. Use Replit Deploy (this repo) or Docker on any VPS.
+Cursor does **not** host the live site.
 
-### Replit Deploy (recommended for this project)
-1. Open the repo in Replit → **Deploy** → Autoscale.
-2. Add a Replit Postgres database (or paste an external `DATABASE_URL`).
-3. Set Secrets (same names as `.env.example`):
-   - `DATABASE_URL`, `SESSION_SECRET` (long random), `APP_URL` (your `https://….replit.app`)
-   - Stripe live keys + 4 price IDs + `STRIPE_WEBHOOK_SECRET`
-   - At least one of `PROPLINE_API_KEY` / `SHARPAPI_API_KEY` / `ODDS_API_KEY`
-4. Point Stripe webhook to `https://YOUR_DOMAIN/api/stripe/webhook`.
-5. Build: `npm run build` · Run: `npm run start:all` (Node + Python data-platform).
+### Render (recommended) — `render.yaml`
+1. Merge/push this branch to GitHub.
+2. [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**.
+3. Connect `SeraphimTweaks` → select `render.yaml`.
+4. Paste secrets when prompted (Stripe + PropLine/SharpAPI).
+5. Deploy creates **Postgres** + one **Docker web** service (Node + Python together).
+6. Stripe webhook → `https://<service>.onrender.com/api/stripe/webhook`.
+7. Check `https://<service>.onrender.com/api/health`.
 
-### Docker (VPS / Railway / Fly)
+Plans used: Postgres `basic-256mb`, web `starter` (Docker is not on free tier).
+
+### Docker (VPS)
 ```bash
 docker compose up --build -d
 ```
-Requires `.env` with production secrets. App listens on `:5000`.
 
 ## Recent Changes
 - 2026-02-11: Imported project from GitHub. Moved files from SeraphimTweaks-1/ subdirectory to workspace root. Configured workflow and deployment for Replit environment.

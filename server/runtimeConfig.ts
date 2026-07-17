@@ -8,6 +8,14 @@ export function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
+/** Public site origin — APP_URL, or Render’s injected RENDER_EXTERNAL_URL. */
+export function resolveAppUrl(): string | undefined {
+  const raw = (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || "").trim();
+  if (!raw) return undefined;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw.replace(/\/$/, "");
+  return `https://${raw.replace(/\/$/, "")}`;
+}
+
 export function assertRuntimeConfig(): void {
   const problems: string[] = [];
 
@@ -19,8 +27,12 @@ export function assertRuntimeConfig(): void {
     if (!sessionSecret || sessionSecret === "seraphim-iq-dev-session-secret" || sessionSecret === "replace-with-a-long-random-string") {
       problems.push("SESSION_SECRET must be a strong unique value in production");
     }
-    if (!process.env.APP_URL?.trim()) {
-      problems.push("APP_URL should be set to the public site origin in production");
+    const appUrl = resolveAppUrl();
+    if (!appUrl) {
+      problems.push("APP_URL (or RENDER_EXTERNAL_URL) must be set to the public https origin");
+    } else if (!process.env.APP_URL?.trim() && process.env.RENDER_EXTERNAL_URL?.trim()) {
+      // Normalize so Stripe redirects and cookies use the same origin.
+      process.env.APP_URL = appUrl;
     }
   }
 

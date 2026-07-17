@@ -52,9 +52,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.get("/api/health", async (_req, res) => {
     const platform = await probeDataPlatform();
-    const ok = platform.ok;
-    res.status(ok ? 200 : 503).json({
-      ok,
+    // Always 200 for liveness (Render / load balancers). dataPlatform.ok shows warehouse status.
+    res.status(200).json({
+      ok: true,
+      ready: platform.ok,
       product: "seraphim-analytics",
       time: new Date().toISOString(),
       databaseConfigured: Boolean(process.env.DATABASE_URL?.trim()),
