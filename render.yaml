@@ -44,7 +44,8 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: npm ci && npm run build
+    # --include=dev: NODE_ENV=production would otherwise skip vite/tsx (devDependencies)
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: node scripts/migrate.mjs && node dist/index.cjs
     healthCheckPath: /api/health
     envVars:
@@ -52,6 +53,8 @@ services:
         value: "20.18.0"
       - key: NODE_ENV
         value: production
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=460"
       - key: DATABASE_URL
         fromDatabase:
           name: seraphim-db
