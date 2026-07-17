@@ -148,9 +148,19 @@ export function registerDataPlatformProxy(
   });
 
   app.get("/api/nba/players/:id", async (req, res) => {
-    await proxyGet(`/api/v1/nba/players/${encodeURIComponent(req.params.id)}`, res, async () => {
-      res.status(503).json({ error: "NBA player profile requires the data platform" });
-    });
+    const qs = new URLSearchParams();
+    if (typeof req.query.platform === "string" && req.query.platform) {
+      qs.set("platform", req.query.platform);
+    }
+    const suffix = qs.toString() ? `?${qs}` : "";
+    await proxyGet(
+      `/api/v1/nba/players/${encodeURIComponent(req.params.id)}${suffix}`,
+      res,
+      async () => {
+        res.status(503).json({ error: "NBA player profile requires the data platform" });
+      },
+      120_000,
+    );
   });
 
   // WNBA — ESPN live + PrizePicks comparison placeholders
@@ -196,9 +206,19 @@ export function registerDataPlatformProxy(
   });
 
   app.get("/api/wnba/players/:id", async (req, res) => {
-    await proxyGet(`/api/v1/wnba/players/${encodeURIComponent(req.params.id)}`, res, async () => {
-      res.status(503).json({ error: "WNBA player profile requires the data platform" });
-    });
+    const qs = new URLSearchParams();
+    if (typeof req.query.platform === "string" && req.query.platform) {
+      qs.set("platform", req.query.platform);
+    }
+    const suffix = qs.toString() ? `?${qs}` : "";
+    await proxyGet(
+      `/api/v1/wnba/players/${encodeURIComponent(req.params.id)}${suffix}`,
+      res,
+      async () => {
+        res.status(503).json({ error: "WNBA player profile requires the data platform" });
+      },
+      120_000,
+    );
   });
 
   app.get("/api/v1/providers", async (_req, res) => {
@@ -385,10 +405,18 @@ export function registerDataPlatformProxy(
   const proxyPlayerDetail = (mount: string, upstream: string) => {
     app.get(`${mount}/:id`, async (req, res) => {
       try {
-        const up = await fetch(`${BASE}${upstream}/${encodeURIComponent(req.params.id)}`, {
-          headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(60_000),
-        });
+        const qs = new URLSearchParams();
+        if (typeof req.query.platform === "string" && req.query.platform) {
+          qs.set("platform", req.query.platform);
+        }
+        const suffix = qs.toString() ? `?${qs}` : "";
+        const up = await fetch(
+          `${BASE}${upstream}/${encodeURIComponent(req.params.id)}${suffix}`,
+          {
+            headers: { Accept: "application/json" },
+            signal: AbortSignal.timeout(120_000),
+          },
+        );
         const data = await up.json().catch(() => ({ detail: "Not found" }));
         // Normalize bare profile payloads to { ok, player } for the research UI
         if (up.ok && data && typeof data === "object" && !("player" in data) && data.markets) {

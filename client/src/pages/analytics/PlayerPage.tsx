@@ -33,6 +33,7 @@ import {
 } from "@/components/research";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
 import type { NbaProp } from "@/data/nbaMock";
+import { usePickemApp } from "@/context/PickemAppContext";
 
 type Tab = "chart" | "lines" | "matchup" | "log";
 
@@ -143,10 +144,13 @@ function logStatKeys(profile: PlayerResearchProfile): string[] {
 export default function PlayerPage() {
   const [, params] = useRoute("/player/:id");
   const playerId = decodePlayerRouteId(params?.id);
+  const { appId, ready: pickemReady } = usePickemApp();
+  // Default PrizePicks so the desk loads every market that app lists (cores + combos).
+  const platform = appId || "prizepicks";
 
   const live = useQuery({
-    queryKey: ["live-player", playerId],
-    enabled: Boolean(playerId),
+    queryKey: ["live-player", playerId, platform],
+    enabled: Boolean(playerId) && pickemReady,
     queryFn: async () => {
       async function tryLeague(
         path: string,
@@ -169,15 +173,9 @@ export default function PlayerPage() {
       }
 
       const encoded = encodeURIComponent(playerId);
-      // Prefer the selected pick'em app so every market that app lists for the
-      // athlete (cores, combos, fantasy, …) appears as research tabs.
-      let platformQs = "";
-      try {
-        const saved = localStorage.getItem("seraphim.pickemApp");
-        if (saved) platformQs = `?platform=${encodeURIComponent(saved)}`;
-      } catch {
-        /* ignore */
-      }
+      // Selected pick'em app — every market that app lists for the athlete
+      // (Points, Rebounds, PRA, Pts+Rebs, Pts+Asts, …) appears as research tabs.
+      const platformQs = `?platform=${encodeURIComponent(platform)}`;
 
       // Prefer league-specific endpoints; try encoded + raw variants.
       const leagueTries: Array<{ path: string; league: string; href: string }> = [

@@ -12,6 +12,7 @@ from app.db.models import Player, PlayerGameLog, Prop, PropAnalytics
 from app.ingestion.pickem_platform_sync import _market_samples
 from app.ingestion.platform_board import normalize_pickem_app
 from app.ingestion.slate_times import format_gamelog_date, format_gamelog_time
+from app.ingestion.player_markets import prop_source_rank
 from app.providers.propline.markets import normalize_league
 
 
@@ -64,6 +65,143 @@ def _log_stat_value(row: PlayerGameLog, market: str) -> Optional[float]:
     return samples[0] if samples else None
 
 
+def _round_half(value: float) -> float:
+    return round(value * 2) / 2
+
+
+def _hit_windows_from_values(values: list[float], *, line: float, side: str) -> list[dict[str, Any]]:
+    def window(n: int, key: str, label: str) -> dict[str, Any]:
+        chunk = values[:n]
+        if not chunk:
+            return {
+                "key": key,
+                "label": label,
+                "average": None,
+                "hitRate": 0.0,
+                "hitPct": 0,
+                "hits": "0/0",
+            }
+        hits = sum(1 for v in chunk if (v > line if side == "Over" else v < line))
+        return {
+            "key": key,
+            "label": label,
+            "average": round(mean(chunk), 1),
+            "hitRate": round(hits / len(chunk), 4),
+            "hitPct": int(round(100 * hits / len(chunk))),
+            "hits": f"{hits}/{len(chunk)}",
+        }
+
+    return [
+        window(5, "l5", "Last 5"),
+        window(10, "l10", "Last 10"),
+        window(20, "l20", "Last 20"),
+        window(len(values) or 1, "all", "All"),
+        {
+            "key": "matchup",
+            "label": "Matchup",
+            "average": None,
+            "hitRate": 0.0,
+            "hitPct": 0,
+            "hits": "0/0",
+        },
+    ]
+
+
+def _research_combo_markets(
+    *,
+    league: str,
+    player: Player,
+    logs: list[PlayerGameLog],
+    existing: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Fill missing basketball combo tabs from core pick'em lines + gamelogs."""
+    by_label = {
+        str(m.get("market") or "").strip().lower(): m
+        for m in existing
+        if m.get("market")
+    }
+    core_line = {
+        label: float(by_label[label]["line"])
+        for label in ("points", "rebounds", "assists")
+        if label in by_label and by_label[label].get("line") is not None
+    }
+    wanted: list[tuple[str, tuple[str, ...]]] = [
+        ("Pts+Rebs", ("points", "rebounds")),
+        ("Pts+Asts", ("points", "assists")),
+        ("Rebs+Asts", ("rebounds", "assists")),
+        ("PRA", ("points", "rebounds", "assists")),
+    ]
+    out: list[dict[str, Any]] = []
+    ext = player.external_id or player.id
+    for market, parts in wanted:
+        if market.lower() in by_label:
+            continue
+        values = _market_samples(logs, market)
+        if len(values) < 3:
+            continue
+        projected = float(mean(values[:10]))
+        if all(p in core_line for p in parts):
+            line = _round_half(sum(core_line[p] for p in parts))
+        else:
+            line = _round_half(projected)
+        if line <= 0:
+            continue
+        side = "Over" if projected >= line else "Under"
+        edge = projected - line
+        chart = []
+        for r in logs[:12]:
+            v = _log_stat_value(r, market)
+            if v is None:
+                continue
+            tip_time = format_gamelog_time(r.played_at)
+            chart.append(
+                {
+                    "date": format_gamelog_date(r.played_at),
+                    "time": tip_time,
+                    "playedAt": r.played_at.isoformat() if r.played_at else None,
+                    "label": format_gamelog_date(r.played_at)
+                    + (f" {tip_time}" if tip_time else ""),
+                    "opponent": r.opponent or "OPP",
+                    "home": bool(r.home),
+                    "value": float(v),
+                    "minutes": float(r.minutes or 0),
+                    "hit": float(v) > line if side == "Over" else float(v) < line,
+                }
+            )
+        slug = market.lower().replace(" ", "")
+        out.append(
+            {
+                "propId": f"{league.lower()}:research:{ext}:{slug}",
+                "market": market,
+                "side": side,
+                "line": line,
+                "americanOdds": -110,
+                "projectedValue": round(projected, 2),
+                "edgeVsLine": round(edge, 2),
+                "edgePercent": round((edge / line) * 100, 2) if line else 0.0,
+                "overProbability": None,
+                "underProbability": None,
+                "researchScore": int(by_label.get("points", {}).get("researchScore") or 70),
+                "confidence": int(by_label.get("points", {}).get("confidence") or 55),
+                "evPercent": 0.0,
+                "explanation": [
+                    f"Research {market} desk from gamelogs"
+                    + (
+                        f" · line estimated from PrizePicks {' + '.join(parts)}"
+                        if all(p in core_line for p in parts)
+                        else " · line from recent average"
+                    )
+                    + "."
+                ],
+                "why": f"{side} {line} {market}",
+                "hitWindows": _hit_windows_from_values(values, line=line, side=side),
+                "chartGames": chart,
+                "platformLine": None,
+            }
+        )
+    return out
+
+
 def get_multisport_player_profile(
     db: Session,
     *,
@@ -102,30 +240,47 @@ def get_multisport_player_profile(
         .where(
             Prop.player_id.in_(peer_ids),
             Prop.league == code,
-            Prop.status == "open",
         )
         .order_by(PropAnalytics.research_score.desc())
     )
+    # Board lists stay upcoming-only; the player desk keeps platform markets even if
+    # a tip just flipped to closed so combo tabs do not disappear mid-research.
+    if not app:
+        prop_q = prop_q.where(Prop.status == "open")
     prop_rows = list(db.execute(prop_q).all())
 
     if app:
         token = f":pickem:{app}:"
-        prop_rows = [
+        scoped = [
             (prop, analytics)
             for prop, analytics in prop_rows
             if token in (prop.id or "").lower()
             or f"pickem:{app}:" in (prop.id or "").lower()
         ]
+        # Prefer open rows; if the platform slate was just closed, keep closed rows.
+        open_scoped = [r for r in scoped if (r[0].status or "") == "open"]
+        prop_rows = open_scoped or scoped
 
-    # Deduplicate by market — keep highest research-score row per market label.
+    # Deduplicate by market — prefer selected pick'em app, then research score.
     best_by_market: dict[str, tuple[Prop, PropAnalytics]] = {}
     for prop, analytics in prop_rows:
         label = str(prop.market or "").strip()
         if not label:
             continue
-        prev = best_by_market.get(label.lower())
-        if prev is None or (analytics.research_score or 0) >= (prev[1].research_score or 0):
-            best_by_market[label.lower()] = (prop, analytics)
+        key = label.lower()
+        prev = best_by_market.get(key)
+        if prev is None:
+            best_by_market[key] = (prop, analytics)
+            continue
+        prev_prop, prev_an = prev
+        prev_rank = prop_source_rank(prev_prop.id or "", app)
+        next_rank = prop_source_rank(prop.id or "", app)
+        prev_score = float(prev_an.research_score or 0)
+        next_score = float(analytics.research_score or 0)
+        prev_open = 0 if (prev_prop.status or "") == "open" else 1
+        next_open = 0 if (prop.status or "") == "open" else 1
+        if (next_rank, next_open, -next_score) < (prev_rank, prev_open, -prev_score):
+            best_by_market[key] = (prop, analytics)
     prop_rows = list(best_by_market.values())
     # Stable desk order: cores → combos → everything else alphabetical
     _CORE_ORDER = (
@@ -250,6 +405,27 @@ def get_multisport_player_profile(
                 ],
                 "chartGames": chart,
             }
+        )
+
+    # When PrizePicks (etc.) only synced cores, still offer combo research tabs
+    # (Pts+Rebs / Pts+Asts / Rebs+Asts / PRA) so the desk matches what athletes
+    # usually have on pick'em. Prefer summing live core lines; never invent books.
+    if code in {"NBA", "WNBA"} and logs:
+        markets.extend(
+            _research_combo_markets(
+                league=code,
+                player=player,
+                logs=logs,
+                existing=markets,
+            )
+        )
+        markets.sort(
+            key=lambda m: (
+                _CORE_ORDER.index(str(m.get("market") or "").lower())
+                if str(m.get("market") or "").lower() in _CORE_ORDER
+                else len(_CORE_ORDER),
+                str(m.get("market") or "").lower(),
+            )
         )
 
     if not markets:

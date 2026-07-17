@@ -902,7 +902,17 @@ def _chart_games(logs: list[PlayerGameLog], *, market: str, line: float, side: s
     return out
 
 
-def _markets_payload(props: list[dict[str, Any]], logs: list[PlayerGameLog], opponent: str) -> list[dict[str, Any]]:
+def _markets_payload(
+    props: list[dict[str, Any]],
+    logs: list[PlayerGameLog],
+    opponent: str,
+    *,
+    prefer_platform: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    from app.ingestion.player_markets import dedupe_market_rows
+
+    # One tab per market — prefer PrizePicks (or selected pick'em) over duplicate books.
+    props = dedupe_market_rows(props, prefer_platform=prefer_platform, id_key="id", market_key="market")
     markets: list[dict[str, Any]] = []
     for p in props:
         projected = float(p.get("projectedValue") or p.get("line") or 0)
@@ -965,7 +975,7 @@ def get_wnba_player_profile(db: Session, player_key: str) -> Optional[dict[str, 
         if not card:
             return None
         mine = [p for p in board_props if p.get("playerId") == player_key]
-        markets = _markets_payload(mine, [], card["opponent"])
+        markets = _markets_payload(mine, [], card["opponent"], prefer_platform="prizepicks")
         primary = markets[0] if markets else None
         return {
             "id": player_key,
@@ -1042,7 +1052,7 @@ def get_wnba_player_profile(db: Session, player_key: str) -> Optional[dict[str, 
     team = _team_abbr(db, player.team_id)
     opp = props[0]["opponent"] if props else "OPP"
     tip = props[0]["tipTime"] if props else ""
-    markets = _markets_payload(props, logs, opp)
+    markets = _markets_payload(props, logs, opp, prefer_platform="prizepicks")
     primary = markets[0] if markets else None
     chart_line = float(primary["line"]) if primary else (round(mean(pts) * 2) / 2 if pts else 0.0)
 

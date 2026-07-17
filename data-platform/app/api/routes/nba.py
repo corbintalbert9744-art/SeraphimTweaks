@@ -137,25 +137,21 @@ def nba_player_detail(
     ),
     db: Session = Depends(get_db),
 ):
-    from app.ingestion.multisport_player import get_multisport_player_profile
-    from app.ingestion.pickem_platform_sync import ensure_pickem_platform_board
-    from app.ingestion.platform_board import normalize_pickem_app
+    from app.ingestion.player_detail import load_platform_player_profile
 
-    app = normalize_pickem_app(platform) if platform else None
-    if app:
-        ensure_pickem_platform_board(db, league="NBA", platform=app, refresh=False)
-        profile = get_multisport_player_profile(
-            db, league="NBA", player_key=player_id, platform=app
-        )
-        if profile and (profile.get("markets") or []):
-            return {"ok": True, "player": profile, "live": True, "platform": app}
+    platform_key = platform or "prizepicks"
 
-    ensure_nba_board(db, force=False)
-    profile = get_nba_player_profile(db, player_id)
-    if not profile or not (profile.get("markets") or []):
-        profile = get_multisport_player_profile(
-            db, league="NBA", player_key=player_id, platform=app
-        )
+    def _fallback():
+        ensure_nba_board(db, force=False)
+        return get_nba_player_profile(db, player_id)
+
+    profile, app = load_platform_player_profile(
+        db,
+        league="NBA",
+        player_id=player_id,
+        platform=platform_key,
+        fallback=_fallback,
+    )
     if not profile or not (profile.get("markets") or []):
         raise HTTPException(status_code=404, detail="Player not found")
     return {"ok": True, "player": profile, "live": True, "platform": app}
