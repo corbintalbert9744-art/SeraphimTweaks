@@ -139,6 +139,7 @@ export async function createUser(input: {
         username,
         passwordHash,
         displayName,
+        role: "member",
         membershipStatus: "inactive",
       })
       .returning();

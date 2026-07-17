@@ -37,11 +37,11 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name"),
-  role: text("role").notNull().default("member"), // member | admin | owner
+  role: text("role").notNull().$defaultFn(() => "member"), // member | admin | owner
   stripeCustomerId: text("stripe_customer_id"),
   /** Denormalized active subscription snapshot (source of truth: subscriptions). */
   stripeSubscriptionId: text("stripe_subscription_id"),
-  membershipStatus: text("membership_status").notNull().default("inactive"), // inactive | active | past_due | canceled | trialing
+  membershipStatus: text("membership_status").notNull().$defaultFn(() => "inactive"), // inactive | active | past_due | canceled | trialing
   plan: text("plan"), // standard | pro
   billingInterval: text("billing_interval"), // monthly | yearly
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
