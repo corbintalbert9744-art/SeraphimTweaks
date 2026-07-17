@@ -111,7 +111,22 @@ export default function ResearchHubPage() {
                           : `/api/tennis/props?tour=${league}${platform ? `&platform=${encodeURIComponent(platform)}` : ""}`,
             ];
       const batches = await Promise.all(paths.map(fetchBoard));
-      const rows = batches.flat().map((row) => {
+      const rows = batches
+        .flat()
+        .filter((row) => {
+          // Client-side guard: never show research-slate / mock book rows.
+          if (row.oddsAreMock === true) return false;
+          const role = String(row.oddsRole || "").toLowerCase();
+          if (role === "comparison-only" || role === "research" || role === "model-only") {
+            return false;
+          }
+          const id = String(row.id || "").toLowerCase();
+          if (id.includes(":pickem:")) return true;
+          if (role === "platform-live" || role === "platform-board") return true;
+          if (row.platform && (row.platformLine != null || row.line != null)) return true;
+          return false;
+        })
+        .map((row) => {
         const detail = asPropDetailFromApi(row);
         return {
           id: detail.id,
@@ -187,7 +202,7 @@ export default function ResearchHubPage() {
       <PageHeader
         eyebrow="Research"
         title="Research Hub"
-        description={`Seraphim model vs live ${app?.name || "pick'em"} and sportsbook lines — edge, probabilities, EV, and movement timestamps. Unavailable books stay blank.`}
+        description={`Seraphim model vs live ${app?.name || "pick'em"} lines only — players currently listed on the betting site. Unavailable books stay blank.`}
         actions={<PickemAppSwitcher />}
       />
 
@@ -213,7 +228,7 @@ export default function ResearchHubPage() {
       {!loading && ranked.length === 0 && (
         <EmptyState
           title="No live props to compare"
-          description="Sync platform lines or pick another league — market rows only appear from warehouse data."
+          description="Only players currently listed on the selected betting site appear here. Try another league or wait for the feed to refresh."
         />
       )}
 

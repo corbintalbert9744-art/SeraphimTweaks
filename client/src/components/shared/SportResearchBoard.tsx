@@ -187,14 +187,14 @@ export function SportResearchBoard({
   // Member-safe copy only — never surface vendor names, API keys, or quota text.
   const memberEmpty =
     emptyHint ||
-    `${app?.name ?? "Platform"} lines for ${league} aren’t available right now. Check back shortly.`;
+    `${app?.name ?? "Platform"} isn’t listing live props for ${league} right now. Only players currently on the betting site appear here.`;
   const note = rateLimited
     ? liveProps.length > 0
       ? `Showing the latest saved ${app?.name ?? "platform"} lines while the live feed refreshes.`
       : memberEmpty
     : needsConfig
       ? memberEmpty
-      : board.data?.note && !/API_KEY|PropLine|free-tier|ODDS_|SHARPAPI|PROPLINE/i.test(board.data.note)
+      : board.data?.note && !/API_KEY|PropLine|free-tier|ODDS_|SHARPAPI|PROPLINE|Research slate/i.test(board.data.note)
         ? board.data.note
         : liveProps.length === 0
           ? memberEmpty
@@ -213,9 +213,7 @@ export function SportResearchBoard({
             {title}
           </h1>
           <p className="mt-1 max-w-2xl text-xs text-neutral-500 sm:text-sm">
-            {isFallback
-              ? "Research slate · live platform lines refresh when available"
-              : `Live ${app?.name ?? "app"} props · Seraphim projections`}
+            Live {app?.name ?? "app"} props only · Seraphim projections
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

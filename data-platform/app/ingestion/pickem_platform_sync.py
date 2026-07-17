@@ -1249,6 +1249,9 @@ def _finalize_platform_board(
             "All cached tips look finished — waiting on PropLine for the next PrizePicks slate."
         )
         note = f"{note} {suffix}".strip() if note else suffix
+    from app.ingestion.platform_board import filter_live_betting_site_props
+
+    filtered = filter_live_betting_site_props(filtered)
     return {
         "ok": True,
         "league": code,
@@ -1262,6 +1265,7 @@ def _finalize_platform_board(
         "propsUpdatedAt": updated,
         "dataSource": f"pickem:{platform}",
         "live": True,
+        "fallback": False,
         "note": note,
         **extra,
     }

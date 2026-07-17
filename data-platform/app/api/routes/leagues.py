@@ -55,7 +55,10 @@ def _scope_to_platform(
 ) -> tuple[list[dict], list[dict], dict]:
     """Live pick'em board for the selected app (PropLine → model)."""
     from app.ingestion.pickem_platform_sync import ensure_pickem_platform_board
-    from app.ingestion.platform_board import normalize_pickem_app
+    from app.ingestion.platform_board import (
+        filter_live_betting_site_props,
+        normalize_pickem_app,
+    )
 
     if not platform or not normalize_pickem_app(platform):
         players = _players_from_props(props)
@@ -63,7 +66,8 @@ def _scope_to_platform(
     scoped = ensure_pickem_platform_board(
         db, league=league, platform=platform, refresh=refresh
     )
-    return scoped.get("props") or [], scoped.get("players") or [], {
+    live_props = filter_live_betting_site_props(scoped.get("props") or [])
+    return live_props, scoped.get("players") or [], {
         "platform": scoped.get("platform"),
         "platformLabel": scoped.get("platformLabel"),
         "dataSource": scoped.get("dataSource"),
@@ -82,6 +86,7 @@ def _scope_to_platform(
         "modeledCount": scoped.get("modeledCount"),
         "refreshError": scoped.get("refreshError"),
         "rateLimited": scoped.get("rateLimited"),
+        "fallback": False,
     }
 
 router = APIRouter(tags=["leagues"])
@@ -129,9 +134,15 @@ def mlb_props(
     from app.ingestion.platform_board import normalize_pickem_app
 
     if platform and normalize_pickem_app(platform):
+        from app.ingestion.platform_board import (
+            empty_platform_board,
+            filter_live_betting_site_props,
+        )
+
         props, players, meta = _scope_to_platform(
             db, [], platform, league="MLB", refresh=refresh
         )
+        props = filter_live_betting_site_props(props)
         if not props:
             from app.ingestion.cursor_board_seed import (
                 load_cursor_board_seed,
@@ -142,30 +153,22 @@ def mlb_props(
                 db, league="MLB", platform=platform
             ) or load_cursor_board_seed("MLB", platform)
             if seed is not None:
-                props = seed.get("props") or []
+                props = filter_live_betting_site_props(seed.get("props") or [])
                 players = seed.get("players") or []
-                meta = {**meta, **{k: v for k, v in seed.items() if k not in ("props", "players")}}
-            else:
-                if refresh or not list_league_props(db, "MLB"):
-                    sync_mlb_warehouse(db)
-                props = list_league_props(db, "MLB")
-                players = _players_from_props(props)
-                label = meta.get("platformLabel") or platform
                 meta = {
                     **meta,
-                    "ok": bool(props),
-                    "fallback": True,
-                    "fallbackSource": "mlb-statsapi",
-                    "source": "mlb-statsapi",
-                    "dataSource": "mlb-research",
-                    "rateLimited": False,
-                    "requiresApiKey": False,
-                    "error": None,
-                    "note": (
-                        f"Research slate active while live {label} lines refresh. "
-                        "Seraphim projections vs research baselines — not scraped pick'em lines."
-                    ),
+                    **{k: v for k, v in seed.items() if k not in ("props", "players")},
+                    "fallback": False,
                 }
+            if not props:
+                return empty_platform_board(
+                    league="MLB",
+                    platform=platform,
+                    platform_label=meta.get("platformLabel"),
+                    rateLimited=meta.get("rateLimited"),
+                    cached=meta.get("cached"),
+                    refreshError=meta.get("refreshError"),
+                )
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         return {
@@ -179,6 +182,7 @@ def mlb_props(
             "live": True,
             "source": meta.get("source") or "propline",
             **meta,
+            "fallback": False,
         }
 
     if refresh:
@@ -245,9 +249,15 @@ def nhl_props(
     from app.ingestion.platform_board import normalize_pickem_app
 
     if platform and normalize_pickem_app(platform):
+        from app.ingestion.platform_board import (
+            empty_platform_board,
+            filter_live_betting_site_props,
+        )
+
         props, players, meta = _scope_to_platform(
             db, [], platform, league="NHL", refresh=refresh
         )
+        props = filter_live_betting_site_props(props)
         if not props:
             from app.ingestion.cursor_board_seed import (
                 load_cursor_board_seed,
@@ -258,30 +268,22 @@ def nhl_props(
                 db, league="NHL", platform=platform
             ) or load_cursor_board_seed("NHL", platform)
             if seed is not None:
-                props = seed.get("props") or []
+                props = filter_live_betting_site_props(seed.get("props") or [])
                 players = seed.get("players") or []
-                meta = {**meta, **{k: v for k, v in seed.items() if k not in ("props", "players")}}
-            else:
-                if refresh or not list_league_props(db, "NHL"):
-                    sync_nhl_warehouse(db)
-                props = list_league_props(db, "NHL")
-                players = _players_from_props(props)
-                label = meta.get("platformLabel") or platform
                 meta = {
                     **meta,
-                    "ok": bool(props),
-                    "fallback": True,
-                    "fallbackSource": "nhl-api",
-                    "source": "nhl-api",
-                    "dataSource": "nhl-research",
-                    "rateLimited": False,
-                    "requiresApiKey": False,
-                    "error": None,
-                    "note": (
-                        f"Research slate active while live {label} lines refresh. "
-                        "Seraphim projections vs research baselines — not scraped pick'em lines."
-                    ),
+                    **{k: v for k, v in seed.items() if k not in ("props", "players")},
+                    "fallback": False,
                 }
+            if not props:
+                return empty_platform_board(
+                    league="NHL",
+                    platform=platform,
+                    platform_label=meta.get("platformLabel"),
+                    rateLimited=meta.get("rateLimited"),
+                    cached=meta.get("cached"),
+                    refreshError=meta.get("refreshError"),
+                )
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         return {
@@ -295,6 +297,7 @@ def nhl_props(
             "live": True,
             "source": meta.get("source") or "propline",
             **meta,
+            "fallback": False,
         }
 
     if refresh:
@@ -423,30 +426,25 @@ def soccer_props(
     from app.ingestion.platform_board import normalize_pickem_app
 
     if platform and normalize_pickem_app(platform):
+        from app.ingestion.platform_board import (
+            empty_platform_board,
+            filter_live_betting_site_props,
+        )
+
         props, players, meta = _scope_to_platform(
             db, [], platform, league="Soccer", refresh=refresh
         )
+        props = filter_live_betting_site_props(props)
         if not props:
-            if refresh or not list_league_props(db, "Soccer"):
-                ensure_soccer_pickem_board(db)
-            props = list_league_props(db, "Soccer")
-            players = _players_from_props(props)
-            label = meta.get("platformLabel") or platform
-            meta = {
-                **meta,
-                "ok": bool(props),
-                "fallback": True,
-                "fallbackSource": "espn-soccer",
-                "source": "espn-soccer",
-                "dataSource": "soccer-research",
-                "rateLimited": False,
-                "requiresApiKey": False,
-                "error": None,
-                "note": (
-                    f"Research slate active while live {label} lines refresh. "
-                    "Seraphim projections vs research baselines — not scraped pick'em lines."
-                ),
-            }
+            return empty_platform_board(
+                league="Soccer",
+                platform=platform,
+                platform_label=meta.get("platformLabel"),
+                rateLimited=meta.get("rateLimited"),
+                cached=meta.get("cached"),
+                refreshError=meta.get("refreshError"),
+                footballDataConfigured=bool(get_settings().football_data_api_key),
+            )
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         settings = get_settings()
@@ -463,6 +461,7 @@ def soccer_props(
             "footballDataConfigured": bool(settings.football_data_api_key),
             "source": meta.get("source") or "propline",
             **meta,
+            "fallback": False,
         }
 
     if refresh or not list_league_props(db, "Soccer"):
@@ -528,33 +527,25 @@ def tennis_props(
 
     code = "WTA" if tour.upper() == "WTA" else "ATP"
     if platform and normalize_pickem_app(platform):
+        from app.ingestion.platform_board import (
+            empty_platform_board,
+            filter_live_betting_site_props,
+        )
+
         props, players, meta = _scope_to_platform(
             db, [], platform, league=code, refresh=refresh
         )
-        # When live pick'em is empty (rate limit / no cache), keep the board usable
-        # with the ESPN research slate — never invent PrizePicks lines, but don't
-        # leave Tennis blank when matchups exist.
+        props = filter_live_betting_site_props(props)
+        # Never pad Tennis with ESPN research slates when a pick'em app is selected.
         if not props:
-            if refresh or not list_league_props(db, code):
-                ensure_tennis_pickem_board(db, tour=code)
-            props = list_league_props(db, code)
-            players = _players_from_props(props)
-            label = meta.get("platformLabel") or platform
-            meta = {
-                **meta,
-                "ok": bool(props),
-                "fallback": True,
-                "fallbackSource": "espn-tennis",
-                "source": "espn-tennis",
-                "dataSource": "espn-tennis-research",
-                "rateLimited": False,
-                "requiresApiKey": False,
-                "error": None,
-                "note": (
-                    f"Research slate active while live {label} lines refresh. "
-                    "Seraphim projections vs research baselines — not scraped pick'em lines."
-                ),
-            }
+            return empty_platform_board(
+                league=code,
+                platform=platform,
+                platform_label=meta.get("platformLabel"),
+                rateLimited=meta.get("rateLimited"),
+                cached=meta.get("cached"),
+                refreshError=meta.get("refreshError"),
+            )
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         return {
@@ -568,6 +559,7 @@ def tennis_props(
             "live": True,
             "source": meta.get("source") or "propline",
             **meta,
+            "fallback": False,
         }
 
     if refresh or not list_league_props(db, code):

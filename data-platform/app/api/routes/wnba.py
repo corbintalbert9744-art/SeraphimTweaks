@@ -68,9 +68,14 @@ def wnba_props(
         payload = ensure_pickem_platform_board(
             db, league="WNBA", platform=platform, refresh=refresh
         )
-        props = payload.get("props") or []
+        from app.ingestion.platform_board import (
+            empty_platform_board,
+            filter_live_betting_site_props,
+        )
+
+        props = filter_live_betting_site_props(payload.get("props") or [])
         # Keep the board usable like local Cursor when live pick'em is empty
-        # (rate limit / cold cache) — prefer Cursor seed, then ESPN research slate.
+        # (rate limit / cold cache) — Cursor seed of real PrizePicks lines only.
         if not props:
             from app.ingestion.cursor_board_seed import (
                 load_cursor_board_seed,
@@ -81,44 +86,45 @@ def wnba_props(
                 db, league="WNBA", platform=platform
             ) or load_cursor_board_seed("WNBA", platform)
             if seed is not None:
-                props = seed.get("props") or []
-                teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
-                markets = sorted({p["market"] for p in props if p.get("market")})
-                return {
-                    **seed,
-                    "teams": seed.get("teams") or ["All", *teams],
-                    "markets": seed.get("markets") or ["All", *markets],
-                }
-            research = ensure_wnba_board(db, force=refresh)
-            props = research.get("props") or []
-            players = research.get("players") or []
-            teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
-            markets = sorted({p["market"] for p in props if p.get("market")})
-            label = payload.get("platformLabel") or platform
-            return {
-                **payload,
-                "ok": bool(props),
-                "props": props,
-                "players": players,
-                "count": len(props),
-                "teams": ["All", *teams],
-                "markets": ["All", *markets],
-                "live": True,
-                "fallback": True,
-                "fallbackSource": "espn-wnba",
-                "source": research.get("source") or "espn-wnba",
-                "dataSource": "espn-wnba-research",
-                "rateLimited": False,
-                "requiresApiKey": False,
-                "error": None,
-                "note": (
-                    f"Research slate active while live {label} lines refresh. "
-                    "Seraphim projections vs research baselines — not scraped pick'em lines."
+                props = filter_live_betting_site_props(seed.get("props") or [])
+                if props:
+                    teams = sorted(
+                        {p["team"] for p in props if p.get("team") and p["team"] != "—"}
+                    )
+                    markets = sorted({p["market"] for p in props if p.get("market")})
+                    return {
+                        **seed,
+                        "props": props,
+                        "players": seed.get("players") or [],
+                        "count": len(props),
+                        "teams": seed.get("teams") or ["All", *teams],
+                        "markets": seed.get("markets") or ["All", *markets],
+                    }
+            return empty_platform_board(
+                league="WNBA",
+                platform=platform,
+                platform_label=payload.get("platformLabel"),
+                rateLimited=payload.get("rateLimited"),
+                cached=payload.get("cached"),
+                refreshError=payload.get("refreshError"),
+                note=(
+                    payload.get("note")
+                    or "No live PrizePicks (or selected app) WNBA props right now. "
+                    "Only players listed on the betting site appear here."
                 ),
-            }
+            )
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
-        return {**payload, "teams": ["All", *teams], "markets": ["All", *markets], "live": True}
+        return {
+            **payload,
+            "props": props,
+            "players": payload.get("players") or [],
+            "count": len(props),
+            "teams": ["All", *teams],
+            "markets": ["All", *markets],
+            "live": True,
+            "fallback": False,
+        }
 
     payload = ensure_wnba_board(db, force=refresh)
     props = payload.get("props") or []

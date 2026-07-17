@@ -32,6 +32,75 @@ KNOWN_PICKEM_SLUGS = frozenset().union(*PICKEM_APP_SLUGS.values()) | frozenset(
     {"prizepicks", "underdog", "sleeper", "parlayplay", "dabble"}
 )
 
+_RESEARCH_ODDS_ROLES = frozenset(
+    {"comparison-only", "research", "model-only", "research-baseline"}
+)
+
+
+def is_live_betting_site_prop(row: dict[str, Any]) -> bool:
+    """True only for props backed by a real pick'em / sportsbook quote.
+
+    Rejects ESPN research slates, mock comparison placeholders, and seed files
+    that were exported from the research warehouse (``:prop:`` + oddsAreMock).
+    """
+    if not isinstance(row, dict):
+        return False
+    if row.get("oddsAreMock") is True:
+        return False
+    role = str(row.get("oddsRole") or "").strip().lower()
+    if role in _RESEARCH_ODDS_ROLES:
+        return False
+    pid = str(row.get("id") or "").lower()
+    # Canonical live pick'em ids: league:pickem:prizepicks:…
+    if ":pickem:" in pid:
+        return True
+    # Explicit live platform tagging from sync / cache
+    if role in {"platform-live", "platform-board"} and row.get("platform"):
+        return True
+    platform = str(row.get("platform") or row.get("platformSlug") or "").strip().lower()
+    if platform in KNOWN_PICKEM_SLUGS and row.get("platformLine") is not None:
+        return True
+    return False
+
+
+def filter_live_betting_site_props(props: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep only players/markets listed on a connected betting site."""
+    return [p for p in props if is_live_betting_site_prop(p)]
+
+
+def empty_platform_board(
+    *,
+    league: str,
+    platform: str,
+    platform_label: Optional[str] = None,
+    note: Optional[str] = None,
+    **extra: Any,
+) -> dict[str, Any]:
+    """Member-safe empty board — never pad with research-slate players."""
+    app = normalize_pickem_app(platform) or platform
+    label = platform_label or PICKEM_APP_LABELS.get(app, app)
+    return {
+        "ok": False,
+        "league": league,
+        "platform": app,
+        "platformLabel": label,
+        "props": [],
+        "players": [],
+        "count": 0,
+        "teams": ["All"],
+        "markets": ["All"],
+        "live": True,
+        "fallback": False,
+        "dataSource": f"pickem:{app}",
+        "source": f"pickem:{app}",
+        "note": note
+        or (
+            f"No live {label} props for {league} right now. "
+            "Only players currently listed on the betting site appear here."
+        ),
+        **extra,
+    }
+
 
 def normalize_pickem_app(platform: Optional[str]) -> Optional[str]:
     if not platform:

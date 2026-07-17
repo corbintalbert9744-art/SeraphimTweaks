@@ -55,9 +55,24 @@ def load_cursor_board_seed(league: str, platform: str = "prizepicks") -> Optiona
         log.warning("cursor seed read failed %s: %s", path.name, exc)
         return None
     props = raw.get("props") or []
+    from app.ingestion.platform_board import filter_live_betting_site_props
+
+    # Reject research-warehouse exports (NBA/NHL seeds were never live pick'em).
+    props = filter_live_betting_site_props(list(props))
     if not props:
         return None
     players = raw.get("players") or []
+    # Keep player cards aligned to live props only
+    live_player_ids = {
+        str(p.get("playerId") or p.get("playerExternalId") or p.get("id") or "")
+        for p in props
+    }
+    if players:
+        players = [
+            c
+            for c in players
+            if str(c.get("id") or c.get("playerId") or "") in live_player_ids
+        ]
     label = raw.get("platformLabel") or "PrizePicks"
     return {
         "ok": True,
