@@ -21,7 +21,6 @@ import PlayersHubPage from "@/pages/analytics/PlayersHubPage";
 import ResearchHubPage from "@/pages/analytics/ResearchHubPage";
 import PlusEvPage from "@/pages/analytics/PlusEvPage";
 import ArbitragePage from "@/pages/analytics/ArbitragePage";
-import MarketComparisonPage from "@/pages/analytics/MarketComparisonPage";
 import PlayerPage from "@/pages/analytics/PlayerPage";
 import PropDetailPage from "@/pages/analytics/PropDetailPage";
 import ParlayBuilderPage from "@/pages/analytics/ParlayBuilderPage";
@@ -77,7 +76,9 @@ function MembersApp() {
               <Route path="/research" component={ResearchHubPage} />
               <Route path="/plus-ev" component={PlusEvPage} />
               <Route path="/arbitrage" component={ArbitragePage} />
-              <Route path="/market-comparison" component={MarketComparisonPage} />
+              <Route path="/market-comparison">
+                <Redirect to="/research" />
+              </Route>
               <Route path="/tennis">{() => <TennisPage />}</Route>
               <Route path="/atp">{() => <TennisPage tour="ATP" />}</Route>
               <Route path="/wta">{() => <TennisPage tour="WTA" />}</Route>
