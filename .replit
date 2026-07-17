@@ -19,7 +19,13 @@ args = "Start application"
 
 [[workflows.workflow]]
 name = "Start application"
+mode = "parallel"
 author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run data-platform"
+waitForPort = 8000
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
@@ -33,7 +39,11 @@ outputType = "webview"
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
 [deployment]
 deploymentTarget = "autoscale"
-run = ["npm", "run", "start"]
+run = ["npm", "run", "start:all"]
 build = ["npm", "run", "build"]

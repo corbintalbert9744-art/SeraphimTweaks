@@ -1,10 +1,14 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import MemoryStoreFactory from "memorystore";
+import connectPgSimple from "connect-pg-simple";
 import type { PublicUser } from "./membershipStore";
 import { getPublicUser } from "./membershipStore";
+import { isDatabaseConfigured } from "./db";
+import { isProduction } from "./runtimeConfig";
 
 const MemoryStore = MemoryStoreFactory(session);
+const PgSession = connectPgSimple(session);
 
 declare module "express-session" {
   interface SessionData {
@@ -14,18 +18,41 @@ declare module "express-session" {
 
 export type AuthedRequest = Request & { user?: PublicUser };
 
+function sessionStore() {
+  if (isDatabaseConfigured()) {
+    return new PgSession({
+      conString: process.env.DATABASE_URL,
+      tableName: "session",
+      createTableIfMissing: true,
+      pruneSessionInterval: 60 * 15,
+    });
+  }
+  if (isProduction()) {
+    throw new Error("DATABASE_URL is required for session persistence in production");
+  }
+  console.warn("[auth] DATABASE_URL unset — using in-memory sessions (dev only)");
+  return new MemoryStore({ checkPeriod: 24 * 60 * 60 * 1000 });
+}
+
 export function configureSession(app: Express) {
-  const secret = process.env.SESSION_SECRET || "seraphim-iq-dev-session-secret";
-  const isProd = process.env.NODE_ENV === "production";
+  const secret = process.env.SESSION_SECRET?.trim();
+  if (!secret) {
+    if (isProduction()) {
+      throw new Error("SESSION_SECRET is required in production");
+    }
+    console.warn("[auth] SESSION_SECRET unset — using insecure dev default");
+  }
+  const resolvedSecret = secret || "seraphim-iq-dev-session-secret";
+  const isProd = isProduction();
 
   app.set("trust proxy", 1);
   app.use(
     session({
       name: "seraphim.sid",
-      secret,
+      secret: resolvedSecret,
       resave: false,
       saveUninitialized: false,
-      store: new MemoryStore({ checkPeriod: 24 * 60 * 60 * 1000 }),
+      store: sessionStore(),
       cookie: {
         httpOnly: true,
         sameSite: "lax",

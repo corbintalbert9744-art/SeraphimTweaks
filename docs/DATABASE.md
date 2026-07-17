@@ -22,7 +22,7 @@ npm run db:push
 cd data-platform && alembic upgrade head
 ```
 
-Without `DATABASE_URL`, Node uses in-memory membership and the data platform uses SQLite (`create_all`).
+Without `DATABASE_URL`, Node uses in-memory membership **in development only** and the data platform uses SQLite (`create_all`). Production refuses to start without Postgres. Sessions use the `session` table via `connect-pg-simple` (`migrations/0002_session_store.sql`).
 
 ## Entity map
 

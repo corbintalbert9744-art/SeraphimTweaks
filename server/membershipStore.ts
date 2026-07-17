@@ -10,8 +10,15 @@ import {
   type MembershipStatus,
 } from "@shared/membership";
 import { getDb, isDatabaseConfigured } from "./db";
+import { isProduction, ownerSeedCredentials } from "./runtimeConfig";
 
 const scrypt = promisify(scryptCallback);
+
+function assertMembershipPersistence(): void {
+  if (isProduction() && !isDatabaseConfigured()) {
+    throw Object.assign(new Error("DATABASE_URL is required in production"), { status: 503 });
+  }
+}
 
 export type MembershipRecord = {
   id: string;
@@ -112,6 +119,7 @@ export async function createUser(input: {
   password: string;
   name?: string;
 }): Promise<PublicUser> {
+  assertMembershipPersistence();
   const email = input.email.trim().toLowerCase();
   const username = email;
   const displayName = (input.name || "").trim() || email.split("@")[0] || "Member";
@@ -163,18 +171,8 @@ export async function authenticateUser(
   email: string,
   password: string,
 ): Promise<PublicUser | null> {
+  assertMembershipPersistence();
   const normalized = email.trim().toLowerCase();
-
-  // Owner credentials always work — ensure account + Active Pro membership first.
-  if (normalized === OWNER_EMAIL && password === OWNER_PASSWORD) {
-    return ensureOwnerAccount();
-  }
-
-  // Quick local login: email 9744 / pass 9744
-  if (normalized === QUICK_LOGIN_EMAIL && password === QUICK_LOGIN_PASSWORD) {
-    return ensureQuickLoginAccount();
-  }
-
   const user = await findUserByEmail(normalized);
   if (!user) return null;
   const ok = await verifyPassword(password, user.passwordHash);
@@ -299,23 +297,27 @@ export async function getPublicUser(userId: string): Promise<PublicUser | null> 
   return user ? toPublic(user) : null;
 }
 
-/** Owner account that always exists with Active Pro membership. */
-export const OWNER_EMAIL = (
-  process.env.OWNER_EMAIL || "corbintalbert@icloud.com"
-).trim().toLowerCase();
-export const OWNER_PASSWORD = process.env.OWNER_PASSWORD || "IamtheMaster1!";
-export const OWNER_NAME = process.env.OWNER_NAME || "Corbin";
-
+/** Optional owner email from env (no hardcoded defaults). */
 export function isOwnerEmail(email: string | null | undefined): boolean {
-  return Boolean(email && email.trim().toLowerCase() === OWNER_EMAIL);
+  const owner = ownerSeedCredentials();
+  return Boolean(owner && email && email.trim().toLowerCase() === owner.email);
 }
 
+/**
+ * Upsert the owner account when OWNER_EMAIL + OWNER_PASSWORD are set.
+ * Never uses hardcoded passwords — refuses to run without env credentials.
+ */
 export async function ensureOwnerAccount(): Promise<PublicUser> {
-  const passwordHash = await hashPassword(OWNER_PASSWORD);
+  assertMembershipPersistence();
+  const creds = ownerSeedCredentials();
+  if (!creds) {
+    throw new Error("OWNER_EMAIL and OWNER_PASSWORD must both be set to seed an owner account");
+  }
+  const passwordHash = await hashPassword(creds.password);
   const periodEnd = new Date();
   periodEnd.setFullYear(periodEnd.getFullYear() + 25);
 
-  const existing = await findUserByEmail(OWNER_EMAIL);
+  const existing = await findUserByEmail(creds.email);
   if (existing) {
     if (isDatabaseConfigured()) {
       const db = getDb();
@@ -323,7 +325,8 @@ export async function ensureOwnerAccount(): Promise<PublicUser> {
         .update(users)
         .set({
           passwordHash,
-          displayName: OWNER_NAME,
+          displayName: creds.name,
+          role: "owner",
           membershipStatus: "active",
           plan: "pro",
           billingInterval: "yearly",
@@ -340,7 +343,7 @@ export async function ensureOwnerAccount(): Promise<PublicUser> {
     const next: MembershipRecord = {
       ...existing,
       passwordHash,
-      displayName: OWNER_NAME,
+      displayName: creds.name,
       membershipStatus: "active",
       plan: "pro",
       billingInterval: "yearly",
@@ -358,10 +361,11 @@ export async function ensureOwnerAccount(): Promise<PublicUser> {
     const [row] = await db
       .insert(users)
       .values({
-        email: OWNER_EMAIL,
-        username: OWNER_EMAIL,
+        email: creds.email,
+        username: creds.email,
         passwordHash,
-        displayName: OWNER_NAME,
+        displayName: creds.name,
+        role: "owner",
         membershipStatus: "active",
         plan: "pro",
         billingInterval: "yearly",
@@ -376,10 +380,10 @@ export async function ensureOwnerAccount(): Promise<PublicUser> {
   const now = new Date();
   const user: MembershipRecord = {
     id: randomUUID(),
-    email: OWNER_EMAIL,
-    username: OWNER_EMAIL,
+    email: creds.email,
+    username: creds.email,
     passwordHash,
-    displayName: OWNER_NAME,
+    displayName: creds.name,
     stripeCustomerId: "cus_owner",
     stripeSubscriptionId: "sub_owner",
     membershipStatus: "active",
@@ -393,166 +397,13 @@ export async function ensureOwnerAccount(): Promise<PublicUser> {
   return toPublic(user);
 }
 
-/** Demo Standard member for previewing gated Pro features. */
-export const STANDARD_DEMO_EMAIL = "standard@seraphim.iq";
-export const STANDARD_DEMO_PASSWORD = "Standard123!";
-
-export async function ensureStandardDemoAccount(): Promise<PublicUser> {
-  const passwordHash = await hashPassword(STANDARD_DEMO_PASSWORD);
-  const periodEnd = new Date();
-  periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-  const existing = await findUserByEmail(STANDARD_DEMO_EMAIL);
-  if (existing) {
-    await updateUserMembership(existing.id, {
-      membershipStatus: "active",
-      plan: "standard",
-      billingInterval: "monthly",
-      currentPeriodEnd: periodEnd,
-    });
-    if (isDatabaseConfigured()) {
-      const db = getDb();
-      await db
-        .update(users)
-        .set({ passwordHash, displayName: "Standard Member", updatedAt: new Date() })
-        .where(eq(users.id, existing.id));
-    } else {
-      const memUser = mem.get(existing.id);
-      if (memUser) {
-        memUser.passwordHash = passwordHash;
-        memUser.displayName = "Standard Member";
-        indexMem(memUser);
-      }
-    }
-    const fresh = await findUserById(existing.id);
-    return toPublic(fresh!);
-  }
-
-  if (isDatabaseConfigured()) {
-    const db = getDb();
-    const [row] = await db
-      .insert(users)
-      .values({
-        email: STANDARD_DEMO_EMAIL,
-        username: STANDARD_DEMO_EMAIL,
-        passwordHash,
-        displayName: "Standard Member",
-        membershipStatus: "active",
-        plan: "standard",
-        billingInterval: "monthly",
-        currentPeriodEnd: periodEnd,
-      })
-      .returning();
-    return toPublic(fromDbRow(row));
-  }
-
-  const now = new Date();
-  const user: MembershipRecord = {
-    id: randomUUID(),
-    email: STANDARD_DEMO_EMAIL,
-    username: STANDARD_DEMO_EMAIL,
-    passwordHash,
-    displayName: "Standard Member",
-    stripeCustomerId: null,
-    stripeSubscriptionId: null,
-    membershipStatus: "active",
-    plan: "standard",
-    billingInterval: "monthly",
-    currentPeriodEnd: periodEnd,
-    createdAt: now,
-    updatedAt: now,
-  };
-  indexMem(user);
-  return toPublic(user);
-}
-
-/** Simple local login: email `9744` / password `9744` with Active Pro. */
-export const QUICK_LOGIN_EMAIL = "9744";
-export const QUICK_LOGIN_PASSWORD = "9744";
-
-export async function ensureQuickLoginAccount(): Promise<PublicUser> {
-  const passwordHash = await hashPassword(QUICK_LOGIN_PASSWORD);
-  const periodEnd = new Date();
-  periodEnd.setFullYear(periodEnd.getFullYear() + 25);
-
-  const existing = await findUserByEmail(QUICK_LOGIN_EMAIL);
-  if (existing) {
-    if (isDatabaseConfigured()) {
-      const db = getDb();
-      const [row] = await db
-        .update(users)
-        .set({
-          passwordHash,
-          displayName: "9744",
-          membershipStatus: "active",
-          plan: "pro",
-          billingInterval: "yearly",
-          currentPeriodEnd: periodEnd,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, existing.id))
-        .returning();
-      return toPublic(fromDbRow(row));
-    }
-
-    const next: MembershipRecord = {
-      ...existing,
-      passwordHash,
-      displayName: "9744",
-      membershipStatus: "active",
-      plan: "pro",
-      billingInterval: "yearly",
-      currentPeriodEnd: periodEnd,
-      updatedAt: new Date(),
-    };
-    indexMem(next);
-    return toPublic(next);
-  }
-
-  if (isDatabaseConfigured()) {
-    const db = getDb();
-    const [row] = await db
-      .insert(users)
-      .values({
-        email: QUICK_LOGIN_EMAIL,
-        username: QUICK_LOGIN_EMAIL,
-        passwordHash,
-        displayName: "9744",
-        membershipStatus: "active",
-        plan: "pro",
-        billingInterval: "yearly",
-        currentPeriodEnd: periodEnd,
-      })
-      .returning();
-    return toPublic(fromDbRow(row));
-  }
-
-  const now = new Date();
-  const user: MembershipRecord = {
-    id: randomUUID(),
-    email: QUICK_LOGIN_EMAIL,
-    username: QUICK_LOGIN_EMAIL,
-    passwordHash,
-    displayName: "9744",
-    stripeCustomerId: null,
-    stripeSubscriptionId: null,
-    membershipStatus: "active",
-    plan: "pro",
-    billingInterval: "yearly",
-    currentPeriodEnd: periodEnd,
-    createdAt: now,
-    updatedAt: now,
-  };
-  indexMem(user);
-  return toPublic(user);
-}
-
-/** Keep owner membership Active even if a webhook tries to revoke it. */
+/** Keep env-configured owner membership Active even if a webhook tries to revoke it. */
 export async function protectOwnerMembership(userId: string): Promise<PublicUser | null> {
   const user = await findUserById(userId);
   if (!user || !isOwnerEmail(user.email)) return user ? toPublic(user) : null;
   if (isMembershipActive(user.membershipStatus, user.currentPeriodEnd) && user.plan === "pro") {
     return toPublic(user);
   }
+  if (!ownerSeedCredentials()) return toPublic(user);
   return ensureOwnerAccount();
 }

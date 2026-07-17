@@ -341,14 +341,7 @@ export function registerDataPlatformProxy(
     }
   });
 
-  app.get("/api/v1/health", async (_req, res) => {
-    try {
-      const upstream = await fetch(`${BASE}/api/v1/health`, { signal: AbortSignal.timeout(5_000) });
-      res.status(upstream.status).json(await upstream.json());
-    } catch {
-      res.status(503).json({ ok: false, error: "data-platform down" });
-    }
-  });
+  // /api/v1/health is registered in routes.ts (public ops probe).
 
   const proxyLeagueGet = (mount: string, upstream: string, timeoutMs = 120_000) => {
     app.get(mount, async (req, res) => {

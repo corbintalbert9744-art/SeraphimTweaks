@@ -10,8 +10,6 @@ import {
   authenticateUser,
   createUser,
   ensureOwnerAccount,
-  ensureQuickLoginAccount,
-  ensureStandardDemoAccount,
   getPublicUser,
   isOwnerEmail,
   protectOwnerMembership,
@@ -26,6 +24,7 @@ import {
   isStripeConfigured,
 } from "./stripeBilling";
 import { isBillingInterval, isMembershipPlan, normalizeBillingInterval } from "@shared/membership";
+import { shouldSeedOwnerAccount } from "./runtimeConfig";
 
 const signupSchema = z.object({
   name: z.string().min(1).max(120).optional(),
@@ -58,10 +57,11 @@ export function registerAuthAndBillingRoutes(app: Express) {
   configureSession(app);
   app.use(loadSessionUser);
 
-  // Seed owner + Standard demo + quick local login accounts.
-  void ensureOwnerAccount().catch((err) => console.error("[owner] seed failed", err));
-  void ensureStandardDemoAccount().catch((err) => console.error("[standard-demo] seed failed", err));
-  void ensureQuickLoginAccount().catch((err) => console.error("[quick-login] seed failed", err));
+  // Optional owner bootstrap only when OWNER_EMAIL + OWNER_PASSWORD are set.
+  // Production also requires ALLOW_OWNER_SEED=1. Demo / quick-login accounts are gone.
+  if (shouldSeedOwnerAccount()) {
+    void ensureOwnerAccount().catch((err) => console.error("[owner] seed failed", err));
+  }
 
   app.post("/api/auth/signup", async (req: AuthedRequest, res) => {
     try {
