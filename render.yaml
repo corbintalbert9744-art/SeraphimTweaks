@@ -47,6 +47,7 @@ services:
     runtime: node
     plan: free
     region: oregon
+    autoDeployTrigger: commit
     # --include=dev: NODE_ENV=production would otherwise skip vite/tsx (devDependencies)
     buildCommand: npm ci --include=dev && npm run build
     startCommand: node scripts/migrate.mjs && node dist/index.cjs
