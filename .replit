@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web"]
+modules = ["nodejs-20", "python-3.12", "web", "postgresql-16"]
 [agent]
 expertMode = true
 
@@ -24,7 +24,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run data-platform"
+args = "cd data-platform && PYTHONPATH=. pip install -q -r requirements.txt && PYTHONPATH=. ENABLE_SCHEDULER=true BOOTSTRAP_NBA_SYNC=true python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
 waitForPort = 8000
 
 [[workflows.workflow.tasks]]
@@ -45,5 +45,11 @@ externalPort = 8000
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["npm", "run", "start:all"]
 build = ["npm", "run", "build"]
+run = ["npm", "run", "start:all"]
+
+[env]
+PYTHONPATH = "data-platform"
+DATA_PLATFORM_URL = "http://127.0.0.1:8000"
+ENABLE_SCHEDULER = "true"
+BOOTSTRAP_NBA_SYNC = "true"

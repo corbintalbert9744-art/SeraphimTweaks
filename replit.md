@@ -22,10 +22,25 @@ A gaming tweaks product website built with Express + Vite + React (TypeScript). 
 - `npm run start` - Production server
 - `npm run db:push` - Push Drizzle schema to database
 
-## Deployment
-- Target: Autoscale
-- Build: `npm run build`
-- Run: `npm run start`
+## Deployment (public internet)
+
+Cursor does **not** host the live site. Use Replit Deploy (this repo) or Docker on any VPS.
+
+### Replit Deploy (recommended for this project)
+1. Open the repo in Replit → **Deploy** → Autoscale.
+2. Add a Replit Postgres database (or paste an external `DATABASE_URL`).
+3. Set Secrets (same names as `.env.example`):
+   - `DATABASE_URL`, `SESSION_SECRET` (long random), `APP_URL` (your `https://….replit.app`)
+   - Stripe live keys + 4 price IDs + `STRIPE_WEBHOOK_SECRET`
+   - At least one of `PROPLINE_API_KEY` / `SHARPAPI_API_KEY` / `ODDS_API_KEY`
+4. Point Stripe webhook to `https://YOUR_DOMAIN/api/stripe/webhook`.
+5. Build: `npm run build` · Run: `npm run start:all` (Node + Python data-platform).
+
+### Docker (VPS / Railway / Fly)
+```bash
+docker compose up --build -d
+```
+Requires `.env` with production secrets. App listens on `:5000`.
 
 ## Recent Changes
 - 2026-02-11: Imported project from GitHub. Moved files from SeraphimTweaks-1/ subdirectory to workspace root. Configured workflow and deployment for Replit environment.

@@ -50,10 +50,11 @@ const pyEnv = {
   BOOTSTRAP_NBA_SYNC: process.env.BOOTSTRAP_NBA_SYNC || "true",
 };
 
-console.log(`[stack] starting data-platform :8000 (${isDev ? "reload" : "prod"})`);
+const pythonBin = process.env.PYTHON || "python3";
+console.log(`[stack] starting data-platform :8000 (${isDev ? "reload" : "prod"}) via ${pythonBin}`);
 run(
   "data-platform",
-  "python3",
+  pythonBin,
   [
     "-m",
     "uvicorn",

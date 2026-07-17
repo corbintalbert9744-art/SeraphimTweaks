@@ -1,3 +1,7 @@
+# Local / VPS full stack: Postgres + data-platform + web
+#   docker compose up --build
+# Set secrets in .env (see .env.example). Production requires DATABASE_URL + SESSION_SECRET + APP_URL.
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,6 +13,28 @@ services:
       - "5432:5432"
     volumes:
       - seraphim_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seraphim -d seraphim_analytics"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://seraphim:seraphim@postgres:5432/seraphim_analytics
+      DATA_PLATFORM_URL: http://127.0.0.1:8000
+      NODE_ENV: production
+      PORT: "5000"
+      ENABLE_SCHEDULER: "true"
+      BOOTSTRAP_NBA_SYNC: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   seraphim_pg:
