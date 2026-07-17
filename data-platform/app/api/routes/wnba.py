@@ -70,8 +70,20 @@ def wnba_props(
         )
         props = payload.get("props") or []
         # Keep the board usable like local Cursor when live pick'em is empty
-        # (rate limit / cold cache) — ESPN research slate, never invented PrizePicks lines.
+        # (rate limit / cold cache) — prefer Cursor seed, then ESPN research slate.
         if not props:
+            from app.ingestion.cursor_board_seed import load_cursor_board_seed
+
+            seed = load_cursor_board_seed("WNBA", platform)
+            if seed is not None:
+                props = seed.get("props") or []
+                teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
+                markets = sorted({p["market"] for p in props if p.get("market")})
+                return {
+                    **seed,
+                    "teams": seed.get("teams") or ["All", *teams],
+                    "markets": seed.get("markets") or ["All", *markets],
+                }
             research = ensure_wnba_board(db, force=refresh)
             props = research.get("props") or []
             players = research.get("players") or []

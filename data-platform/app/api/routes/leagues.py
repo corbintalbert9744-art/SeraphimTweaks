@@ -133,26 +133,34 @@ def mlb_props(
             db, [], platform, league="MLB", refresh=refresh
         )
         if not props:
-            if refresh or not list_league_props(db, "MLB"):
-                sync_mlb_warehouse(db)
-            props = list_league_props(db, "MLB")
-            players = _players_from_props(props)
-            label = meta.get("platformLabel") or platform
-            meta = {
-                **meta,
-                "ok": bool(props),
-                "fallback": True,
-                "fallbackSource": "mlb-statsapi",
-                "source": "mlb-statsapi",
-                "dataSource": "mlb-research",
-                "rateLimited": False,
-                "requiresApiKey": False,
-                "error": None,
-                "note": (
-                    f"Research slate active while live {label} lines refresh. "
-                    "Seraphim projections vs research baselines — not scraped pick'em lines."
-                ),
-            }
+            from app.ingestion.cursor_board_seed import load_cursor_board_seed
+
+            seed = load_cursor_board_seed("MLB", platform)
+            if seed is not None:
+                props = seed.get("props") or []
+                players = seed.get("players") or []
+                meta = {**meta, **{k: v for k, v in seed.items() if k not in ("props", "players")}}
+            else:
+                if refresh or not list_league_props(db, "MLB"):
+                    sync_mlb_warehouse(db)
+                props = list_league_props(db, "MLB")
+                players = _players_from_props(props)
+                label = meta.get("platformLabel") or platform
+                meta = {
+                    **meta,
+                    "ok": bool(props),
+                    "fallback": True,
+                    "fallbackSource": "mlb-statsapi",
+                    "source": "mlb-statsapi",
+                    "dataSource": "mlb-research",
+                    "rateLimited": False,
+                    "requiresApiKey": False,
+                    "error": None,
+                    "note": (
+                        f"Research slate active while live {label} lines refresh. "
+                        "Seraphim projections vs research baselines — not scraped pick'em lines."
+                    ),
+                }
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         return {
@@ -236,26 +244,34 @@ def nhl_props(
             db, [], platform, league="NHL", refresh=refresh
         )
         if not props:
-            if refresh or not list_league_props(db, "NHL"):
-                sync_nhl_warehouse(db)
-            props = list_league_props(db, "NHL")
-            players = _players_from_props(props)
-            label = meta.get("platformLabel") or platform
-            meta = {
-                **meta,
-                "ok": bool(props),
-                "fallback": True,
-                "fallbackSource": "nhl-api",
-                "source": "nhl-api",
-                "dataSource": "nhl-research",
-                "rateLimited": False,
-                "requiresApiKey": False,
-                "error": None,
-                "note": (
-                    f"Research slate active while live {label} lines refresh. "
-                    "Seraphim projections vs research baselines — not scraped pick'em lines."
-                ),
-            }
+            from app.ingestion.cursor_board_seed import load_cursor_board_seed
+
+            seed = load_cursor_board_seed("NHL", platform)
+            if seed is not None:
+                props = seed.get("props") or []
+                players = seed.get("players") or []
+                meta = {**meta, **{k: v for k, v in seed.items() if k not in ("props", "players")}}
+            else:
+                if refresh or not list_league_props(db, "NHL"):
+                    sync_nhl_warehouse(db)
+                props = list_league_props(db, "NHL")
+                players = _players_from_props(props)
+                label = meta.get("platformLabel") or platform
+                meta = {
+                    **meta,
+                    "ok": bool(props),
+                    "fallback": True,
+                    "fallbackSource": "nhl-api",
+                    "source": "nhl-api",
+                    "dataSource": "nhl-research",
+                    "rateLimited": False,
+                    "requiresApiKey": False,
+                    "error": None,
+                    "note": (
+                        f"Research slate active while live {label} lines refresh. "
+                        "Seraphim projections vs research baselines — not scraped pick'em lines."
+                    ),
+                }
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         return {
