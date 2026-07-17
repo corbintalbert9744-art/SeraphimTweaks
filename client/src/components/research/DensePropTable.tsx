@@ -91,9 +91,12 @@ export function DensePropTable({
       data-feature="dense-prop-table"
       className="overflow-hidden rounded-lg border border-[var(--seraphim-border)] bg-[var(--seraphim-surface)]"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--seraphim-border)] px-3 py-2.5 sm:px-4">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--seraphim-border)] px-3 py-2 sm:px-4">
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold text-white">{title}</h2>
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-400" />
+            <h2 className="truncate text-sm font-semibold text-white">{title}</h2>
+          </div>
           {(platformLabel || subtitle) && (
             <p className="mt-0.5 truncate text-[11px] text-neutral-500">
               {[platformLabel, subtitle].filter(Boolean).join(" · ")}
@@ -105,7 +108,7 @@ export function DensePropTable({
 
       <div className="overflow-x-auto">
         <table className="min-w-[1100px] w-full text-left text-[13px]">
-          <thead className="sticky top-0 z-10 bg-[#0e0e0e] text-[10px] uppercase tracking-[0.08em] text-neutral-500">
+          <thead className="sticky top-0 z-10 bg-[#0c0c0c] text-[10px] uppercase tracking-[0.08em] text-neutral-500">
             <tr className="border-b border-[var(--seraphim-border)]">
               <th className="px-3 py-2 font-medium">Player</th>
               <th className="px-3 py-2 font-medium">Matchup</th>

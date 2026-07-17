@@ -132,7 +132,7 @@ export default function CommandCenterPage() {
             <span className="rounded-md border border-[#1a1a1a] bg-[#111] px-2.5 py-1">
               Updated {new Date(data.generatedAt).toLocaleTimeString()}
             </span>
-            <span className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-300">
+            <span className="rounded-md border border-yellow-500/25 bg-yellow-500/10 px-2.5 py-1 text-yellow-300">
               No-vig every 5 min
             </span>
           </div>

@@ -116,7 +116,7 @@ export function HitRateSummaryBoxes({
               "shrink-0 rounded-lg border text-left transition",
               compact ? "min-w-[4.25rem] px-2 py-1.5" : "min-w-[5.5rem] rounded-xl px-3 py-2.5",
               active
-                ? "border-emerald-500/40 bg-emerald-500/[0.08]"
+                ? "border-yellow-500/40 bg-yellow-500/[0.08]"
                 : "border-[#222] bg-[#0c0c0c] hover:border-[#333]",
             )}
           >
@@ -169,7 +169,7 @@ export function MarketTabs({
             onClick={() => onSelect(i)}
             className={cn(
               "relative shrink-0 px-3.5 py-3 text-[11px] font-semibold uppercase tracking-wide transition",
-              active ? "text-emerald-300" : "text-neutral-500 hover:text-neutral-300",
+              active ? "text-yellow-300" : "text-neutral-500 hover:text-neutral-300",
             )}
           >
             {m.label}
@@ -177,7 +177,7 @@ export function MarketTabs({
               <span className="ml-1.5 tabular-nums opacity-70">{m.line}</span>
             ) : null}
             {active ? (
-              <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-emerald-400" />
+              <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-yellow-400" />
             ) : null}
           </button>
         );
@@ -275,7 +275,7 @@ export function BookLineStrip({
           className={cn(
             "min-w-[6.5rem] shrink-0 rounded-xl border px-3 py-2.5",
             b.highlight
-              ? "border-emerald-500/35 bg-emerald-500/[0.07]"
+              ? "border-yellow-500/35 bg-yellow-500/[0.07]"
               : "border-[#222] bg-[#0c0c0c]",
           )}
         >

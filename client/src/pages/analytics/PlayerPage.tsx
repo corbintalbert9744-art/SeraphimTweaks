@@ -57,10 +57,13 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-neutral-500">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" /> Over line
+          <span className="h-2.5 w-2.5 rounded-sm bg-yellow-400/85" /> Game log
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-red-500/70" /> Under line
+          <span className="h-px w-4 border-t border-dashed border-red-400" /> Line
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-400" /> Under
         </span>
         <span className="tabular-nums text-neutral-400">Line {line}</span>
       </div>
@@ -70,11 +73,11 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
           y1={lineY}
           x2={w - padR}
           y2={lineY}
-          stroke="rgba(250,204,21,0.55)"
+          stroke="rgba(248,113,113,0.75)"
           strokeWidth="1.5"
           strokeDasharray="5 4"
         />
-        <text x={w - padR} y={lineY - 4} textAnchor="end" className="fill-yellow-400/80" fontSize="9">
+        <text x={w - padR} y={lineY - 4} textAnchor="end" className="fill-red-400/90" fontSize="9">
           {line}
         </text>
         {games.map((g, i) => {
@@ -83,13 +86,13 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
           const raw = Number.isFinite(g.value) ? g.value : 0;
           const barH = (Math.abs(raw) / maxStat) * innerH;
           const y = padT + innerH - barH;
-          const over = raw > line;
+          const under = raw < line;
           return (
             <g key={`${g.label}-${i}`}>
               <defs>
                 <linearGradient id={`bar-${i}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={over ? "rgb(52, 211, 153)" : "rgb(248, 113, 113)"} />
-                  <stop offset="100%" stopColor={over ? "rgb(5, 150, 105)" : "rgb(185, 28, 28)"} />
+                  <stop offset="0%" stopColor="rgb(250, 204, 21)" />
+                  <stop offset="100%" stopColor="rgb(180, 130, 10)" />
                 </linearGradient>
               </defs>
               <rect
@@ -97,10 +100,13 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
                 y={y}
                 width={barW}
                 height={Math.max(3, barH)}
-                rx={4}
+                rx={3}
                 fill={`url(#bar-${i})`}
-                opacity={0.92}
+                opacity={0.9}
               />
+              {under ? (
+                <circle cx={cx} cy={padT + innerH + 4} r={2.5} className="fill-red-400" />
+              ) : null}
               <text
                 x={cx}
                 y={Math.max(14, y - 5)}
@@ -121,7 +127,7 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
                 x={cx}
                 y={h - 2}
                 textAnchor="middle"
-                className={g.home ? "fill-emerald-400/80" : "fill-neutral-500"}
+                className={g.home ? "fill-yellow-400/80" : "fill-neutral-500"}
                 fontSize="8"
               >
                 {g.home ? "H" : "A"}
@@ -478,7 +484,7 @@ export default function PlayerPage() {
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold",
                 added
-                  ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                  ? "border border-yellow-500/30 bg-yellow-500/15 text-yellow-300"
                   : "bg-gradient-to-b from-yellow-400 to-amber-500 text-black",
               )}
             >
@@ -556,8 +562,8 @@ export default function PlayerPage() {
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold",
                 added
-                  ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
-                  : "bg-emerald-500 text-black hover:bg-emerald-400",
+                  ? "border border-yellow-500/30 bg-yellow-500/15 text-yellow-300"
+                  : "bg-gradient-to-b from-yellow-400 to-amber-500 text-black hover:from-yellow-300 hover:to-amber-400",
               )}
             >
               {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -614,7 +620,7 @@ export default function PlayerPage() {
                     className={cn(
                       "rounded-lg px-2.5 py-1 text-xs font-medium transition",
                       tab === id
-                        ? "bg-emerald-500/15 text-emerald-300"
+                        ? "bg-yellow-500/15 text-yellow-300"
                         : "text-neutral-500 hover:text-neutral-300",
                     )}
                   >
@@ -843,9 +849,9 @@ export default function PlayerPage() {
             <h3 className="mt-1 text-sm font-semibold text-white">{profile.matchup.title}</h3>
             <p className="mt-1 text-xs text-neutral-500">{profile.matchup.defenseRank}</p>
             <div className="mt-4 flex items-center justify-center">
-              <div className="relative flex h-28 w-28 items-center justify-center rounded-full border-4 border-emerald-500/35">
+              <div className="relative flex h-28 w-28 items-center justify-center rounded-full border-4 border-yellow-500/35">
                 <div className="text-center">
-                  <p className="text-2xl font-semibold tabular-nums text-emerald-300">
+                  <p className="text-2xl font-semibold tabular-nums text-yellow-300">
                     {Math.round(
                       (selectedSide === "Under"
                         ? market.underProbability ?? 1 - (market.overProbability ?? 0.5)
