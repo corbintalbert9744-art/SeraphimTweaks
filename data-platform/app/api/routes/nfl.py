@@ -74,6 +74,34 @@ def nfl_props(
             db, league="NFL", platform=platform, refresh=refresh
         )
         props = payload.get("props") or []
+        if not props:
+            research = ensure_nfl_board(db, force=refresh)
+            props = research.get("props") or []
+            players = research.get("players") or []
+            teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
+            markets = sorted({p["market"] for p in props if p.get("market")})
+            label = payload.get("platformLabel") or platform
+            return {
+                **payload,
+                "ok": bool(props),
+                "props": props,
+                "players": players,
+                "count": len(props),
+                "teams": ["All", *teams],
+                "markets": ["All", *markets],
+                "live": True,
+                "fallback": True,
+                "fallbackSource": "espn-nfl",
+                "source": research.get("source") or "espn-nfl",
+                "dataSource": "espn-nfl-research",
+                "rateLimited": False,
+                "requiresApiKey": False,
+                "error": None,
+                "note": (
+                    f"Research slate active while live {label} lines refresh. "
+                    "Seraphim projections vs research baselines — not scraped pick'em lines."
+                ),
+            }
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         return {**payload, "teams": ["All", *teams], "markets": ["All", *markets], "live": True}

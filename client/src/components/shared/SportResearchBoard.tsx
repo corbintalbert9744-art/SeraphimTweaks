@@ -276,7 +276,7 @@ export function SportResearchBoard({
                 delta: board.isFetching
                   ? "Refreshing…"
                   : isFallback
-                    ? "ESPN slate fallback"
+                    ? "Research slate"
                     : `${liveProps.length} on platform`,
                 deltaTone: "neutral",
                 hint: isFallback ? "Research slate" : platformLabel || "Platform board",

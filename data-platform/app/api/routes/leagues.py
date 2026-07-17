@@ -132,6 +132,27 @@ def mlb_props(
         props, players, meta = _scope_to_platform(
             db, [], platform, league="MLB", refresh=refresh
         )
+        if not props:
+            if refresh or not list_league_props(db, "MLB"):
+                sync_mlb_warehouse(db)
+            props = list_league_props(db, "MLB")
+            players = _players_from_props(props)
+            label = meta.get("platformLabel") or platform
+            meta = {
+                **meta,
+                "ok": bool(props),
+                "fallback": True,
+                "fallbackSource": "mlb-statsapi",
+                "source": "mlb-statsapi",
+                "dataSource": "mlb-research",
+                "rateLimited": False,
+                "requiresApiKey": False,
+                "error": None,
+                "note": (
+                    f"Research slate active while live {label} lines refresh. "
+                    "Seraphim projections vs research baselines — not scraped pick'em lines."
+                ),
+            }
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         return {
@@ -214,6 +235,27 @@ def nhl_props(
         props, players, meta = _scope_to_platform(
             db, [], platform, league="NHL", refresh=refresh
         )
+        if not props:
+            if refresh or not list_league_props(db, "NHL"):
+                sync_nhl_warehouse(db)
+            props = list_league_props(db, "NHL")
+            players = _players_from_props(props)
+            label = meta.get("platformLabel") or platform
+            meta = {
+                **meta,
+                "ok": bool(props),
+                "fallback": True,
+                "fallbackSource": "nhl-api",
+                "source": "nhl-api",
+                "dataSource": "nhl-research",
+                "rateLimited": False,
+                "requiresApiKey": False,
+                "error": None,
+                "note": (
+                    f"Research slate active while live {label} lines refresh. "
+                    "Seraphim projections vs research baselines — not scraped pick'em lines."
+                ),
+            }
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         return {
@@ -358,6 +400,27 @@ def soccer_props(
         props, players, meta = _scope_to_platform(
             db, [], platform, league="Soccer", refresh=refresh
         )
+        if not props:
+            if refresh or not list_league_props(db, "Soccer"):
+                ensure_soccer_pickem_board(db)
+            props = list_league_props(db, "Soccer")
+            players = _players_from_props(props)
+            label = meta.get("platformLabel") or platform
+            meta = {
+                **meta,
+                "ok": bool(props),
+                "fallback": True,
+                "fallbackSource": "espn-soccer",
+                "source": "espn-soccer",
+                "dataSource": "soccer-research",
+                "rateLimited": False,
+                "requiresApiKey": False,
+                "error": None,
+                "note": (
+                    f"Research slate active while live {label} lines refresh. "
+                    "Seraphim projections vs research baselines — not scraped pick'em lines."
+                ),
+            }
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         settings = get_settings()
@@ -451,7 +514,6 @@ def tennis_props(
             props = list_league_props(db, code)
             players = _players_from_props(props)
             label = meta.get("platformLabel") or platform
-            prior = (meta.get("note") or "").strip()
             meta = {
                 **meta,
                 "ok": bool(props),
@@ -459,12 +521,13 @@ def tennis_props(
                 "fallbackSource": "espn-tennis",
                 "source": "espn-tennis",
                 "dataSource": "espn-tennis-research",
+                "rateLimited": False,
+                "requiresApiKey": False,
+                "error": None,
                 "note": (
-                    f"{prior} ".strip()
-                    + f" Showing {code} research slate (Fantasy Score, Total Games, Total Sets) "
-                    f"from ESPN matchups until live {label} lines sync. "
-                    "These are Seraphim research lines — not scraped from the pick'em app."
-                ).strip(),
+                    f"Research slate active while live {label} lines refresh. "
+                    "Seraphim projections vs research baselines — not scraped pick'em lines."
+                ),
             }
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})

@@ -69,6 +69,36 @@ def wnba_props(
             db, league="WNBA", platform=platform, refresh=refresh
         )
         props = payload.get("props") or []
+        # Keep the board usable like local Cursor when live pick'em is empty
+        # (rate limit / cold cache) — ESPN research slate, never invented PrizePicks lines.
+        if not props:
+            research = ensure_wnba_board(db, force=refresh)
+            props = research.get("props") or []
+            players = research.get("players") or []
+            teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
+            markets = sorted({p["market"] for p in props if p.get("market")})
+            label = payload.get("platformLabel") or platform
+            return {
+                **payload,
+                "ok": bool(props),
+                "props": props,
+                "players": players,
+                "count": len(props),
+                "teams": ["All", *teams],
+                "markets": ["All", *markets],
+                "live": True,
+                "fallback": True,
+                "fallbackSource": "espn-wnba",
+                "source": research.get("source") or "espn-wnba",
+                "dataSource": "espn-wnba-research",
+                "rateLimited": False,
+                "requiresApiKey": False,
+                "error": None,
+                "note": (
+                    f"Research slate active while live {label} lines refresh. "
+                    "Seraphim projections vs research baselines — not scraped pick'em lines."
+                ),
+            }
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         return {**payload, "teams": ["All", *teams], "markets": ["All", *markets], "live": True}
