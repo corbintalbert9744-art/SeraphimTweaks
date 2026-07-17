@@ -134,6 +134,7 @@ export async function createUser(input: {
     const [row] = await db
       .insert(users)
       .values({
+        id: randomUUID(),
         email,
         username,
         passwordHash,
@@ -361,6 +362,7 @@ export async function ensureOwnerAccount(): Promise<PublicUser> {
     const [row] = await db
       .insert(users)
       .values({
+        id: randomUUID(),
         email: creds.email,
         username: creds.email,
         passwordHash,

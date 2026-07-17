@@ -31,7 +31,8 @@ import { z } from "zod";
 
 /** Application users (email/password + Stripe linkage). */
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // $defaultFn so Drizzle always sends an id (DB default alone can insert NULL)
+  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   email: text("email").notNull().unique(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
