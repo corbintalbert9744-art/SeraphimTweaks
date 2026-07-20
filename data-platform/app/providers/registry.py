@@ -264,7 +264,7 @@ def provider_status() -> list[dict]:
             "legitimate": bool(settings.antelytics_api_key),
             "envVar": "ANTELYTICS_API_KEY",
             "notes": (
-                "Antelytics adapter scaffold. Set ANTELYTICS_API_KEY (+ optional ANTELYTICS_BASE_URL). "
+                "Antelytics (antelytics.dev) DFS props. Set ANTELYTICS_API_KEY (+ optional ANTELYTICS_BASE_URL). "
                 "Unavailable until keyed / schema confirmed — never fabricated."
             ),
         },
@@ -283,9 +283,13 @@ def provider_status() -> list[dict]:
             "operators": [
                 "PrizePicks",
                 "Underdog",
+                "Sleeper",
                 "FanDuel",
                 "DraftKings",
                 "BetMGM",
+                "Caesars",
+                "Fanatics",
+                "ESPN BET",
                 "Bovada",
                 "Pinnacle",
                 "BetRivers",

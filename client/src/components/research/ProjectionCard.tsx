@@ -8,6 +8,7 @@ import { propResearchPath } from "@/lib/playerLinks";
 import { cn } from "@/lib/utils";
 import type { LeagueCode } from "@/data/mock";
 import { HitRateChips } from "./HitRateChips";
+import { modelEdgePercent } from "@/lib/playerResearchProfile";
 
 export type ProjectionCardProp = {
   id: string;
@@ -49,10 +50,25 @@ export function ProjectionCard({
   className?: string;
 }) {
   const proj = prop.projectedValue;
+  const leanSide = prop.side === "Under" ? "Under" : "Over";
+  const leanProb =
+    prop.noVigProb != null
+      ? Number(prop.noVigProb)
+      : leanSide === "Over"
+        ? 0.55
+        : 0.45;
+  const overP = leanSide === "Over" ? leanProb : 1 - leanProb;
+  const underP = 1 - overP;
   const edge =
     prop.edgePercent ??
-    (proj != null && prop.line
-      ? ((proj - prop.line) / prop.line) * 100
+    (proj != null
+      ? modelEdgePercent({
+          projected: proj,
+          line: prop.line,
+          overProbability: overP,
+          underProbability: underP,
+          side: leanSide,
+        })
       : null);
   const noVigPct = prop.noVigProb != null ? Math.round(Number(prop.noVigProb) * 100) : null;
 

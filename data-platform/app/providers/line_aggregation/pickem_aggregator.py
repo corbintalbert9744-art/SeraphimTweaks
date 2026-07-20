@@ -22,7 +22,7 @@ from app.providers.propline.markets import PICKEM_SLUGS
 log = logging.getLogger(__name__)
 
 # Providers that can supply DFS / pick'em books (when configured + capable).
-DEFAULT_PICKEM_PRIORITY = ("propline", "sharpapi", "the-odds-api")
+DEFAULT_PICKEM_PRIORITY = ("propline", "sharpapi", "the-odds-api", "antelytics")
 
 # In-process cooldown after a provider 429 / hard failure (per source).
 _provider_cooldown_until: dict[str, datetime] = {}

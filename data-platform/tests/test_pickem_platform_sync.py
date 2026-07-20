@@ -58,7 +58,10 @@ def test_sync_requires_any_odds_key():
         out = sync_pickem_platform_board(db, league="NBA", platform="prizepicks", force=True)
     assert out["requiresApiKey"] is True
     assert out["props"] == []
-    assert "PROPLINE_API_KEY" in (out.get("note") or "")
+    note = out.get("note") or ""
+    assert "aren’t available" in note or "aren't available" in note
+    assert "PROPLINE_API_KEY" not in note
+    assert "ODDS_API_KEY" not in note
 
 
 def test_sync_other_unavailable():

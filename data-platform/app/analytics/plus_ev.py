@@ -100,7 +100,15 @@ def evaluate_side_at_line(
     over_p, under_p = estimate_side_probabilities(float(projected), float(line), float(sigma))
     model_p = over_p if side == "Over" else under_p
     edge = model_edge_for_side(projected, line, side)
-    edge_pct = round((edge / line) * 100, 2) if line else 0.0
+    from app.analytics.prediction import model_edge_percent
+
+    edge_pct = model_edge_percent(
+        projected=float(projected),
+        line=float(line),
+        over_probability=over_p,
+        under_probability=under_p,
+        side=side,
+    )
 
     implied: Optional[float] = None
     no_vig: Optional[float] = None

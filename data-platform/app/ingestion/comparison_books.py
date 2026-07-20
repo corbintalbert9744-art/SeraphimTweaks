@@ -11,10 +11,11 @@ Rules:
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models import LineSnapshot, Odds, Player, Prop, Sportsbook
@@ -31,6 +32,11 @@ PICKEM_SLUGS = {"prizepicks", "underdog", "sleeper", "parlayplay"}
 
 def _slugify_book(slug: str | None, name: str) -> str:
     return normalize_book_slug(slug or name)
+
+
+def _player_name_slug(name: str) -> str:
+    """Normalize a display name for cross-platform pick'em prop id matching."""
+    return re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-")
 
 
 def _platform_from_prop_id(prop_id: str) -> Optional[str]:
@@ -107,8 +113,14 @@ def _collect_live_odds_rows(
     market: str,
     league: str,
 ) -> list[tuple[Odds, Sportsbook]]:
-    """Live odds on this prop, same-player siblings, and same-name peers."""
-    prop_ids: set[str] = {prop_id}
+    """Live odds on this prop, same-player siblings, and same-name peers.
+
+    Peers include other pick'em platforms (PrizePicks / Underdog / Sleeper) that
+    share the player display name or slugified name in the prop id — board props
+    and pick'em props often use different warehouse player ids.
+    """
+    prop_ids: set[str] = {prop_id} if prop_id else set()
+    league_codes = {league, league.upper(), league.lower()} if league else set()
 
     if player_warehouse_id:
         for row in (
@@ -125,16 +137,11 @@ def _collect_live_odds_rows(
             prop_ids.add(str(row))
 
     if player_name:
-        peer_ids = (
-            db.execute(
-                select(Player.id).where(
-                    Player.full_name == player_name,
-                    or_(Player.league == league, Player.league == league.upper()),
-                )
-            )
-            .scalars()
-            .all()
-        )
+        name_norm = player_name.strip().lower()
+        peer_q = select(Player.id).where(func.lower(Player.full_name) == name_norm)
+        if league_codes:
+            peer_q = peer_q.where(Player.league.in_(list(league_codes)))
+        peer_ids = db.execute(peer_q).scalars().all()
         if peer_ids:
             for row in (
                 db.execute(
@@ -148,6 +155,35 @@ def _collect_live_odds_rows(
                 .all()
             ):
                 prop_ids.add(str(row))
+
+        # Cross-platform pick'em ids: wnba:pickem:sleeper:carla-leite:points
+        slug = _player_name_slug(player_name)
+        if slug:
+            market_token = re.sub(r"[^a-z0-9]+", "", (market or "").lower())
+            league_prefix = (league or "").split()[0].lower() if league else ""
+            id_filters = [Prop.id.contains(f":{slug}:")]
+            if league_prefix:
+                id_filters.append(Prop.id.startswith(f"{league_prefix}:"))
+            slug_props = (
+                db.execute(
+                    select(Prop.id).where(
+                        *id_filters,
+                        Prop.market == market,
+                        Prop.status == "open",
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for row in slug_props:
+                pid = str(row)
+                # Prefer props whose trailing market token matches (points, assists, …)
+                if market_token and market_token not in pid.replace("+", "").replace("-", ""):
+                    continue
+                prop_ids.add(pid)
+
+    if not prop_ids:
+        return []
 
     rows = (
         db.execute(
@@ -168,6 +204,131 @@ def _latest_snapshot_at(db: Session, prop_id: str) -> Optional[datetime]:
         .order_by(LineSnapshot.captured_at.desc())
         .limit(1)
     ).scalar_one_or_none()
+
+
+def _movement_prop_ids(
+    db: Session,
+    *,
+    prop_id: str,
+    player_warehouse_id: Optional[str],
+    player_name: str,
+    market: str,
+    league: str,
+) -> list[str]:
+    """Prop ids that share this market for line-movement history."""
+    ids: set[str] = {prop_id} if prop_id else set()
+    if player_warehouse_id:
+        for row in (
+            db.execute(
+                select(Prop.id).where(
+                    Prop.player_id == player_warehouse_id,
+                    Prop.market == market,
+                )
+            )
+            .scalars()
+            .all()
+        ):
+            ids.add(str(row))
+    if player_name:
+        peer_ids = (
+            db.execute(
+                select(Player.id).where(
+                    Player.full_name == player_name,
+                    or_(Player.league == league, Player.league == league.upper()),
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if peer_ids:
+            for row in (
+                db.execute(
+                    select(Prop.id).where(
+                        Prop.player_id.in_(list(peer_ids)),
+                        Prop.market == market,
+                    )
+                )
+                .scalars()
+                .all()
+            ):
+                ids.add(str(row))
+    return list(ids)
+
+
+def build_line_movement(
+    db: Session,
+    *,
+    prop_id: str,
+    player_warehouse_id: Optional[str] = None,
+    player_name: str = "",
+    market: str = "",
+    league: str = "",
+    limit: int = 16,
+) -> list[dict[str, Any]]:
+    """Chronological line ticks from real ``line_snapshots`` only.
+
+    Returns [] when there is no warehouse history — never invents Open/AM/Now.
+    """
+    if not prop_id and not player_warehouse_id and not player_name:
+        return []
+    prop_ids = _movement_prop_ids(
+        db,
+        prop_id=prop_id,
+        player_warehouse_id=player_warehouse_id,
+        player_name=player_name,
+        market=market,
+        league=league,
+    )
+    if not prop_ids:
+        return []
+
+    rows = (
+        db.execute(
+            select(LineSnapshot, Sportsbook)
+            .outerjoin(Sportsbook, Sportsbook.id == LineSnapshot.sportsbook_id)
+            .where(LineSnapshot.prop_id.in_(prop_ids))
+            .order_by(LineSnapshot.captured_at.asc())
+            .limit(max(limit * 4, 48))
+        )
+        .all()
+    )
+    if not rows:
+        return []
+
+    # Prefer the sportsbook with the densest history for a clean chart.
+    by_book: dict[str, list[tuple[LineSnapshot, Optional[Sportsbook]]]] = {}
+    for snap, book in rows:
+        key = (book.slug if book and book.slug else None) or (book.name if book else None) or "market"
+        by_book.setdefault(str(key), []).append((snap, book))
+    book_key = max(by_book.keys(), key=lambda k: len(by_book[k]))
+    series = by_book[book_key]
+
+    # Downsample evenly so the UI stays readable.
+    if len(series) > limit:
+        step = max(1, len(series) // limit)
+        picked = series[::step]
+        if picked[-1] is not series[-1]:
+            picked.append(series[-1])
+        series = picked[-limit:]
+
+    out: list[dict[str, Any]] = []
+    for snap, book in series:
+        ts = snap.captured_at
+        if ts is not None and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        label = ts.strftime("%m/%d %H:%M") if ts is not None else "—"
+        out.append(
+            {
+                "label": label,
+                "line": float(snap.line),
+                "odds": int(snap.american_odds) if snap.american_odds is not None else -110,
+                "book": (book.name if book else None) or book_key,
+                "slug": (book.slug if book else None) or None,
+                "source": snap.source,
+                "capturedAt": _iso(ts),
+            }
+        )
+    return out
 
 
 def _ensure_platform_quote_from_prop(

@@ -2,16 +2,14 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { StatCard } from "@/components/dashboard/StatCard";
 import { NbaFiltersBar, type NbaBoardFilters } from "@/components/nba/NbaFiltersBar";
 import { NbaPropTable } from "@/components/nba/NbaPropTable";
-import { NbaPlayerCards } from "@/components/nba/NbaPlayerCards";
 import { PickemAppGate, PickemAppSwitcher } from "@/components/shared/PickemAppGate";
 import { usePickemApp } from "@/context/PickemAppContext";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CardSkeleton } from "@/components/shared/Skeleton";
-import { parseHitRate, type NbaPlayerCard, type NbaProp } from "@/data/nbaMock";
+import { parseHitRate, type NbaProp } from "@/data/nbaMock";
 import { asNbaPropFromApi, cacheNbaBoardProps } from "@/lib/nbaLiveCache";
 
 const defaultFilters: NbaBoardFilters = {
@@ -69,7 +67,7 @@ export default function NbaPage() {
       if (!res.ok) throw new Error("board");
       return res.json() as Promise<{
         props: Record<string, unknown>[];
-        players: NbaPlayerCard[];
+        players?: unknown[];
         live?: boolean;
         source?: string;
         count?: number;
@@ -89,7 +87,6 @@ export default function NbaPage() {
     if (rows.length) cacheNbaBoardProps(rows);
     return rows;
   }, [board.data?.props]);
-  const livePlayers = board.data?.players ?? [];
 
   const filtered = useMemo(() => {
     const q = filters.query.trim().toLowerCase();
@@ -109,17 +106,8 @@ export default function NbaPage() {
     return sortProps(rows, filters);
   }, [filters, liveProps]);
 
-  const avgEdgePct =
-    filtered.length === 0
-      ? 0
-      : filtered.reduce((sum, p) => {
-          const pct =
-            p.edgePercent ??
-            (p.projectedValue != null && p.line
-              ? ((p.projectedValue - p.line) / p.line) * 100
-              : 0);
-          return sum + pct;
-        }, 0) / filtered.length;
+  const overCount = filtered.filter((p) => p.side === "Over").length;
+  const underCount = filtered.filter((p) => p.side === "Under").length;
 
   if (!ready) {
     return (
@@ -134,7 +122,7 @@ export default function NbaPage() {
       <div>
         <PageHeader
           eyebrow="NBA"
-          title="NBA Research Board"
+          title="NBA Props"
           description="Choose your pick'em app first — we only load that platform's available players and lines."
         />
         <div className="mt-8">
@@ -145,120 +133,81 @@ export default function NbaPage() {
   }
 
   const platformLabel = board.data?.platformLabel ?? app?.name ?? null;
-  const note = board.data?.note;
+  const rawNote = board.data?.note ?? "";
+  const memberSafeNote =
+    rawNote && !/API_KEY|PropLine|free-tier|ODDS_|SHARPAPI|PROPLINE/i.test(rawNote)
+      ? rawNote
+      : null;
+  const memberEmpty = `${app?.name ?? "Platform"} lines aren’t available right now. Check back shortly.`;
   const updatedAt = board.data?.propsUpdatedAt ?? board.data?.updatedAt ?? board.data?.syncedAt;
 
   return (
     <div>
-      <PageHeader
-        eyebrow="NBA"
-        title="NBA Research Board"
-        description={`Live ${app?.name ?? "app"} props via PropLine → Seraphim model. Players not on that board stay hidden.`}
-        actions={
-          <Link
-            href="/parlay-builder"
-            className="btn-3d rounded-xl bg-gradient-to-b from-yellow-400 to-amber-500 px-4 py-2 text-sm font-semibold text-black transition hover:brightness-105"
-          >
-            Parlay Builder{legs.length > 0 ? ` (${legs.length})` : ""}
-          </Link>
-        }
-      />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-yellow-500/80">NBA</p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">NBA Props</h1>
+          <p className="mt-1 text-xs text-neutral-500 sm:text-sm">
+            Live {app?.name ?? "app"} props · Seraphim projections
+          </p>
+        </div>
+        <Link
+          href="/parlay-builder"
+          className="rounded-lg bg-yellow-400 px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-yellow-300"
+        >
+          Parlay{legs.length > 0 ? ` · ${legs.length}` : ""}
+        </Link>
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <PickemAppSwitcher />
         {updatedAt && (
           <p className="text-[11px] tabular-nums text-neutral-500" data-feature="props-updated-at">
-            Props updated {new Date(updatedAt).toLocaleString()}
+            Updated {new Date(updatedAt).toLocaleString()}
           </p>
         )}
       </div>
 
-      {note && (
-        <p className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-200/90">
-          {note}
+      {memberSafeNote && liveProps.length > 0 && (
+        <p className="mt-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs text-neutral-400">
+          {memberSafeNote}
         </p>
       )}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <StatCard
-          card={{
-            id: "nba-props",
-            label: `${app?.shortName ?? "App"} props`,
-            value: String(filtered.length),
-            delta: board.data?.live ? "Platform board" : "Loading…",
-            deltaTone: board.data?.live ? "up" : "neutral",
-            hint: "Available on selected app",
-          }}
-        />
-        <StatCard
-          card={{
-            id: "nba-edge",
-            label: "Avg edge %",
-            value: `${avgEdgePct >= 0 ? "+" : ""}${avgEdgePct.toFixed(1)}%`,
-            delta: "vs platform line",
-            deltaTone: avgEdgePct >= 0 ? "up" : "down",
-            hint: "Seraphim model estimate",
-          }}
-        />
-        <StatCard
-          card={{
-            id: "nba-builder",
-            label: "Legs in builder",
-            value: String(legs.length),
-            delta: legs.length ? "Ready to price" : "Empty slip",
-            deltaTone: legs.length ? "up" : "neutral",
-            hint: "Shared draft across pages",
-          }}
-        />
-      </div>
-
-      <div className="mt-6">
+      <div className="mt-4">
         <NbaFiltersBar filters={filters} onChange={setFilters} resultCount={filtered.length} />
       </div>
 
       {board.isLoading && (
-        <div className="mt-6">
+        <div className="mt-4">
           <CardSkeleton rows={4} />
-          <p className="mt-3 text-center text-xs text-neutral-500">
-            Loading {app?.name} NBA board…
-          </p>
         </div>
       )}
       {board.isError && (
-        <div className="mt-6">
+        <div className="mt-4">
           <EmptyState
             title="Live board unavailable"
-            description="Start the data platform (`npm run data-platform`) and refresh."
+            description="This board is temporarily unavailable. Please try again in a few minutes."
           />
         </div>
       )}
 
       {!board.isLoading && !board.isError && (
-        <>
-          {livePlayers.length > 0 && (
-            <div className="mt-6">
-              <NbaPlayerCards players={livePlayers} props={liveProps} />
-            </div>
+        <div className="mt-3">
+          {filtered.length === 0 ? (
+            <EmptyState
+              title={`No ${app?.name ?? "platform"} props`}
+              description={memberSafeNote || memberEmpty}
+            />
+          ) : (
+            <NbaPropTable
+              rows={filtered}
+              title="NBA Props"
+              subtitle={`${filtered.length} props · ${overCount} OVER · ${underCount} UNDER`}
+              platformLabel={platformLabel}
+            />
           )}
-          <div className="mt-6">
-            {filtered.length === 0 ? (
-              <EmptyState
-                title={`No ${app?.name ?? "platform"} props`}
-                description={
-                  note ||
-                  "Sync market lines for this app, then refresh. We never invent pick'em boards from another database."
-                }
-              />
-            ) : (
-              <NbaPropTable
-                rows={filtered}
-                title={`NBA · ${app?.shortName ?? "App"} board`}
-                subtitle="Player · stat · line · projection · edge % · confidence"
-                platformLabel={platformLabel}
-              />
-            )}
-          </div>
-        </>
+        </div>
       )}
     </div>
   );

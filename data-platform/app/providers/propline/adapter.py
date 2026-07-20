@@ -277,18 +277,35 @@ class PropLineAdapter:
             try:
                 if not self.sport_is_active(sk):
                     continue
+                # Pick'em boards should surface every market the app lists for an
+                # athlete (cores, combos, fantasy, …). Omit the markets filter for
+                # NBA/WNBA pick'em so PropLine returns the full PrizePicks book.
+                pickem_only = bool(allowed) and allowed.issubset(PICKEM_SLUGS)
+                discover = pickem_only and code in {"NBA", "WNBA", "ATP", "WTA"}
                 batch = self._fetch_sport_props(
                     code,
                     sk,
-                    markets,
+                    [] if discover else markets,
                     bookmakers=allowed,
                     max_events=limit,
                     horizon_hours=horizon_hours,
                     target_day=target_day,
+                    discover_all_markets=discover,
                 )
+                # Fallback: known allowlist if discovery returned nothing.
+                if not batch and discover and markets:
+                    batch = self._fetch_sport_props(
+                        code,
+                        sk,
+                        markets,
+                        bookmakers=allowed,
+                        max_events=limit,
+                        horizon_hours=horizon_hours,
+                        target_day=target_day,
+                    )
                 # Tennis DFS market keys are lightly documented — if the known
                 # list returns nothing, pull all markets and keep pick'em player props.
-                if not batch and code in {"ATP", "WTA"}:
+                if not batch and code in {"ATP", "WTA"} and not discover:
                     batch = self._fetch_sport_props(
                         code,
                         sk,

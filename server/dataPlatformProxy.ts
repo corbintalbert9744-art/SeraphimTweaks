@@ -4,8 +4,9 @@
  * endpoints prefer the Python warehouse and fall back to the Node NBA service.
  */
 import type { Express, Request, Response } from "express";
+import { resolveDataPlatformUrl } from "./runtimeConfig";
 
-const BASE = process.env.DATA_PLATFORM_URL || "http://127.0.0.1:8000";
+const BASE = resolveDataPlatformUrl();
 const ENABLED = process.env.DATA_PLATFORM_PROXY !== "0";
 
 async function proxyGet(
@@ -59,7 +60,8 @@ export function registerDataPlatformProxy(
   });
 
   app.get("/api/command-center", async (req, res) => {
-    await proxyGet(`/api/v1/nba/command-center`, res, () => handlers.commandCenter(req, res));
+    // Command Center aggregates multi-sport pick'em — allow cold-start headroom.
+    await proxyGet(`/api/v1/nba/command-center`, res, () => handlers.commandCenter(req, res), 90_000);
   });
 
   // NFL — data platform only (no Node ESPN fallback yet)
@@ -148,9 +150,19 @@ export function registerDataPlatformProxy(
   });
 
   app.get("/api/nba/players/:id", async (req, res) => {
-    await proxyGet(`/api/v1/nba/players/${encodeURIComponent(req.params.id)}`, res, async () => {
-      res.status(503).json({ error: "NBA player profile requires the data platform" });
-    });
+    const qs = new URLSearchParams();
+    if (typeof req.query.platform === "string" && req.query.platform) {
+      qs.set("platform", req.query.platform);
+    }
+    const suffix = qs.toString() ? `?${qs}` : "";
+    await proxyGet(
+      `/api/v1/nba/players/${encodeURIComponent(req.params.id)}${suffix}`,
+      res,
+      async () => {
+        res.status(503).json({ error: "NBA player profile requires the data platform" });
+      },
+      120_000,
+    );
   });
 
   // WNBA — ESPN live + PrizePicks comparison placeholders
@@ -196,9 +208,19 @@ export function registerDataPlatformProxy(
   });
 
   app.get("/api/wnba/players/:id", async (req, res) => {
-    await proxyGet(`/api/v1/wnba/players/${encodeURIComponent(req.params.id)}`, res, async () => {
-      res.status(503).json({ error: "WNBA player profile requires the data platform" });
-    });
+    const qs = new URLSearchParams();
+    if (typeof req.query.platform === "string" && req.query.platform) {
+      qs.set("platform", req.query.platform);
+    }
+    const suffix = qs.toString() ? `?${qs}` : "";
+    await proxyGet(
+      `/api/v1/wnba/players/${encodeURIComponent(req.params.id)}${suffix}`,
+      res,
+      async () => {
+        res.status(503).json({ error: "WNBA player profile requires the data platform" });
+      },
+      120_000,
+    );
   });
 
   app.get("/api/v1/providers", async (_req, res) => {
@@ -341,14 +363,7 @@ export function registerDataPlatformProxy(
     }
   });
 
-  app.get("/api/v1/health", async (_req, res) => {
-    try {
-      const upstream = await fetch(`${BASE}/api/v1/health`, { signal: AbortSignal.timeout(5_000) });
-      res.status(upstream.status).json(await upstream.json());
-    } catch {
-      res.status(503).json({ ok: false, error: "data-platform down" });
-    }
-  });
+  // /api/v1/health is registered in routes.ts (public ops probe).
 
   const proxyLeagueGet = (mount: string, upstream: string, timeoutMs = 120_000) => {
     app.get(mount, async (req, res) => {
@@ -392,10 +407,18 @@ export function registerDataPlatformProxy(
   const proxyPlayerDetail = (mount: string, upstream: string) => {
     app.get(`${mount}/:id`, async (req, res) => {
       try {
-        const up = await fetch(`${BASE}${upstream}/${encodeURIComponent(req.params.id)}`, {
-          headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(60_000),
-        });
+        const qs = new URLSearchParams();
+        if (typeof req.query.platform === "string" && req.query.platform) {
+          qs.set("platform", req.query.platform);
+        }
+        const suffix = qs.toString() ? `?${qs}` : "";
+        const up = await fetch(
+          `${BASE}${upstream}/${encodeURIComponent(req.params.id)}${suffix}`,
+          {
+            headers: { Accept: "application/json" },
+            signal: AbortSignal.timeout(120_000),
+          },
+        );
         const data = await up.json().catch(() => ({ detail: "Not found" }));
         // Normalize bare profile payloads to { ok, player } for the research UI
         if (up.ok && data && typeof data === "object" && !("player" in data) && data.markets) {

@@ -34,7 +34,6 @@ from app.ingestion.warehouse import (
     upsert_player,
     upsert_prop,
 )
-from app.providers.mock.odds import MockOddsProvider
 from app.providers.registry import get_nfl_providers
 
 log = logging.getLogger(__name__)
@@ -270,15 +269,9 @@ def build_and_store_featured_nfl_prop(
             quotes = []
 
     if not quotes:
-        quotes = MockOddsProvider().quote_for_prop(
-            league="NFL",
-            player_name=player.full_name,
-            player_external_id=athlete.external_id,
-            market=market,
-            line=line,
-            game_external_id=game.external_id,
-        )
+        # Never invent sportsbook lines — comparison UI marks operators unavailable.
         odds_are_mock = True
+        quotes = []
 
     game_row = db.get(Game, f"nfl:game:{game.external_id}")
     prop = upsert_prop(
@@ -292,6 +285,8 @@ def build_and_store_featured_nfl_prop(
     )
     db.flush()
     for q in quotes:
+        if getattr(q, "is_mock", False):
+            continue
         insert_odds(db, q, prop.id)
 
     over_odds = next((q.american_odds for q in quotes if q.side == "Over"), -110)

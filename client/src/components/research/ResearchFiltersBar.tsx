@@ -43,28 +43,25 @@ export function ResearchFiltersBar({
     <section
       data-feature="research-filters"
       className={cn(
-        "rounded-xl border border-[#1a1a1a] bg-[#0d0d0d]/95 p-3 backdrop-blur-md sm:p-4",
+        "rounded-lg border border-[var(--seraphim-border)] bg-[var(--seraphim-surface)]/95 px-2.5 py-2 backdrop-blur-md sm:px-3",
         sticky && "sticky top-16 z-20",
         className,
       )}
     >
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="relative w-full max-w-sm">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
-            Search{leagueLabel ? ` · ${leagueLabel}` : ""}
-          </label>
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative w-full max-w-xs">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-500" />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-500" />
             <input
               value={filters.query}
               onChange={(e) => onChange({ ...filters, query: e.target.value })}
-              placeholder="Player, team, opponent…"
-              className="h-10 w-full rounded-lg border border-[#1a1a1a] bg-[#111] pl-9 pr-3 text-sm text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-yellow-500/40 focus:ring-1 focus:ring-yellow-500/20"
+              placeholder={leagueLabel ? `Search ${leagueLabel}…` : "Search player…"}
+              className="h-8 w-full rounded-md border border-[#1a1a1a] bg-[#111] pl-8 pr-3 text-xs text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-yellow-500/40"
             />
           </div>
         </div>
 
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Select
             label="Market"
             value={filters.market}
@@ -83,21 +80,19 @@ export function ResearchFiltersBar({
             options={["All", "Over", "Under"]}
             onChange={(side) => onChange({ ...filters, side: side as ResearchFilterState["side"] })}
           />
-          <div>
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
-              Min conf
-            </label>
-            <div className="flex h-10 items-center gap-2 rounded-lg border border-[#1a1a1a] bg-[#111] px-2.5">
-              <input
-                type="range"
-                min={minConfidenceFloor}
-                max={minConfidenceCeiling}
-                value={filters.minConfidence}
-                onChange={(e) => onChange({ ...filters, minConfidence: Number(e.target.value) })}
-                className="w-20 accent-yellow-400"
-              />
-              <span className="w-7 text-xs tabular-nums text-yellow-400">{filters.minConfidence}</span>
-            </div>
+          <div className="flex h-8 items-center gap-1.5 rounded-md border border-[#1a1a1a] bg-[#111] px-2">
+            <span className="text-[9px] font-semibold uppercase tracking-wide text-neutral-500">
+              Conf
+            </span>
+            <input
+              type="range"
+              min={minConfidenceFloor}
+              max={minConfidenceCeiling}
+              value={filters.minConfidence}
+              onChange={(e) => onChange({ ...filters, minConfidence: Number(e.target.value) })}
+              className="w-16 accent-yellow-400"
+            />
+            <span className="w-6 text-[11px] tabular-nums text-yellow-400">{filters.minConfidence}</span>
           </div>
           <Select
             label="Sort"
@@ -111,11 +106,11 @@ export function ResearchFiltersBar({
             onClick={() =>
               onChange({ ...filters, sortDir: filters.sortDir === "asc" ? "desc" : "asc" })
             }
-            className="h-10 rounded-lg border border-[#1a1a1a] bg-[#111] px-3 text-xs font-medium text-neutral-300 hover:border-yellow-500/30 hover:text-yellow-400"
+            className="h-8 rounded-md border border-[#1a1a1a] bg-[#111] px-2.5 text-[11px] font-medium text-neutral-300 hover:border-yellow-500/30 hover:text-yellow-400"
           >
             {filters.sortDir === "asc" ? "Asc" : "Desc"}
           </button>
-          <div className="flex h-10 items-center rounded-lg border border-[#1a1a1a] bg-[#111] px-3 text-xs tabular-nums text-neutral-400">
+          <div className="flex h-8 items-center rounded-md border border-[#1a1a1a] bg-[#111] px-2.5 text-[11px] tabular-nums text-neutral-400">
             {resultCount} props
           </div>
         </div>
@@ -138,14 +133,13 @@ function Select({
   onChange: (v: string) => void;
 }) {
   return (
-    <div>
-      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
-        {label}
-      </label>
+    <div className="relative">
+      <label className="sr-only">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 min-w-[7.5rem] rounded-lg border border-[#1a1a1a] bg-[#111] px-2.5 text-xs text-neutral-200 outline-none focus:border-yellow-500/40"
+        title={label}
+        className="h-8 min-w-[6.5rem] rounded-md border border-[#1a1a1a] bg-[#111] px-2 text-[11px] text-neutral-200 outline-none focus:border-yellow-500/40"
       >
         {options.map((opt) => (
           <option key={opt} value={opt}>

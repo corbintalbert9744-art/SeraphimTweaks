@@ -5,8 +5,8 @@ Live quotes come from the multi-provider aggregator (PropLine, SharpAPI,
 The Odds API, Antelytics) cached in Postgres.
 
 Canonical operators (always returned):
-  PrizePicks, Underdog, FanDuel, DraftKings, BetMGM, Caesars, Fanatics,
-  ESPN BET, Bovada, Pinnacle, BetRivers
+  PrizePicks, Underdog, Sleeper, FanDuel, DraftKings, BetMGM, Caesars,
+  Fanatics, ESPN BET, Bovada, Pinnacle, BetRivers
 
 Missing operators are marked requires_integration / unavailable — never fabricated.
 """
@@ -47,6 +47,12 @@ CANONICAL_LINE_PROVIDERS: tuple[LineProviderSpec, ...] = (
         "Underdog",
         "pickem",
         notes="Live when PropLine / Underdog Fantasy quotes arrive — otherwise unavailable.",
+    ),
+    LineProviderSpec(
+        "sleeper",
+        "Sleeper",
+        "pickem",
+        notes="Live when PropLine / SharpAPI returns Sleeper — otherwise unavailable.",
     ),
     LineProviderSpec(
         "fanduel",

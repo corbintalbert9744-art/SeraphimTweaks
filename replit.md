@@ -22,10 +22,25 @@ A gaming tweaks product website built with Express + Vite + React (TypeScript). 
 - `npm run start` - Production server
 - `npm run db:push` - Push Drizzle schema to database
 
-## Deployment
-- Target: Autoscale
-- Build: `npm run build`
-- Run: `npm run start`
+## Deployment (public internet)
+
+Cursor does **not** host the live site.
+
+### Render (recommended) — `render.yaml`
+1. Merge/push this branch to GitHub.
+2. [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**.
+3. Connect `SeraphimTweaks` → select `render.yaml`.
+4. Paste secrets when prompted (Stripe + PropLine/SharpAPI).
+5. Deploy creates **Postgres** + one **Docker web** service (Node + Python together).
+6. Stripe webhook → `https://<service>.onrender.com/api/stripe/webhook`.
+7. Check `https://<service>.onrender.com/api/health`.
+
+Plans used: Postgres `basic-256mb`, web `starter` (Docker is not on free tier).
+
+### Docker (VPS)
+```bash
+docker compose up --build -d
+```
 
 ## Recent Changes
 - 2026-02-11: Imported project from GitHub. Moved files from SeraphimTweaks-1/ subdirectory to workspace root. Configured workflow and deployment for Replit environment.

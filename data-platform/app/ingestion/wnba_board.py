@@ -31,21 +31,26 @@ from app.ingestion.warehouse import (
     upsert_prop,
 )
 from app.providers.comparison_lines import get_comparison_lines_provider
-from app.ingestion.comparison_books import build_live_odds_comparison
+from app.ingestion.comparison_books import build_line_movement, build_live_odds_comparison
 from app.providers.base import NormalizedGame, NormalizedPlayer
 from app.providers.registry import get_wnba_providers
 
 log = logging.getLogger(__name__)
 
-MARKETS_FOR_BOARD = (
+MARKETS_FOR_BOARD = (  # ESPN research slate — pick'em sync may add still more per athlete
     "Points",
     "Rebounds",
     "Assists",
     "Threes",
+    "Steals",
+    "Blocks",
+    "Turnovers",
     "PRA",
     "Pts+Rebs",
     "Pts+Asts",
     "Rebs+Asts",
+    "Steals+Blocks",
+    "Fantasy Score",
 )
 
 
@@ -476,6 +481,7 @@ def get_wnba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
     analytics = db.execute(select(PropAnalytics).where(PropAnalytics.prop_id == prop_id)).scalar_one_or_none()
     projected = float(base.get("projectedValue") or (analytics.projected_value if analytics else 0) or 0)
     model_side = str(base.get("side") or "Over")
+    line = float(base.get("line") or base.get("comparisonLine") or projected or 0)
 
     comparison = build_live_odds_comparison(
         db,
@@ -486,12 +492,14 @@ def get_wnba_prop_detail(db: Session, prop_id: str) -> Optional[dict[str, Any]]:
     )
     books = comparison["books"]
 
-    line = float(base["line"])
-    movement = [
-        {"label": "Open", "line": line + 0.5, "odds": -110},
-        {"label": "AM", "line": line, "odds": -110},
-        {"label": "Now", "line": line, "odds": base["americanOdds"]},
-    ]
+    movement = build_line_movement(
+        db,
+        prop_id=prop_id,
+        player_warehouse_id=str(base.get("playerWarehouseId") or "") or None,
+        player_name=str(base.get("player") or ""),
+        market=str(base.get("market") or ""),
+        league="WNBA",
+    )
 
     # Research context from warehouse gamelogs
     player = None
@@ -787,25 +795,10 @@ def _market_attr(market: str) -> str:
 
 
 def _stat_from_log(r: PlayerGameLog, market: str) -> Optional[float]:
-    if market in ("PRA", "Pts+Rebs+Asts"):
-        if r.points is None and r.rebounds is None and r.assists is None:
-            return None
-        return float(r.points or 0) + float(r.rebounds or 0) + float(r.assists or 0)
-    if market in ("PR", "Pts+Rebs"):
-        if r.points is None and r.rebounds is None:
-            return None
-        return float(r.points or 0) + float(r.rebounds or 0)
-    if market in ("PA", "Pts+Asts"):
-        if r.points is None and r.assists is None:
-            return None
-        return float(r.points or 0) + float(r.assists or 0)
-    if market in ("RA", "Rebs+Asts"):
-        if r.rebounds is None and r.assists is None:
-            return None
-        return float(r.rebounds or 0) + float(r.assists or 0)
-    attr = _market_attr(market)
-    v = getattr(r, attr, None)
-    return float(v) if v is not None else None
+    from app.ingestion.nba_pipeline import _market_values
+
+    vals = _market_values([r], market)
+    return vals[0] if vals else None
 
 
 def _parse_hit_label(label: str) -> tuple[int, int, float]:
@@ -909,14 +902,32 @@ def _chart_games(logs: list[PlayerGameLog], *, market: str, line: float, side: s
     return out
 
 
-def _markets_payload(props: list[dict[str, Any]], logs: list[PlayerGameLog], opponent: str) -> list[dict[str, Any]]:
+def _markets_payload(
+    props: list[dict[str, Any]],
+    logs: list[PlayerGameLog],
+    opponent: str,
+    *,
+    prefer_platform: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    from app.ingestion.player_markets import dedupe_market_rows
+
+    # One tab per market — prefer PrizePicks (or selected pick'em) over duplicate books.
+    props = dedupe_market_rows(props, prefer_platform=prefer_platform, id_key="id", market_key="market")
     markets: list[dict[str, Any]] = []
     for p in props:
         projected = float(p.get("projectedValue") or p.get("line") or 0)
         line = float(p.get("line") or 0)
         side = str(p.get("side") or "Over")
         edge = float(p.get("edgeVsLine") if p.get("edgeVsLine") is not None else (projected - line))
-        edge_pct = round((edge / line) * 100, 1) if line else 0.0
+        from app.analytics.prediction import model_edge_percent
+
+        edge_pct = model_edge_percent(
+            projected=projected,
+            line=line,
+            over_probability=float(p.get("overProbability") or 0.5),
+            under_probability=float(p.get("underProbability") or 0.5),
+            side=side,
+        )
         markets.append(
             {
                 "propId": p["id"],
@@ -972,7 +983,7 @@ def get_wnba_player_profile(db: Session, player_key: str) -> Optional[dict[str, 
         if not card:
             return None
         mine = [p for p in board_props if p.get("playerId") == player_key]
-        markets = _markets_payload(mine, [], card["opponent"])
+        markets = _markets_payload(mine, [], card["opponent"], prefer_platform="prizepicks")
         primary = markets[0] if markets else None
         return {
             "id": player_key,
@@ -1049,7 +1060,7 @@ def get_wnba_player_profile(db: Session, player_key: str) -> Optional[dict[str, 
     team = _team_abbr(db, player.team_id)
     opp = props[0]["opponent"] if props else "OPP"
     tip = props[0]["tipTime"] if props else ""
-    markets = _markets_payload(props, logs, opp)
+    markets = _markets_payload(props, logs, opp, prefer_platform="prizepicks")
     primary = markets[0] if markets else None
     chart_line = float(primary["line"]) if primary else (round(mean(pts) * 2) / 2 if pts else 0.0)
 

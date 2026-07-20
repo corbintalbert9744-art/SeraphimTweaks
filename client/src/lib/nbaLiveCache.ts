@@ -105,19 +105,43 @@ export function asPropDetailFromApi(row: Record<string, unknown>): PropDetail {
     : Array.isArray(row.lines)
       ? (row.lines as PropDetail["books"])
       : [];
+  // Prefer real books from the API. If the board only has a live pick'em line,
+  // surface that platform as a connected book — never invent Unavailable DraftKings.
+  const platformName =
+    row.platformName != null
+      ? String(row.platformName)
+      : row.platform != null
+        ? String(row.platform)
+        : null;
+  const platformLine =
+    row.platformLine != null
+      ? Number(row.platformLine)
+      : row.line != null
+        ? Number(row.line)
+        : null;
+  const lineUpdatedAt =
+    row.linesUpdatedAt != null
+      ? String(row.linesUpdatedAt)
+      : row.lineUpdatedAt != null
+        ? String(row.lineUpdatedAt)
+        : null;
   const books =
     booksRaw.length > 0
       ? booksRaw
-      : [
-          {
-            book: "DraftKings",
-            line: Number(row.line ?? 0),
-            over: Number(row.americanOdds ?? -110),
-            under: -110,
-            requiresIntegration: true,
-            isMock: true,
-          },
-        ];
+      : platformName && platformLine != null && Number.isFinite(platformLine)
+        ? [
+            {
+              book: platformName,
+              line: platformLine,
+              over: Number(row.overOdds ?? row.americanOdds ?? -110),
+              under: Number(row.underOdds ?? 100),
+              requiresIntegration: false,
+              isMock: false,
+              isBestValue: true,
+              connected: true,
+            },
+          ]
+        : [];
   const rawLeague = String(row.league || "NBA");
   const league = (
     ["NBA", "NFL", "WNBA", "MLB", "NHL", "Soccer", "ATP", "WTA"].includes(rawLeague)
@@ -170,12 +194,17 @@ export function asPropDetailFromApi(row: Record<string, unknown>): PropDetail {
     edgeVsLine: row.edgeVsLine != null ? Number(row.edgeVsLine) : null,
     overProbability: row.overProbability != null ? Number(row.overProbability) : undefined,
     underProbability: row.underProbability != null ? Number(row.underProbability) : undefined,
-    bestValueBook: row.bestValueBook != null ? String(row.bestValueBook) : books.find((b) => b.isBestValue)?.book,
+    bestValueBook:
+      row.bestValueBook != null
+        ? String(row.bestValueBook)
+        : books.find((b) => b.isBestValue)?.book ?? platformName ?? undefined,
     linesAreMock: Boolean(row.linesAreMock ?? books.some((b) => b.isMock || b.requiresIntegration)),
-    linesUpdatedAt: row.linesUpdatedAt != null ? String(row.linesUpdatedAt) : null,
+    linesUpdatedAt: lineUpdatedAt,
     linesDiffer: Boolean(row.linesDiffer),
     connectedBookCount:
-      row.connectedBookCount != null ? Number(row.connectedBookCount) : undefined,
+      row.connectedBookCount != null
+        ? Number(row.connectedBookCount)
+        : books.filter((b) => !b.requiresIntegration && !b.isMock).length,
     consensusLine: row.consensusLine != null ? Number(row.consensusLine) : null,
     isPlusEv: Boolean(row.isPlusEv),
     isStrongPlusEv: Boolean(row.isStrongPlusEv),

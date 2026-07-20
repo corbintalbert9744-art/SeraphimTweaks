@@ -62,6 +62,7 @@ Start-Sleep -Seconds 2
 Start-Process "http://127.0.0.1:5000"
 
 Write-Host "`nOpen http://127.0.0.1:5000" -ForegroundColor Green
-Write-Host "Standard: standard@seraphim.iq / Standard123!"
-Write-Host "Pro:      corbintalbert@icloud.com / IamtheMaster1!"
-Write-Host "`nLeave the two PowerShell windows open. Close them to stop.`n"
+Write-Host "Sign up + Stripe checkout creates members. Optional local owner:"
+Write-Host "  set OWNER_EMAIL / OWNER_PASSWORD in .env (dev only; never commit)."
+Write-Host "Keep both processes running (or use: npm run dev:all)."
+Write-Host "Health: http://127.0.0.1:5000/api/health  (data-platform must be ok).`n"

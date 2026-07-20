@@ -12,8 +12,13 @@ const nav = [
 ];
 
 export function MarketingShell({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
-  const { isAuthenticated, membershipActive } = useMembership();
+  const [location, setLocation] = useLocation();
+  const { isAuthenticated, membershipActive, signOut } = useMembership();
+
+  async function onSignOut() {
+    await signOut();
+    setLocation("/");
+  }
 
   return (
     <div className="marketing-site relative min-h-screen bg-black font-sans text-neutral-100">
@@ -48,12 +53,37 @@ export function MarketingShell({ children }: { children: ReactNode }) {
 
           <div className="flex items-center gap-1.5">
             {isAuthenticated && membershipActive ? (
-              <Link
-                href="/app"
-                className="rounded-full bg-yellow-400 px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-yellow-300"
-              >
-                Open Dashboard
-              </Link>
+              <>
+                <button
+                  type="button"
+                  onClick={() => void onSignOut()}
+                  className="hidden rounded-md px-2.5 py-1.5 text-xs text-neutral-300 transition hover:text-white sm:inline"
+                >
+                  Sign out
+                </button>
+                <Link
+                  href="/app"
+                  className="rounded-full bg-yellow-400 px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-yellow-300"
+                >
+                  Open Dashboard
+                </Link>
+              </>
+            ) : isAuthenticated ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void onSignOut()}
+                  className="rounded-md px-2.5 py-1.5 text-xs text-neutral-300 transition hover:text-white"
+                >
+                  Sign out
+                </button>
+                <Link
+                  href="/checkout"
+                  className="rounded-full bg-yellow-400 px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-yellow-300"
+                >
+                  Finish checkout
+                </Link>
+              </>
             ) : (
               <>
                 <Link
@@ -108,12 +138,24 @@ export function MarketingShell({ children }: { children: ReactNode }) {
               <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
                 Members
               </p>
-              <Link href="/login" className="block text-neutral-400 hover:text-yellow-400">
-                Sign in
-              </Link>
-              <Link href="/signup" className="block text-neutral-400 hover:text-yellow-400">
-                Sign up
-              </Link>
+              {isAuthenticated ? (
+                <button
+                  type="button"
+                  onClick={() => void onSignOut()}
+                  className="block text-left text-neutral-400 hover:text-yellow-400"
+                >
+                  Sign out
+                </button>
+              ) : (
+                <>
+                  <Link href="/login" className="block text-neutral-400 hover:text-yellow-400">
+                    Sign in
+                  </Link>
+                  <Link href="/signup" className="block text-neutral-400 hover:text-yellow-400">
+                    Sign up
+                  </Link>
+                </>
+              )}
               <Link href="/pricing" className="block text-neutral-400 hover:text-yellow-400">
                 Become a Member
               </Link>

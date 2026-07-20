@@ -34,11 +34,11 @@ class Settings(BaseSettings):
     nba_sync_per_team: int = Field(default=3, alias="NBA_SYNC_PER_TEAM")
 
     odds_api_key: str | None = Field(default=None, alias="ODDS_API_KEY")
-    propline_api_key: str | None = Field(default=None, alias="PROPLINE_API_KEY")
-    sharpapi_api_key: str | None = Field(default=None, alias="SHARPAPI_API_KEY")
-    antelytics_api_key: str | None = Field(default=None, alias="ANTELYTICS_API_KEY")
+    propline_api_key: str | None = Field(default="702d1706113c12b862b2c8c5c0efd781", alias="PROPLINE_API_KEY")
+    sharpapi_api_key: str | None = Field(default="sk_live_Qc5dqyWFrnYAtkDmrYTpDQ", alias="SHARPAPI_API_KEY")
+    antelytics_api_key: str | None = Field(default="ant_live_8b89a9b79f03_a4acdf25b6b8f579e94c3cc38bd50b4af4d9e79331c521e4", alias="ANTELYTICS_API_KEY")
     antelytics_base_url: str = Field(
-        default="https://api.antelytics.com/v1",
+        default="https://backend.antehq.com/v1",
         alias="ANTELYTICS_BASE_URL",
     )
     # Comma-separated priority: first wins on duplicate book/player/market/side
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
         alias="LINE_PROVIDER_PRIORITY",
     )
     football_data_api_key: str | None = Field(default=None, alias="FOOTBALL_DATA_API_KEY")
-    bootstrap_multi_sport: bool = Field(default=False, alias="BOOTSTRAP_MULTI_SPORT")
+    bootstrap_multi_sport: bool = Field(default=True, alias="BOOTSTRAP_MULTI_SPORT")
     schedule_multi_sport_hours: int = Field(default=6, alias="MULTI_SPORT_SYNC_HOURS")
     espn_user_agent: str = "SeraphimAnalytics/1.0 (+data-platform)"
 

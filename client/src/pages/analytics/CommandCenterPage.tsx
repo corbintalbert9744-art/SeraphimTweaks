@@ -25,7 +25,12 @@ import {
 
 type CommandCenterResponse = {
   generatedAt: string;
-  board?: { date?: string; games?: Array<any> } | null;
+  board?: {
+    date?: string;
+    games?: Array<any>;
+    livePropCount?: number;
+    books?: string[];
+  } | null;
   gamesStartingSoon?: Array<any>;
   bestEvToday?: any | null;
   highestConfidence?: any | null;
@@ -36,11 +41,11 @@ type CommandCenterResponse = {
   injuryAlerts?: Array<{ team: string; player: string; status: string; detail?: string }>;
   savedParlays?: Array<{ id: string; title: string; legs: number }>;
   featured?: { ok: boolean; source?: any };
-  providers?: { novigRefreshSeconds?: number };
+  providers?: { novigRefreshSeconds?: number; books?: string[]; slate?: string };
 };
 
 async function fetchCommandCenter(): Promise<CommandCenterResponse> {
-  const res = await fetch("/api/command-center");
+  const res = await fetch("/api/command-center", { signal: AbortSignal.timeout(90_000) });
   if (!res.ok) throw new Error("Command Center unavailable");
   return res.json();
 }
@@ -53,6 +58,8 @@ export default function CommandCenterPage() {
     queryFn: fetchCommandCenter,
     refetchInterval: 300_000,
     staleTime: 60_000,
+    retry: 2,
+    retryDelay: (n) => Math.min(2_000 * (n + 1), 8_000),
   });
 
   useEffect(() => {
@@ -65,12 +72,14 @@ export default function CommandCenterPage() {
     }
   }, [data?.generatedAt, data?.notifications, toast]);
 
+  const showSkeleton = isLoading && !data;
+
   return (
     <div className="space-y-4">
       <PageHeader
         eyebrow="Research desk"
         title="Command Center"
-        description="Seraphim projections, no-vig edges, hit probability, and injury signals — refreshed every 5 minutes."
+        description="Live pick'em lines from PrizePicks / Underdog / Sleeper — Seraphim projections, no-vig edges, and hit probability."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Link
@@ -97,17 +106,17 @@ export default function CommandCenterPage() {
         }
       />
 
-      {isLoading && (
+      {showSkeleton && (
         <div className="grid gap-4 lg:grid-cols-2">
           <CardSkeleton rows={4} />
           <CardSkeleton rows={4} />
         </div>
       )}
 
-      {isError && (
+      {isError && !data && (
         <EmptyState
           title="Couldn’t load Command Center"
-          description="Retry after the data platform is up, or open a league board."
+          description="Live betting lines are refreshing. Retry, or open a league board (WNBA / MLB) for pick'em props."
           action={
             <button
               type="button"
@@ -126,13 +135,22 @@ export default function CommandCenterPage() {
             <span className="rounded-md border border-[#1a1a1a] bg-[#111] px-2.5 py-1">
               Slate · {data.board?.date || "today"}
             </span>
-            <span className="rounded-md border border-[#1a1a1a] bg-[#111] px-2.5 py-1">
-              {(data.board?.games ?? data.gamesStartingSoon ?? []).length} games
+            <span className="rounded-md border border-yellow-500/25 bg-yellow-500/10 px-2.5 py-1 text-yellow-300">
+              {Number(data.board?.livePropCount ?? data.topProps?.length ?? 0)} live props
             </span>
+            {(data.board?.books ?? data.providers?.books ?? []).length > 0 ? (
+              <span className="rounded-md border border-[#1a1a1a] bg-[#111] px-2.5 py-1">
+                {(data.board?.books ?? data.providers?.books ?? []).join(" · ")}
+              </span>
+            ) : (
+              <span className="rounded-md border border-[#1a1a1a] bg-[#111] px-2.5 py-1">
+                Pick’em lines
+              </span>
+            )}
             <span className="rounded-md border border-[#1a1a1a] bg-[#111] px-2.5 py-1">
               Updated {new Date(data.generatedAt).toLocaleTimeString()}
             </span>
-            <span className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-300">
+            <span className="rounded-md border border-yellow-500/25 bg-yellow-500/10 px-2.5 py-1 text-yellow-300">
               No-vig every 5 min
             </span>
           </div>
@@ -178,7 +196,7 @@ export default function CommandCenterPage() {
               ) : (
                 <EmptyState
                   title="No Prop of the Day yet"
-                  description="Waiting on today’s live slate props."
+                  description="Waiting on live PrizePicks / Underdog / Sleeper lines for tonight’s slate."
                 />
               )}
 

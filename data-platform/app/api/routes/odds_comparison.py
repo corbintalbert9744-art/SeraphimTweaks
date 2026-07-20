@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -37,24 +38,66 @@ def _infer_league(prop_id: str, league: str | None) -> str | None:
 
 
 def _prop_base(db: Session, prop_id: str, league: str | None) -> tuple[dict, str]:
-    """Resolve a prop row + league for comparison."""
+    """Resolve a prop row + league for comparison.
+
+    Prefer board rows + build_live_odds_comparison over full detail builders so a
+    secondary research-detail bug cannot blank the entire Live Odds table.
+    """
+    from app.db.models import Player, Prop, PropAnalytics
+
+    # Direct warehouse hit (includes materialized pick'em / seed props).
+    prop_row = db.get(Prop, prop_id)
+    if prop_row is not None:
+        analytics = db.execute(
+            select(PropAnalytics).where(PropAnalytics.prop_id == prop_id)
+        ).scalar_one_or_none()
+        player = db.get(Player, prop_row.player_id) if prop_row.player_id else None
+        resolved = prop_row.league or _infer_league(prop_id, league) or "NBA"
+        return (
+            {
+                "id": prop_row.id,
+                "player": player.full_name if player else "Player",
+                "playerId": (player.external_id if player else None) or "",
+                "playerWarehouseId": player.id if player else prop_row.player_id,
+                "market": prop_row.market,
+                "side": prop_row.side,
+                "line": prop_row.line,
+                "league": resolved,
+                "projectedValue": (
+                    analytics.projected_value if analytics and analytics.projected_value is not None else prop_row.line
+                ),
+                "recommendation": prop_row.side,
+            },
+            resolved,
+        )
+
     inferred = _infer_league(prop_id, league)
     order = (
         [inferred]
         if inferred
         else ["NBA", "WNBA", "NFL", "MLB", "NHL", "Soccer", "ATP", "WTA"]
     )
-    # Prefer rich detail builders when available
     for code in order:
         if code == "NBA":
-            detail = get_nba_prop_detail(db, prop_id)
-            if detail:
-                return detail, "NBA"
             board = {p["id"]: p for p in list_nba_props_from_warehouse(db)}
             if prop_id in board:
                 return board[prop_id], "NBA"
+            try:
+                detail = get_nba_prop_detail(db, prop_id)
+            except Exception:  # noqa: BLE001 — comparison must degrade gracefully
+                detail = None
+            if detail:
+                return detail, "NBA"
         elif code == "WNBA":
-            detail = get_wnba_prop_detail(db, prop_id)
+            from app.ingestion.wnba_board import list_wnba_props_from_warehouse
+
+            board = {p["id"]: p for p in list_wnba_props_from_warehouse(db)}
+            if prop_id in board:
+                return board[prop_id], "WNBA"
+            try:
+                detail = get_wnba_prop_detail(db, prop_id)
+            except Exception:  # noqa: BLE001
+                detail = None
             if detail:
                 return detail, "WNBA"
         props = list_league_props(db, code)
@@ -77,8 +120,28 @@ def _prop_base(db: Session, prop_id: str, league: str | None) -> tuple[dict, str
 
 @router.get("/providers")
 def odds_providers():
-    """Canonical sportsbook + pick'em catalog (frontend adapters map onto these slugs)."""
-    return {"ok": True, "providers": canonical_provider_catalog()}
+    """Canonical sportsbook + pick'em catalog + upstream adapter configuration status.
+
+    Operator rows stay unavailable until a live quote is captured — never fabricated.
+    """
+    from app.providers.line_aggregation.factory import get_line_aggregator
+
+    try:
+        agg = get_line_aggregator().status()
+        adapters = list(agg.get("adapters") or [])
+    except Exception:  # noqa: BLE001 — status must never 500 the catalog
+        adapters = []
+    configured = [a for a in adapters if a.get("configured")]
+    return {
+        "ok": True,
+        "providers": canonical_provider_catalog(),
+        "adapters": adapters,
+        "configuredAdapterCount": len(configured),
+        "disclaimer": (
+            "Connected books only show live captured lines. "
+            "Unavailable operators stay blank — market data is never fabricated."
+        ),
+    }
 
 
 @router.get("/comparison/{prop_id:path}")

@@ -38,7 +38,194 @@ export type PlayerMarket = {
   why: string;
   hitWindows: HitWindow[];
   chartGames: ChartGame[];
+  /** Platform / board line before any desk stepper override. */
+  platformLine?: number;
 };
+
+/** Standard player-prop tick (14.5 → 14.0 → 13.5 …). */
+export const PROP_LINE_STEP = 0.5;
+
+export function normalizePropLine(line: number): number {
+  if (!Number.isFinite(line)) return PROP_LINE_STEP;
+  return Math.max(PROP_LINE_STEP, Math.round(line * 2) / 2);
+}
+
+/** Abramowitz–Stegun erf — matches data-platform ``math.erf`` closely enough for lean %. */
+function erf(x: number): number {
+  const sign = x < 0 ? -1 : 1;
+  const ax = Math.abs(x);
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+  const t = 1 / (1 + p * ax);
+  const y =
+    1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-ax * ax);
+  return sign * y;
+}
+
+function normalCdf(x: number): number {
+  return 0.5 * (1 + erf(x / Math.SQRT2));
+}
+
+/**
+ * Display edge % that stays coherent with pick'em 0.5 / 1.5 step markets.
+ * Relative (proj-line)/line explodes on Hits/TB 0.5 — use probability edge there.
+ */
+export function modelEdgePercent(opts: {
+  projected: number;
+  line: number;
+  overProbability: number;
+  underProbability: number;
+  side?: "Over" | "Under" | string | null;
+}): number {
+  const lean =
+    opts.side === "Over" || opts.side === "Under"
+      ? opts.side
+      : opts.projected >= opts.line
+        ? "Over"
+        : "Under";
+  const leanP = Math.min(
+    0.99,
+    Math.max(0.01, lean === "Over" ? opts.overProbability : opts.underProbability),
+  );
+  const unitEdge =
+    lean === "Over" ? opts.projected - opts.line : opts.line - opts.projected;
+  if (Math.abs(opts.line) < 2 - 1e-9) {
+    return Number(((leanP - 0.5) * 100).toFixed(2));
+  }
+  if (Math.abs(opts.line) < 1e-9) return 0;
+  const rel = (unitEdge / Math.abs(opts.line)) * 100;
+  return Number(Math.max(-75, Math.min(75, rel)).toFixed(2));
+}
+
+function invNormalCdf(p: number): number {
+  const target = Math.min(0.999999, Math.max(1e-6, p));
+  let lo = -8;
+  let hi = 8;
+  for (let i = 0; i < 56; i++) {
+    const mid = (lo + hi) / 2;
+    if (normalCdf(mid) < target) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/** Mirror data-platform ``estimate_side_probabilities``. */
+export function estimateSideProbabilities(
+  projected: number,
+  line: number,
+  sigma: number,
+): { over: number; under: number } {
+  const sig = Math.max(sigma, 0.5);
+  const z = (line - projected) / sig;
+  let under = normalCdf(z);
+  let over = 1 - under;
+  over = Math.min(0.92, Math.max(0.08, over));
+  under = 1 - over;
+  return { over, under };
+}
+
+/**
+ * Residual σ for desk line nudges.
+ * Prefer σ calibrated so P(Over) at the board line matches the model’s
+ * published probability — then lowering the line raises lean as expected.
+ */
+export function residualSigmaForMarket(market: PlayerMarket): number {
+  const projected = market.projectedValue;
+  const platform = market.platformLine ?? market.line;
+  const boardOver = market.overProbability;
+
+  if (
+    boardOver != null &&
+    boardOver > 0.08 &&
+    boardOver < 0.92 &&
+    Number.isFinite(platform) &&
+    Number.isFinite(projected) &&
+    Math.abs(platform - projected) > 1e-6
+  ) {
+    const z = invNormalCdf(1 - boardOver);
+    if (Math.abs(z) > 1e-6) {
+      const calibrated = Math.abs((platform - projected) / z);
+      if (calibrated >= 0.5) return Math.max(0.75, calibrated);
+    }
+  }
+
+  const values = market.chartGames
+    .map((g) => g.value)
+    .filter((v) => Number.isFinite(v));
+  if (values.length >= 3) {
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length;
+    const stdev = Math.sqrt(variance);
+    if (stdev >= 0.5) return Math.max(0.75, stdev);
+  }
+
+  return Math.max(0.75, Math.abs(projected || 10) * 0.2);
+}
+
+/** Recompute edge / lean probs / hit rates / chart hits for a user-adjusted research line. */
+export function applyLineOverride(market: PlayerMarket, line: number): PlayerMarket {
+  const platformLine = market.platformLine ?? market.line;
+  const next = normalizePropLine(line);
+  const sigma = residualSigmaForMarket({ ...market, platformLine });
+  const { over, under } = estimateSideProbabilities(market.projectedValue, next, sigma);
+  // Lean side follows the stronger model side at the adjusted line.
+  const leanSide: "Over" | "Under" = over >= under ? "Over" : "Under";
+  const edgeVsLine =
+    leanSide === "Over" ? market.projectedValue - next : next - market.projectedValue;
+  const edgePercent = modelEdgePercent({
+    projected: market.projectedValue,
+    line: next,
+    overProbability: over,
+    underProbability: under,
+    side: leanSide,
+  });
+  const chartGames = market.chartGames.map((g) => ({
+    ...g,
+    hit: leanSide === "Over" ? g.value > next : g.value < next,
+  }));
+
+  const hitWindows = market.hitWindows.map((w) => {
+    const take =
+      w.key === "l5" ? 5 : w.key === "l10" ? 10 : w.key === "l20" ? 20 : chartGames.length;
+    const slice = chartGames.slice(0, Math.min(take, chartGames.length));
+    if (!slice.length) {
+      return { ...w };
+    }
+    const hits = slice.filter((g) =>
+      leanSide === "Over" ? g.value > next : g.value < next,
+    ).length;
+    const average =
+      w.key === "matchup" && w.average == null
+        ? null
+        : Number((slice.reduce((sum, g) => sum + g.value, 0) / slice.length).toFixed(1));
+    return {
+      ...w,
+      average: w.key === "matchup" && (w.average == null || !Number.isFinite(w.average))
+        ? w.average
+        : average,
+      hitRate: hits / slice.length,
+      hitPct: Math.round((hits / slice.length) * 100),
+      hits: `${hits}/${slice.length}`,
+    };
+  });
+
+  return {
+    ...market,
+    platformLine,
+    line: next,
+    side: leanSide,
+    edgeVsLine: Number(edgeVsLine.toFixed(2)),
+    edgePercent: Number(edgePercent.toFixed(1)),
+    overProbability: Number(over.toFixed(4)),
+    underProbability: Number(under.toFixed(4)),
+    chartGames,
+    hitWindows,
+  };
+}
 
 export type PlayerResearchProfile = {
   id: string;
@@ -90,6 +277,7 @@ type BoardProp = {
   season: string;
   tipTime: string;
   projectedValue?: number;
+  edgePercent?: number;
   researchScore?: number;
   injury?: string;
   league: string;
@@ -150,48 +338,27 @@ function hitWindowsFor(prop: BoardProp, projected: number): HitWindow[] {
   });
 }
 
-function synthesizeChart(prop: BoardProp, n = 10): ChartGame[] {
-  const parsed = parseHits(prop.l10);
-  const count = Math.min(n, parsed.samples || n);
-  const hitTarget = parsed.hits || Math.round(count * 0.6);
-  const rand = seeded(`${prop.id}:${prop.line}`);
-  const outcomes = Array.from({ length: count }, (_, i) => i < hitTarget);
-  for (let i = outcomes.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [outcomes[i], outcomes[j]] = [outcomes[j], outcomes[i]];
-  }
-  const opponents = ["WAS", "LAS", "CHI", "PHX", "SEA", "ATL", "MIN", "DAL", "NYK", "BOS"];
-  return outcomes.map((hit, i) => {
-    const overHit = prop.side === "Over" ? hit : !hit;
-    const delta = (0.35 + rand() * 0.9) * Math.max(1, prop.line * 0.12);
-    const value = Number(
-      (overHit ? prop.line + delta : Math.max(0, prop.line - delta)).toFixed(1),
-    );
-    const minutes = Math.round(22 + rand() * 18);
-    const opp = opponents[i % opponents.length];
-    const home = i % 2 === 0;
-    const month = 6;
-    const day = 10 + i;
-    return {
-      date: `${month}/${day}`,
-      label: `${month}/${day} ${home ? "" : "@"}${opp}`,
-      opponent: opp,
-      home,
-      value,
-      minutes,
-      hit: overHit === (prop.side === "Over") ? hit : hit,
-    };
-  }).map((g) => ({
-    ...g,
-    hit: prop.side === "Over" ? g.value > prop.line : g.value < prop.line,
-  }));
+function synthesizeChart(_prop: BoardProp, _n = 10): ChartGame[] {
+  // Never invent game bars — live gamelogs come from the player desk API.
+  return [];
 }
 
 function marketFromProp(prop: BoardProp, insight?: string): PlayerMarket {
   const projectedValue = estimateProjection(prop);
   const edgeVsLine =
     prop.side === "Over" ? projectedValue - prop.line : prop.line - projectedValue;
-  const edgePercent = prop.line ? (edgeVsLine / prop.line) * 100 : 0;
+  const overProbability = prop.side === "Over" ? prop.noVigProb : 1 - prop.noVigProb;
+  const underProbability = prop.side === "Under" ? prop.noVigProb : 1 - prop.noVigProb;
+  const edgePercent =
+    prop.edgePercent != null && Number.isFinite(prop.edgePercent)
+      ? Number(prop.edgePercent)
+      : modelEdgePercent({
+          projected: projectedValue,
+          line: prop.line,
+          overProbability,
+          underProbability,
+          side: prop.side,
+        });
   const researchScore = prop.researchScore ?? Math.min(99, prop.confidence + 4);
   const chartGames = synthesizeChart(prop);
   const why =
@@ -202,12 +369,13 @@ function marketFromProp(prop: BoardProp, insight?: string): PlayerMarket {
     market: prop.market,
     side: prop.side,
     line: prop.line,
+    platformLine: prop.line,
     americanOdds: prop.americanOdds,
     projectedValue,
     edgeVsLine: Number(edgeVsLine.toFixed(2)),
     edgePercent: Number(edgePercent.toFixed(1)),
-    overProbability: prop.side === "Over" ? prop.noVigProb : 1 - prop.noVigProb,
-    underProbability: prop.side === "Under" ? prop.noVigProb : 1 - prop.noVigProb,
+    overProbability,
+    underProbability,
     researchScore,
     confidence: prop.confidence,
     evPercent: prop.evPercent,
@@ -320,6 +488,12 @@ export function asLivePlayerResearch(player: PlayerResearchProfile): PlayerResea
     ...player,
     live: true,
     boardHref: player.boardHref || "/nba",
+    markets: (player.markets ?? []).map((m) => ({
+      ...m,
+      platformLine: m.platformLine ?? m.line,
+      chartGames: Array.isArray(m.chartGames) ? m.chartGames : [],
+      hitWindows: Array.isArray(m.hitWindows) ? m.hitWindows : [],
+    })),
   };
 }
 

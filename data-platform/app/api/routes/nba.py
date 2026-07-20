@@ -85,14 +85,60 @@ def nba_props(
         payload = ensure_pickem_platform_board(
             db, league="NBA", platform=platform, refresh=refresh
         )
-        props = payload.get("props") or []
+        from app.ingestion.platform_board import (
+            empty_platform_board,
+            filter_live_betting_site_props,
+        )
+
+        props = filter_live_betting_site_props(payload.get("props") or [])
+        if not props:
+            from app.ingestion.cursor_board_seed import (
+                load_cursor_board_seed,
+                materialize_cursor_seed_to_warehouse,
+            )
+
+            seed = materialize_cursor_seed_to_warehouse(
+                db, league="NBA", platform=platform
+            ) or load_cursor_board_seed("NBA", platform)
+            if seed is not None:
+                props = filter_live_betting_site_props(seed.get("props") or [])
+                if props:
+                    teams = sorted(
+                        {p["team"] for p in props if p.get("team") and p["team"] != "—"}
+                    )
+                    markets = sorted({p["market"] for p in props if p.get("market")})
+                    return {
+                        **seed,
+                        "props": props,
+                        "players": seed.get("players") or [],
+                        "count": len(props),
+                        "teams": seed.get("teams") or ["All", *teams],
+                        "markets": seed.get("markets") or ["All", *markets],
+                    }
+            return empty_platform_board(
+                league="NBA",
+                platform=platform,
+                platform_label=payload.get("platformLabel"),
+                rateLimited=payload.get("rateLimited"),
+                cached=payload.get("cached"),
+                refreshError=payload.get("refreshError"),
+                note=(
+                    payload.get("note")
+                    or "No live PrizePicks (or selected app) NBA props right now. "
+                    "Only players listed on the betting site appear here."
+                ),
+            )
         teams = sorted({p["team"] for p in props if p.get("team") and p["team"] != "—"})
         markets = sorted({p["market"] for p in props if p.get("market")})
         return {
             **payload,
+            "props": props,
+            "players": payload.get("players") or [],
+            "count": len(props),
             "teams": ["All", *teams],
             "markets": ["All", *markets],
             "live": True,
+            "fallback": False,
         }
 
     payload = ensure_nba_board(db, force=refresh)
@@ -129,16 +175,32 @@ def nba_players(db: Session = Depends(get_db)):
 
 
 @router.get("/players/{player_id}")
-def nba_player_detail(player_id: str, db: Session = Depends(get_db)):
-    ensure_nba_board(db, force=False)
-    profile = get_nba_player_profile(db, player_id)
-    if not profile or not (profile.get("markets") or []):
-        from app.ingestion.multisport_player import get_multisport_player_profile
+def nba_player_detail(
+    player_id: str,
+    platform: Optional[str] = Query(
+        None,
+        description="Pick'em app id: prizepicks | underdog | sleeper — list every market that app has for this athlete",
+    ),
+    db: Session = Depends(get_db),
+):
+    from app.ingestion.player_detail import load_platform_player_profile
 
-        profile = get_multisport_player_profile(db, league="NBA", player_key=player_id)
+    platform_key = platform or "prizepicks"
+
+    def _fallback():
+        ensure_nba_board(db, force=False)
+        return get_nba_player_profile(db, player_id)
+
+    profile, app = load_platform_player_profile(
+        db,
+        league="NBA",
+        player_id=player_id,
+        platform=platform_key,
+        fallback=_fallback,
+    )
     if not profile or not (profile.get("markets") or []):
         raise HTTPException(status_code=404, detail="Player not found")
-    return {"ok": True, "player": profile, "live": True}
+    return {"ok": True, "player": profile, "live": True, "platform": app}
 
 
 @router.get("/featured-prop")

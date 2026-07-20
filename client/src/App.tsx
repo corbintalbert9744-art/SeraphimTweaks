@@ -76,6 +76,9 @@ function MembersApp() {
               <Route path="/research" component={ResearchHubPage} />
               <Route path="/plus-ev" component={PlusEvPage} />
               <Route path="/arbitrage" component={ArbitragePage} />
+              <Route path="/market-comparison">
+                <Redirect to="/research" />
+              </Route>
               <Route path="/tennis">{() => <TennisPage />}</Route>
               <Route path="/atp">{() => <TennisPage tour="ATP" />}</Route>
               <Route path="/wta">{() => <TennisPage tour="WTA" />}</Route>

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Optional
 
 from app.providers.base import NormalizedOddsQuote, ProviderMeta
@@ -16,8 +15,9 @@ class MockOddsProvider:
         requires_api_key=False,
         is_mock=True,
         notes=(
-            "MOCK — returns -110/-110 consensus placeholders. "
-            "Replace by setting ODDS_API_KEY (The Odds API) or another OddsProvider."
+            "Stand-in when no odds API key is configured. "
+            "Returns no quotes — never fabricates sportsbook lines. "
+            "Set PROPLINE_API_KEY / SHARPAPI_API_KEY / ODDS_API_KEY for live data."
         ),
     )
 
@@ -36,29 +36,10 @@ class MockOddsProvider:
         line: float,
         game_external_id: Optional[str] = None,
     ) -> list[NormalizedOddsQuote]:
-        now = datetime.now(timezone.utc)
-        books = [
-            ("draftkings", "DraftKings"),
-            ("fanduel", "FanDuel"),
-            ("betmgm", "BetMGM"),
-        ]
-        out: list[NormalizedOddsQuote] = []
-        for slug, name in books:
-            for side, american in (("Over", -110), ("Under", -110)):
-                out.append(
-                    NormalizedOddsQuote(
-                        league=league,
-                        player_external_id=player_external_id,
-                        player_name=player_name,
-                        market=market,
-                        side=side,
-                        line=line,
-                        american_odds=american,
-                        sportsbook_slug=slug,
-                        sportsbook_name=name,
-                        game_external_id=game_external_id,
-                        captured_at=now,
-                        is_mock=True,
-                    )
-                )
-        return out
+        """Never invent sportsbook lines.
+
+        When no live odds provider is keyed, return an empty list so comparison
+        rows stay marked unavailable instead of fabricating DK/FD/MGM quotes.
+        """
+        _ = (league, player_name, player_external_id, market, line, game_external_id)
+        return []

@@ -3,6 +3,9 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { assertRuntimeConfig } from "./runtimeConfig";
+
+assertRuntimeConfig();
 
 const app = express();
 const httpServer = createServer(app);
@@ -91,10 +94,14 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
-  const listenOptions =
-    process.platform === "win32"
-      ? { port, host: "0.0.0.0" }
-      : { port, host: "0.0.0.0", reusePort: true };
+  // reusePort helps some Replit setups; Render/Linux free instances can reject it.
+  const listenOptions: { port: number; host: string; reusePort?: boolean } = {
+    port,
+    host: "0.0.0.0",
+  };
+  if (process.platform !== "win32" && !process.env.RENDER) {
+    listenOptions.reusePort = true;
+  }
 
   httpServer.listen(listenOptions, () => {
     log(`serving on port ${port}`);

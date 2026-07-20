@@ -121,10 +121,7 @@ export default function DashboardPage() {
       : liveProps.reduce(
           (s, p) =>
             s +
-            (p.edgePercent ??
-              (p.projectedValue != null && p.line
-                ? ((p.projectedValue - p.line) / p.line) * 100
-                : 0)),
+            (p.edgePercent ?? 0),
           0,
         ) / liveProps.length;
   const avgRs =
@@ -235,7 +232,7 @@ export default function DashboardPage() {
       ) : board.isError ? (
         <EmptyState
           title="Live dashboard unavailable"
-          description="Start the data platform (`npm run data-platform`) so the board can load."
+          description="This board is temporarily unavailable. Please try again in a few minutes."
         />
       ) : (
         <>

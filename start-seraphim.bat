@@ -60,8 +60,9 @@ start "Seraphim App" cmd /k "cd /d "%~dp0" && npm run dev"
 
 echo.
 echo Open: http://127.0.0.1:5000
-echo Login Standard: standard@seraphim.iq / Standard123!
-echo Login Pro/owner: corbintalbert@icloud.com / IamtheMaster1!
+echo Members: sign up + Stripe. Optional owner: OWNER_EMAIL / OWNER_PASSWORD in .env
+echo Prefer: npm run dev:all  ^(keeps app + data-platform together^)
+echo Health: http://127.0.0.1:5000/api/health
 echo.
 echo Two windows opened — leave them running. Close those windows to stop.
 pause

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Plus, Check, Info } from "lucide-react";
+import { ArrowLeft, Plus, Check } from "lucide-react";
 import { ResearchScoreBadge } from "@/components/shared/ResearchScoreBadge";
 import { useParlayDraft } from "@/components/parlay/ParlayDraftContext";
 import { propIdToBuilderLeg } from "@/lib/addPropToBuilder";
@@ -11,8 +11,11 @@ import {
   getCachedNbaProp,
 } from "@/lib/nbaLiveCache";
 import {
+  PROP_LINE_STEP,
+  applyLineOverride,
   asLivePlayerResearch,
   getPlayerResearchFromProps,
+  normalizePropLine,
   type ChartGame,
   type PlayerResearchProfile,
 } from "@/lib/playerResearchProfile";
@@ -23,13 +26,14 @@ import { ProOnly } from "@/components/membership/ProOnly";
 import { CardSkeleton } from "@/components/shared/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
-  BookLineStrip,
   HitRateSummaryBoxes,
   MarketTabs,
+  MarketVsModelPanel,
   NoVigOddsCard,
 } from "@/components/research";
 import { nbaToBuilderLeg } from "@/lib/builderMappers";
 import type { NbaProp } from "@/data/nbaMock";
+import { usePickemApp } from "@/context/PickemAppContext";
 
 type Tab = "chart" | "lines" | "matchup" | "log";
 
@@ -53,10 +57,13 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-neutral-500">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" /> Over line
+          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/85" /> Over line
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-red-500/70" /> Under line
+          <span className="h-2.5 w-2.5 rounded-sm bg-red-500/80" /> Under line
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-px w-4 border-t border-dashed border-red-400" /> Line
         </span>
         <span className="tabular-nums text-neutral-400">Line {line}</span>
       </div>
@@ -66,11 +73,11 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
           y1={lineY}
           x2={w - padR}
           y2={lineY}
-          stroke="rgba(250,204,21,0.55)"
+          stroke="rgba(248,113,113,0.75)"
           strokeWidth="1.5"
           strokeDasharray="5 4"
         />
-        <text x={w - padR} y={lineY - 4} textAnchor="end" className="fill-yellow-400/80" fontSize="9">
+        <text x={w - padR} y={lineY - 4} textAnchor="end" className="fill-red-400/90" fontSize="9">
           {line}
         </text>
         {games.map((g, i) => {
@@ -84,8 +91,14 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
             <g key={`${g.label}-${i}`}>
               <defs>
                 <linearGradient id={`bar-${i}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={over ? "rgb(52, 211, 153)" : "rgb(248, 113, 113)"} />
-                  <stop offset="100%" stopColor={over ? "rgb(5, 150, 105)" : "rgb(185, 28, 28)"} />
+                  <stop
+                    offset="0%"
+                    stopColor={over ? "rgb(52, 211, 153)" : "rgb(248, 113, 113)"}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={over ? "rgb(5, 150, 105)" : "rgb(185, 28, 28)"}
+                  />
                 </linearGradient>
               </defs>
               <rect
@@ -93,7 +106,7 @@ function GameChart({ games, line }: { games: ChartGame[]; line: number }) {
                 y={y}
                 width={barW}
                 height={Math.max(3, barH)}
-                rx={4}
+                rx={3}
                 fill={`url(#bar-${i})`}
                 opacity={0.92}
               />
@@ -140,10 +153,13 @@ function logStatKeys(profile: PlayerResearchProfile): string[] {
 export default function PlayerPage() {
   const [, params] = useRoute("/player/:id");
   const playerId = decodePlayerRouteId(params?.id);
+  const { appId, ready: pickemReady } = usePickemApp();
+  // Default PrizePicks so the desk loads every market that app lists (cores + combos).
+  const platform = appId || "prizepicks";
 
   const live = useQuery({
-    queryKey: ["live-player", playerId],
-    enabled: Boolean(playerId),
+    queryKey: ["live-player", playerId, platform],
+    enabled: Boolean(playerId) && pickemReady,
     queryFn: async () => {
       async function tryLeague(
         path: string,
@@ -166,15 +182,19 @@ export default function PlayerPage() {
       }
 
       const encoded = encodeURIComponent(playerId);
+      // Selected pick'em app — every market that app lists for the athlete
+      // (Points, Rebounds, PRA, Pts+Rebs, Pts+Asts, …) appears as research tabs.
+      const platformQs = `?platform=${encodeURIComponent(platform)}`;
+
       // Prefer league-specific endpoints; try encoded + raw variants.
       const leagueTries: Array<{ path: string; league: string; href: string }> = [
-        { path: `/api/mlb/players/${encoded}`, league: "MLB", href: "/mlb" },
-        { path: `/api/wnba/players/${encoded}`, league: "WNBA", href: "/wnba" },
-        { path: `/api/nba/players/${encoded}`, league: "NBA", href: "/nba" },
-        { path: `/api/nhl/players/${encoded}`, league: "NHL", href: "/nhl" },
-        { path: `/api/nfl/players/${encoded}`, league: "NFL", href: "/nfl" },
-        { path: `/api/soccer/players/${encoded}`, league: "Soccer", href: "/soccer" },
-        { path: `/api/tennis/players/${encoded}`, league: "ATP", href: "/tennis" },
+        { path: `/api/mlb/players/${encoded}${platformQs}`, league: "MLB", href: "/mlb" },
+        { path: `/api/wnba/players/${encoded}${platformQs}`, league: "WNBA", href: "/wnba" },
+        { path: `/api/nba/players/${encoded}${platformQs}`, league: "NBA", href: "/nba" },
+        { path: `/api/nhl/players/${encoded}${platformQs}`, league: "NHL", href: "/nhl" },
+        { path: `/api/nfl/players/${encoded}${platformQs}`, league: "NFL", href: "/nfl" },
+        { path: `/api/soccer/players/${encoded}${platformQs}`, league: "Soccer", href: "/soccer" },
+        { path: `/api/tennis/players/${encoded}${platformQs}`, league: "ATP", href: "/tennis" },
       ];
       for (const t of leagueTries) {
         const hit = await tryLeague(t.path, t.league, t.href);
@@ -182,13 +202,6 @@ export default function PlayerPage() {
       }
 
       // Multi-sport boards: build a research profile from open props.
-      let platformQs = "";
-      try {
-        const saved = localStorage.getItem("seraphim.pickemApp");
-        if (saved) platformQs = `?platform=${encodeURIComponent(saved)}`;
-      } catch {
-        /* ignore */
-      }
       const boardSources: Array<{ path: string; league: string; boardHref: string }> = [
         { path: `/api/wnba/props${platformQs}`, league: "WNBA", boardHref: "/wnba" },
         { path: `/api/nba/props${platformQs}`, league: "NBA", boardHref: "/nba" },
@@ -282,16 +295,32 @@ export default function PlayerPage() {
   const [marketIdx, setMarketIdx] = useState(0);
   const [side, setSide] = useState<"Over" | "Under" | null>(null);
   const [windowKey, setWindowKey] = useState("l10");
+  /** Per-prop desk line overrides (shared player page — all leagues). */
+  const [lineOverrides, setLineOverrides] = useState<Record<string, number>>({});
 
   const markets = profile?.markets ?? [];
   useEffect(() => {
     setMarketIdx(0);
     setSide(null);
     setWindowKey("l10");
+    setLineOverrides({});
   }, [playerId]);
 
-  const market = markets[Math.min(marketIdx, Math.max(0, markets.length - 1))] ?? null;
+  const baseMarket = markets[Math.min(marketIdx, Math.max(0, markets.length - 1))] ?? null;
+  const market = useMemo(() => {
+    if (!baseMarket) return null;
+    const override = lineOverrides[baseMarket.propId];
+    if (override == null) return baseMarket;
+    return applyLineOverride(baseMarket, override);
+  }, [baseMarket, lineOverrides]);
   const selectedSide = (side ?? market?.side ?? "Over") as "Over" | "Under";
+
+  function nudgeLine(delta: number) {
+    if (!baseMarket) return;
+    const current = lineOverrides[baseMarket.propId] ?? baseMarket.line;
+    const next = normalizePropLine(current + delta);
+    setLineOverrides((prev) => ({ ...prev, [baseMarket.propId]: next }));
+  }
 
   useEffect(() => {
     if (boardProps.data?.props?.length) {
@@ -330,6 +359,7 @@ export default function PlayerPage() {
 
   function addCurrent(overrideSide?: "Over" | "Under") {
     const s = overrideSide ?? selectedSide;
+    const line = market!.line;
     let leg = propIdToBuilderLeg(market!.propId);
     if (!leg) {
       const cached = getCachedNbaProp(market!.propId);
@@ -344,7 +374,7 @@ export default function PlayerPage() {
           position: profile!.position,
           market: market!.market as NbaProp["market"],
           side: market!.side === "Under" ? "Under" : "Over",
-          line: market!.line,
+          line,
           americanOdds: market!.americanOdds,
           noVigProb: market!.overProbability ?? 0.5,
           evPercent: market!.evPercent,
@@ -357,9 +387,9 @@ export default function PlayerPage() {
           projectedMinutes: 32,
           injury: "None",
         } as NbaProp);
-      leg = nbaToBuilderLeg({ ...row, side: s });
+      leg = nbaToBuilderLeg({ ...row, side: s, line });
     } else {
-      leg = { ...leg, side: s };
+      leg = { ...leg, side: s, line };
     }
     addLeg(leg);
   }
@@ -457,7 +487,7 @@ export default function PlayerPage() {
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold",
                 added
-                  ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                  ? "border border-yellow-500/30 bg-yellow-500/15 text-yellow-300"
                   : "bg-gradient-to-b from-yellow-400 to-amber-500 text-black",
               )}
             >
@@ -473,7 +503,7 @@ export default function PlayerPage() {
           markets={markets.map((m) => ({
             id: m.propId,
             label: m.market,
-            line: m.line,
+            line: lineOverrides[m.propId] ?? m.line,
           }))}
           activeIndex={marketIdx}
           onSelect={(i) => {
@@ -492,21 +522,25 @@ export default function PlayerPage() {
               {market.market}
             </h2>
             <p className="mt-1 text-sm text-neutral-400">
-              {market.side} {market.line} · proj {market.projectedValue.toFixed(1)} ·{" "}
+              {selectedSide} {market.line} · proj {market.projectedValue.toFixed(1)} ·{" "}
               <span className={leanTextClass(market.side)}>
                 {market.edgeVsLine > 0 ? "+" : ""}
                 {market.edgeVsLine.toFixed(1)} vs line
               </span>
+              {market.platformLine != null && market.platformLine !== market.line ? (
+                <span className="ml-1.5 text-neutral-600">
+                  (board {market.platformLine})
+                </span>
+              ) : null}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 rounded-xl border border-[#222] bg-[#0c0c0c] px-2 py-1.5">
               <button
                 type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white"
-                onClick={() => {
-                  /* line is from market; UI affordance for desk parity */
-                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                onClick={() => nudgeLine(-PROP_LINE_STEP)}
+                disabled={market.line <= PROP_LINE_STEP}
                 aria-label="Lower line"
               >
                 −
@@ -516,7 +550,9 @@ export default function PlayerPage() {
               </span>
               <button
                 type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                onClick={() => nudgeLine(PROP_LINE_STEP)}
+                disabled={market.line >= 200}
                 aria-label="Higher line"
               >
                 +
@@ -529,8 +565,8 @@ export default function PlayerPage() {
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold",
                 added
-                  ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
-                  : "bg-emerald-500 text-black hover:bg-emerald-400",
+                  ? "border border-yellow-500/30 bg-yellow-500/15 text-yellow-300"
+                  : "bg-gradient-to-b from-yellow-400 to-amber-500 text-black hover:from-yellow-300 hover:to-amber-400",
               )}
             >
               {added ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -587,7 +623,7 @@ export default function PlayerPage() {
                     className={cn(
                       "rounded-lg px-2.5 py-1 text-xs font-medium transition",
                       tab === id
-                        ? "bg-emerald-500/15 text-emerald-300"
+                        ? "bg-yellow-500/15 text-yellow-300"
                         : "text-neutral-500 hover:text-neutral-300",
                     )}
                   >
@@ -660,7 +696,7 @@ export default function PlayerPage() {
                         className="min-w-0 flex-1 text-left"
                       >
                         <span className="block text-neutral-200">
-                          {m.market} · {m.side} {m.line}
+                          {m.market} · {m.side} {lineOverrides[m.propId] ?? m.line}
                         </span>
                         <span className={cn("mt-0.5 block text-xs tabular-nums", leanTextClass(m.side))}>
                           Proj {m.projectedValue.toFixed(1)} ·{" "}
@@ -754,34 +790,22 @@ export default function PlayerPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Metric
-              label="Our Projection"
-              value={market.projectedValue.toFixed(1)}
-              hint="Seraphim model"
-              lean={market.side}
-            />
-            <Metric
-              label="Edge"
-              value={`${market.edgeVsLine > 0 ? "+" : ""}${market.edgeVsLine.toFixed(1)}`}
-              hint="vs platform line"
-              lean={market.side}
-            />
-            <Metric
-              label="Edge %"
-              value={`${market.edgePercent > 0 ? "+" : ""}${market.edgePercent.toFixed(1)}%`}
-              hint="edge / line"
-              lean={market.side}
-            />
-            <Metric label="Confidence" value={`${market.confidence}%`} hint="model certainty" />
-            <Metric label="Research Score" value={`${market.researchScore}`} hint="checklist-backed" />
-            <Metric
-              label="Model EV"
-              value={`+${market.evPercent.toFixed(1)}%`}
-              hint="vs comparison odds"
-              lean={market.side}
-            />
-          </div>
+          <MarketVsModelPanel
+            propId={market.propId}
+            projected={market.projectedValue}
+            line={market.line}
+            side={market.side === "Under" ? "Under" : "Over"}
+            overProbability={market.overProbability}
+            underProbability={market.underProbability}
+            confidence={market.confidence}
+            researchScore={market.researchScore}
+            evPercent={market.evPercent}
+            selectedSide={selectedSide === "Under" ? "Under" : "Over"}
+            onSelectSide={(s) => setSide(s)}
+            showComparison
+            showMovement={false}
+            compact
+          />
 
           <ProOnly
             title="Why this lean"
@@ -821,24 +845,6 @@ export default function PlayerPage() {
             side={selectedSide}
           />
 
-          <BookLineStrip
-            books={[
-              {
-                book: "Seraphim",
-                line: market.line,
-                odds: market.americanOdds > 0 ? `+${market.americanOdds}` : String(market.americanOdds),
-                evPct: market.evPercent,
-                highlight: true,
-              },
-              {
-                book: "Consensus",
-                line: market.line,
-                odds: "-110",
-                evPct: null,
-              },
-            ]}
-          />
-
           <div className="rounded-2xl border border-[#1a1a1a] bg-[#0c0c0c] p-4">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
               Insights
@@ -846,9 +852,9 @@ export default function PlayerPage() {
             <h3 className="mt-1 text-sm font-semibold text-white">{profile.matchup.title}</h3>
             <p className="mt-1 text-xs text-neutral-500">{profile.matchup.defenseRank}</p>
             <div className="mt-4 flex items-center justify-center">
-              <div className="relative flex h-28 w-28 items-center justify-center rounded-full border-4 border-emerald-500/35">
+              <div className="relative flex h-28 w-28 items-center justify-center rounded-full border-4 border-yellow-500/35">
                 <div className="text-center">
-                  <p className="text-2xl font-semibold tabular-nums text-emerald-300">
+                  <p className="text-2xl font-semibold tabular-nums text-yellow-300">
                     {Math.round(
                       (selectedSide === "Under"
                         ? market.underProbability ?? 1 - (market.overProbability ?? 0.5)
@@ -862,8 +868,8 @@ export default function PlayerPage() {
             </div>
             <p className="mt-3 text-center text-xs text-neutral-400">
               Model lean{" "}
-              <span className={cn("font-semibold", leanTextClass(market.side))}>
-                {market.side} {market.line}
+              <span className={cn("font-semibold", leanTextClass(selectedSide))}>
+                {selectedSide} {market.line}
               </span>
             </p>
           </div>
@@ -908,7 +914,7 @@ export default function PlayerPage() {
                     )}
                   >
                     <span>{m.market}</span>
-                    <span className="tabular-nums">{m.line}</span>
+                    <span className="tabular-nums">{lineOverrides[m.propId] ?? m.line}</span>
                   </button>
                 </li>
               ))}
@@ -926,32 +932,3 @@ export default function PlayerPage() {
   );
 }
 
-function Metric({
-  label,
-  value,
-  hint,
-  lean,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  lean?: "Over" | "Under" | string | null;
-}) {
-  return (
-    <div className="card-3d rounded-2xl border border-[#1a1a1a] p-3.5">
-      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
-        {label}
-        {hint && <Info className="h-3 w-3 opacity-50" aria-label={hint} />}
-      </div>
-      <p
-        className={cn(
-          "mt-2 text-xl font-semibold tabular-nums",
-          lean ? leanTextClass(lean) : "text-white",
-        )}
-      >
-        {value}
-      </p>
-      {hint && <p className="mt-1 text-[10px] text-neutral-600">{hint}</p>}
-    </div>
-  );
-}

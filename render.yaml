@@ -1,0 +1,72 @@
+# Seraphim Analytics — FREE Render Blueprint
+# Dashboard → New → Blueprint → branch: cursor/market-vs-model-754e
+#
+# Free tier notes:
+#   - Site sleeps after ~15 min idle (first load ~1 min)
+#   - Free Postgres expires after 30 days (upgrade or export before then)
+#   - Only 1 free Postgres per Render workspace
+#
+# API / Stripe keys are optional at deploy time. Add them later under each
+# service → Environment (copy from your local .env).
+
+databases:
+  - name: seraphim-db
+    plan: free
+    postgresMajorVersion: "16"
+    ipAllowList: []
+
+services:
+  # Python warehouse / odds sync (internal API)
+  - type: web
+    name: seraphim-data
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: data-platform
+    autoDeployTrigger: commit
+    buildCommand: pip install -r requirements.txt
+    startCommand: PYTHONPATH=. uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: seraphim-db
+          property: connectionString
+      - key: ENABLE_SCHEDULER
+        value: "true"
+      - key: BOOTSTRAP_NBA_SYNC
+        value: "true"
+      - key: BOOTSTRAP_MULTI_SPORT
+        value: "true"
+
+  # Public website + membership API
+  - type: web
+    name: seraphim
+    runtime: node
+    plan: free
+    region: oregon
+    autoDeployTrigger: commit
+    # --include=dev: NODE_ENV=production would otherwise skip vite/tsx (devDependencies)
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node scripts/migrate.mjs && node dist/index.cjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20.18.0"
+      - key: NODE_ENV
+        value: production
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=460"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: seraphim-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATA_PLATFORM_PROXY
+        value: "1"
+      # Public onrender hostname (Blueprint "host" alone is often just the service name)
+      - key: DATA_PLATFORM_URL
+        value: https://seraphim-data.onrender.com

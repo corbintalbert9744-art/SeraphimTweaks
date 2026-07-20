@@ -37,30 +37,33 @@ SOCCER_EXTRA_SPORTS: tuple[str, ...] = (
     "soccer_ligue_1",
 )
 
+# Full PropLine basketball player-prop set (docs / npm client).
+# Used for NBA + WNBA so PrizePicks cores + combos are requested, not just PRA.
+BASKETBALL_PROP_MARKETS: tuple[str, ...] = (
+    "player_points",
+    "player_rebounds",
+    "player_assists",
+    "player_threes",
+    "player_steals",
+    "player_blocks",
+    "player_turnovers",
+    "player_points_rebounds",
+    "player_points_assists",
+    "player_rebounds_assists",
+    "player_points_rebounds_assists",
+    "player_double_double",
+    "player_triple_double",
+    # PrizePicks-style fantasy — may be absent on some PropLine plans; discovery
+    # fallback in the pick'em adapter still surfaces it when present.
+    "player_fantasy_score",
+)
+
 # PropLine market keys we request per league (player props only).
 # Empty tuple = PropLine does not document player props for this league yet.
 PROP_MARKETS: dict[str, tuple[str, ...]] = {
-    "NBA": (
-        "player_points",
-        "player_rebounds",
-        "player_assists",
-        "player_threes",
-        "player_steals",
-        "player_blocks",
-        "player_turnovers",
-        "player_points_rebounds_assists",
-        "player_double_double",
-    ),
-    # WNBA reuses NBA player-prop keys when the sport is active on PropLine.
-    "WNBA": (
-        "player_points",
-        "player_rebounds",
-        "player_assists",
-        "player_threes",
-        "player_steals",
-        "player_blocks",
-        "player_points_rebounds_assists",
-    ),
+    "NBA": BASKETBALL_PROP_MARKETS,
+    # WNBA reuses the full NBA player-prop key set when the sport is active.
+    "WNBA": BASKETBALL_PROP_MARKETS,
     # NFL player props are not in PropLine's published market table (game lines only
     # until their football prop rollout). Keep empty → clear unavailable.
     "NFL": (),
@@ -119,15 +122,29 @@ MARKET_LABELS: dict[str, str] = {
     "player_rebounds": "Rebounds",
     "player_assists": "Assists",
     "player_threes": "Threes",
+    "player_threes_made": "Threes",
+    "player_3_pointers_made": "Threes",
     "player_steals": "Steals",
     "player_blocks": "Blocks",
     "player_turnovers": "Turnovers",
     "player_points_rebounds_assists": "PRA",
-    "player_points_rebounds": "PR",
-    "player_points_assists": "PA",
-    "player_rebounds_assists": "RA",
+    "player_points_rebounds": "Pts+Rebs",
+    "player_points_assists": "Pts+Asts",
+    "player_rebounds_assists": "Rebs+Asts",
+    "player_steals_blocks": "Steals+Blocks",
+    "player_blocks_rebounds": "Blocks+Rebs",
+    "player_assists_turnovers": "Asts+TOs",
+    "player_field_goals": "FGM",
+    "player_field_goals_made": "FGM",
+    "player_field_goal_attempts": "FGA",
+    "player_two_pointers_made": "2PM",
+    "player_three_point_attempts": "3PA",
+    "player_free_throws_made": "FTM",
+    "player_free_throw_attempts": "FTA",
     "player_double_double": "Double Double",
     "player_triple_double": "Triple Double",
+    "player_fantasy_score": "Fantasy Score",
+    "player_fantasy_points": "Fantasy Score",
     "pitcher_strikeouts": "Strikeouts",
     "pitcher_outs": "Outs",
     "pitcher_earned_runs": "Earned Runs",
@@ -152,7 +169,6 @@ MARKET_LABELS: dict[str, str] = {
     "player_double_faults": "Double Faults",
     "player_games_won": "Games Won",
     "player_break_points_won": "Break Points Won",
-    "player_fantasy_score": "Fantasy Score",
     "player_total_games": "Total Games",
     "player_sets_won": "Sets Won",
 }
@@ -162,12 +178,30 @@ LABEL_TO_MARKET_KEYS: dict[str, tuple[str, ...]] = {
     "Points": ("player_points",),
     "Rebounds": ("player_rebounds",),
     "Assists": ("player_assists",),
-    "Threes": ("player_threes",),
+    "Threes": ("player_threes", "player_threes_made", "player_3_pointers_made"),
+    "3-Pointers Made": ("player_threes",),
     "Steals": ("player_steals",),
     "Blocks": ("player_blocks",),
     "Turnovers": ("player_turnovers",),
     "PRA": ("player_points_rebounds_assists",),
+    "Pts+Rebs+Asts": ("player_points_rebounds_assists",),
+    "PR": ("player_points_rebounds",),
+    "Pts+Rebs": ("player_points_rebounds",),
+    "PA": ("player_points_assists",),
+    "Pts+Asts": ("player_points_assists",),
+    "RA": ("player_rebounds_assists",),
+    "Rebs+Asts": ("player_rebounds_assists",),
+    "Steals+Blocks": ("player_steals_blocks",),
+    "Blocks+Rebs": ("player_blocks_rebounds",),
+    "Asts+TOs": ("player_assists_turnovers",),
+    "FGM": ("player_field_goals_made", "player_field_goals"),
+    "FGA": ("player_field_goal_attempts",),
+    "2PM": ("player_two_pointers_made",),
+    "3PA": ("player_three_point_attempts",),
+    "FTM": ("player_free_throws_made",),
+    "FTA": ("player_free_throw_attempts",),
     "Double Double": ("player_double_double",),
+    "Triple Double": ("player_triple_double",),
     "Hits": ("batter_hits",),
     "Home Runs": ("batter_home_runs",),
     "RBIs": ("batter_rbis",),
@@ -190,12 +224,18 @@ LABEL_TO_MARKET_KEYS: dict[str, tuple[str, ...]] = {
 }
 
 # Bookmakers returned by PropLine (docs). Used for UI catalog + kind.
+# Aliases (williamhill_us, espn_bet, …) normalize via comparison_lines.normalize_book_slug.
 PROPLINE_BOOKMAKERS: dict[str, dict[str, str]] = {
     "prizepicks": {"name": "PrizePicks", "kind": "pickem"},
     "underdog": {"name": "Underdog", "kind": "pickem"},
     "fanduel": {"name": "FanDuel", "kind": "sportsbook"},
     "draftkings": {"name": "DraftKings", "kind": "sportsbook"},
     "betmgm": {"name": "BetMGM", "kind": "sportsbook"},
+    "caesars": {"name": "Caesars", "kind": "sportsbook"},
+    "williamhill_us": {"name": "Caesars", "kind": "sportsbook"},
+    "fanatics": {"name": "Fanatics", "kind": "sportsbook"},
+    "espnbet": {"name": "ESPN BET", "kind": "sportsbook"},
+    "espn_bet": {"name": "ESPN BET", "kind": "sportsbook"},
     "bovada": {"name": "Bovada", "kind": "sportsbook"},
     "pinnacle": {"name": "Pinnacle", "kind": "sportsbook"},
     "betrivers": {"name": "BetRivers", "kind": "sportsbook"},
@@ -208,7 +248,32 @@ PICKEM_SLUGS = frozenset({"prizepicks", "underdog", "sleeper", "parlayplay", "da
 
 
 def market_label(market_key: str) -> str:
-    return MARKET_LABELS.get(market_key, market_key.replace("_", " ").title())
+    key = (market_key or "").strip().lower()
+    if key in MARKET_LABELS:
+        return MARKET_LABELS[key]
+    # Strip common prefixes / DFS suffixes then retry
+    stripped = key
+    for prefix in ("player_", "batter_", "pitcher_"):
+        if stripped.startswith(prefix):
+            stripped = stripped[len(prefix) :]
+            break
+    if stripped in MARKET_LABELS:
+        return MARKET_LABELS[stripped]
+    aliases = {
+        "points_rebounds": "Pts+Rebs",
+        "points_assists": "Pts+Asts",
+        "rebounds_assists": "Rebs+Asts",
+        "points_rebounds_assists": "PRA",
+        "threes_made": "Threes",
+        "3_pointers_made": "Threes",
+        "fantasy_points": "Fantasy Score",
+        "fantasy_score": "Fantasy Score",
+        "steals_blocks": "Steals+Blocks",
+        "blocks_rebounds": "Blocks+Rebs",
+    }
+    if stripped in aliases:
+        return aliases[stripped]
+    return (market_key or "Prop").replace("_", " ").title()
 
 
 def market_keys_for_label(label: str) -> tuple[str, ...]:

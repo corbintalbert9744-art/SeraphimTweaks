@@ -1,15 +1,10 @@
-"""Antelytics adapter stub — LineMarketProvider.
+"""Antelytics (antelytics.dev) LineMarketProvider.
 
-No public sports-odds OpenAPI was found for Antelytics at integration time.
-This adapter:
+Official API: ``https://backend.antehq.com/v1``
+Auth: ``Authorization: Bearer ant_live_…``
 
-- Requires ANTELYTICS_API_KEY (+ optional ANTELYTICS_BASE_URL)
-- Attempts a configurable REST odds path when keyed
-- Returns clear *unavailable* when not configured or the upstream shape is empty
-- Never fabricates lines
-
-When Antelytics publishes official prop docs, map their payload in
-``_parse_payload`` without changing the aggregator or frontend.
+Primary endpoint for DFS books: ``GET /v1/props?sport=nba``.
+Never fabricates lines — empty / tier-gated responses stay empty.
 """
 
 from __future__ import annotations
@@ -26,12 +21,44 @@ from app.providers.base import (
     ProviderMeta,
     ProviderRateLimitError,
 )
+from app.providers.propline.markets import market_label
 
 log = logging.getLogger(__name__)
 
-DEFAULT_BASE = "https://api.antelytics.com/v1"
+DEFAULT_BASE = "https://backend.antehq.com/v1"
 
-LEAGUES = ("NBA", "WNBA", "NFL", "MLB", "NHL", "Soccer", "ATP", "WTA")
+# Seraphim league → Antelytics sport query key
+SPORT_KEYS: dict[str, str] = {
+    "NBA": "nba",
+    "WNBA": "wnba",
+    "NFL": "nfl",
+    "MLB": "mlb",
+    "NHL": "nhl",
+    "Soccer": "epl",
+    "ATP": "atp",
+    "WTA": "wta",
+}
+
+# Free tier is NBA-only; higher tiers unlock more sports.
+FREE_TIER_SPORTS = frozenset({"nba"})
+
+STAT_LABELS: dict[str, str] = {
+    "points": "Points",
+    "rebounds": "Rebounds",
+    "assists": "Assists",
+    "threes": "Threes",
+    "three_pointers": "Threes",
+    "steals": "Steals",
+    "blocks": "Blocks",
+    "turnovers": "Turnovers",
+    "points_rebounds": "Pts+Rebs",
+    "points_assists": "Pts+Asts",
+    "rebounds_assists": "Rebs+Asts",
+    "points_rebounds_assists": "PRA",
+    "steals_blocks": "Steals+Blocks",
+    "fantasy_score": "Fantasy Score",
+    "fantasy_points": "Fantasy Score",
+}
 
 
 def _norm_league(league: str) -> str:
@@ -40,21 +67,30 @@ def _norm_league(league: str) -> str:
     return (league or "").upper()
 
 
+def _parse_ts(raw: Any) -> datetime:
+    if isinstance(raw, str) and raw:
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+    return datetime.now(timezone.utc)
+
+
 class AntelyticsAdapter:
-    """Configurable Antelytics LineMarketProvider (stub until official docs land)."""
+    """Antelytics DFS props adapter (PrizePicks / Underdog / Sleeper / …)."""
 
     meta = ProviderMeta(
         name="antelytics",
-        leagues=list(LEAGUES),
-        capabilities=["odds", "props"],
+        leagues=list(SPORT_KEYS.keys()),
+        capabilities=["odds", "props", "pickem"],
         requires_api_key=True,
         is_mock=False,
         notes=(
-            "Antelytics adapter scaffold. Set ANTELYTICS_API_KEY and optional "
-            "ANTELYTICS_BASE_URL. Until the official player-prop schema is confirmed, "
-            "unsupported responses are marked unavailable — never fabricated."
+            "Antelytics (https://antelytics.dev) DFS props via backend.antehq.com. "
+            "Set ANTELYTICS_API_KEY. Free tier is NBA-only; higher tiers unlock more sports. "
+            "Unavailable / empty responses are never fabricated."
         ),
-        homepage=None,
+        homepage="https://antelytics.dev",
     )
 
     def __init__(
@@ -77,7 +113,8 @@ class AntelyticsAdapter:
 
     def supports_league(self, league: str) -> LeagueSupportStatus:
         code = _norm_league(league)
-        if code not in LEAGUES:
+        sport = SPORT_KEYS.get(code)
+        if not sport:
             return LeagueSupportStatus(code, False, reason="League not mapped", unavailable=True)
         if not self.api_key:
             return LeagueSupportStatus(
@@ -86,13 +123,11 @@ class AntelyticsAdapter:
                 reason="ANTELYTICS_API_KEY not configured — Antelytics lines unavailable.",
                 unavailable=True,
             )
-        # Optimistic: try fetch; empty results stay empty without fabricating.
         return LeagueSupportStatus(code, True)
 
     def _get(self, path: str, params: Optional[dict[str, Any]] = None) -> Any:
         headers = {
             "Accept": "application/json",
-            "X-API-Key": self.api_key,
             "Authorization": f"Bearer {self.api_key}",
             "User-Agent": "SeraphimAnalytics/1.0 (+AntelyticsAdapter)",
         }
@@ -101,7 +136,16 @@ class AntelyticsAdapter:
             if res.status_code == 429:
                 raise ProviderRateLimitError("antelytics", "HTTP 429")
             if res.status_code in {401, 403}:
-                raise RuntimeError("Antelytics API key invalid or unauthorized")
+                # Tier gates / bad key — treat as unavailable for this call
+                try:
+                    body = res.json()
+                except Exception:  # noqa: BLE001
+                    body = {}
+                msg = str((body or {}).get("message") or res.text or f"HTTP {res.status_code}")
+                if res.status_code == 403 and "tier" in msg.lower():
+                    log.info("Antelytics tier gate: %s", msg)
+                    return None
+                raise RuntimeError(f"Antelytics unauthorized: {msg}")
             if res.status_code == 404:
                 return None
             res.raise_for_status()
@@ -115,71 +159,127 @@ class AntelyticsAdapter:
         if not support.supported:
             return []
         code = _norm_league(league)
-        # Common REST shapes to try — first non-empty parse wins.
-        candidates = (
-            (f"/leagues/{code.lower()}/props", {}),
-            (f"/odds", {"league": code.lower(), "market": "player_prop"}),
-            (f"/player-props", {"league": code.lower()}),
-        )
-        for path, params in candidates:
+        sport = SPORT_KEYS[code]
+        try:
+            payload = self._get(
+                "/props",
+                {"sport": sport, "limit": "500", "offset": "0"},
+            )
+        except ProviderRateLimitError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Antelytics %s /props failed: %s", code, exc)
+            return []
+        parsed = self._parse_props_payload(code, payload)
+        if not parsed:
+            log.info(
+                "Antelytics returned no player props for %s — treating as unavailable (not fabricated).",
+                code,
+            )
+        return parsed
+
+    def fetch_pickem_prop_odds(
+        self,
+        league: str,
+        *,
+        platforms: Optional[set[str]] = None,
+        date: Optional[str] = None,
+        max_events: Optional[int] = None,
+        horizon_hours: int = 48,
+    ) -> list[NormalizedOddsQuote]:
+        """DFS-only fetch; optional platform filter (prizepicks / underdog / sleeper)."""
+        _ = (max_events, horizon_hours, date)
+        support = self.supports_league(league)
+        if not support.supported:
+            return []
+        code = _norm_league(league)
+        sport = SPORT_KEYS[code]
+        allowed = {p.lower() for p in platforms} if platforms else None
+        out: list[NormalizedOddsQuote] = []
+        # Prefer per-platform pages when filtering — keeps responses smaller.
+        platform_iter: list[Optional[str]] = sorted(allowed) if allowed else [None]
+        for platform in platform_iter:
+            params: dict[str, Any] = {"sport": sport, "limit": "500", "offset": "0"}
+            if platform:
+                params["platform"] = platform
             try:
-                payload = self._get(path, params)
+                payload = self._get("/props", params)
             except ProviderRateLimitError:
                 raise
             except Exception as exc:  # noqa: BLE001
-                log.debug("Antelytics %s %s: %s", code, path, exc)
+                log.debug("Antelytics pickem %s/%s: %s", code, platform, exc)
                 continue
-            parsed = self._parse_payload(code, payload)
-            if parsed:
-                return parsed
-        log.info(
-            "Antelytics returned no player props for %s — treating as unavailable (not fabricated).",
-            code,
-        )
-        return []
+            batch = self._parse_props_payload(code, payload)
+            if allowed:
+                batch = [q for q in batch if q.sportsbook_slug in allowed]
+            out.extend(batch)
+        return out
 
-    def _parse_payload(self, league: str, payload: Any) -> list[NormalizedOddsQuote]:
-        if payload is None:
+    def _stat_to_market(self, stat_type: str, stat_label: str) -> str:
+        key = (stat_type or "").strip().lower()
+        if key in STAT_LABELS:
+            return STAT_LABELS[key]
+        if stat_label:
+            return str(stat_label)
+        return market_label(f"player_{key}" if key else "Prop")
+
+    def _parse_props_payload(self, league: str, payload: Any) -> list[NormalizedOddsQuote]:
+        if not isinstance(payload, dict):
             return []
-        rows: list[Any]
-        if isinstance(payload, list):
-            rows = payload
-        elif isinstance(payload, dict):
-            rows = payload.get("data") or payload.get("props") or payload.get("odds") or []
-        else:
-            return []
+        rows = payload.get("props") or payload.get("data") or []
         if not isinstance(rows, list):
             return []
 
         out: list[NormalizedOddsQuote] = []
-        now = datetime.now(timezone.utc)
         for row in rows:
             if not isinstance(row, dict):
                 continue
-            player = row.get("player_name") or row.get("player") or row.get("description")
-            market = row.get("market") or row.get("market_name") or row.get("stat")
-            side_raw = str(row.get("side") or row.get("selection") or row.get("name") or "")
-            side = "Over" if "over" in side_raw.lower() else "Under" if "under" in side_raw.lower() else None
-            point = row.get("line") or row.get("point")
-            price = row.get("american_odds") or row.get("price") or row.get("odds")
-            slug = str(row.get("sportsbook") or row.get("book") or row.get("bookmaker") or "").lower()
-            if not player or not market or side is None or point is None or price is None or not slug:
+            player_obj = row.get("player") if isinstance(row.get("player"), dict) else {}
+            market_obj = row.get("market") if isinstance(row.get("market"), dict) else {}
+            player = player_obj.get("name") or row.get("player_name")
+            if not player:
                 continue
-            out.append(
-                NormalizedOddsQuote(
-                    league=league,
-                    player_external_id=None,
-                    player_name=str(player),
-                    market=str(market),
-                    side=side,
-                    line=float(point),
-                    american_odds=int(price),
-                    sportsbook_slug=slug,
-                    sportsbook_name=str(row.get("sportsbook_name") or row.get("book_title") or slug.title()),
-                    game_external_id=str(row.get("game_id") or row.get("event_id") or "") or None,
-                    captured_at=now,
-                    is_mock=False,
-                    source_provider="antelytics",
-                )
+            line = market_obj.get("line")
+            if line is None:
+                line = row.get("line")
+            if line is None:
+                continue
+            direction = str(market_obj.get("direction") or row.get("direction") or "over").lower()
+            side = "Over" if direction.startswith("over") else "Under" if direction.startswith("under") else None
+            if side is None:
+                continue
+            platform = str(
+                market_obj.get("platform") or row.get("platform") or "prizepicks"
+            ).lower()
+            market = self._stat_to_market(
+                str(market_obj.get("stat_type") or ""),
+                str(market_obj.get("stat_label") or ""),
             )
+            # DFS pick'em is even-money synthetic pricing.
+            american = 100
+            captured = _parse_ts(row.get("updated_at") or row.get("start_time"))
+            # Emit both sides at the same line so comparison UI can attach Over/Under.
+            for emit_side in (side, "Under" if side == "Over" else "Over"):
+                out.append(
+                    NormalizedOddsQuote(
+                        league=league,
+                        player_external_id=str(player_obj.get("id") or "") or None,
+                        player_name=str(player),
+                        market=market,
+                        side=emit_side,
+                        line=float(line),
+                        american_odds=american,
+                        sportsbook_slug=platform,
+                        sportsbook_name=platform.replace("_", " ").title(),
+                        game_external_id=str(row.get("game_id") or "") or None,
+                        captured_at=captured,
+                        is_mock=False,
+                        source_provider="antelytics",
+                        quote_external_id=str(row.get("prop_id") or "") or None,
+                        home_team=None,
+                        away_team=None,
+                        sport_key=str(row.get("sport") or SPORT_KEYS.get(league)),
+                        raw={"direction": direction, "platform": platform},
+                    )
+                )
         return out

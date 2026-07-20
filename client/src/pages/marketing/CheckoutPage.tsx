@@ -25,6 +25,7 @@ export default function CheckoutPage() {
     isAuthenticated,
     membershipActive,
     startCheckout,
+    signOut,
     user,
     loading,
   } = useMembership();
@@ -37,11 +38,22 @@ export default function CheckoutPage() {
   );
   const [plan, setPlan] = useState<MembershipPlan>(() => parsePlan(params.get("plan")));
   const [busy, setBusy] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && membershipActive) setLocation("/app");
   }, [membershipActive, loading, setLocation]);
+
+  async function onSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut();
+      setLocation("/");
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -72,11 +84,30 @@ export default function CheckoutPage() {
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
             Become a Seraphim IQ Member
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-            {user
-              ? `Signed in as ${user.email}. Confirm Standard or Pro, then subscribe securely with Stripe.`
-              : "Create an account first, then confirm your membership with Stripe Checkout."}
-          </p>
+          {user ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
+              <p className="min-w-0 text-sm text-neutral-300">
+                Signed in as <span className="font-medium text-white">{user.email}</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => void onSignOut()}
+                disabled={signingOut}
+                className="shrink-0 rounded-lg border border-[#2a2a2a] bg-[#111] px-3 py-1.5 text-xs font-medium text-neutral-200 transition hover:border-yellow-500/40 hover:text-yellow-400 disabled:opacity-60"
+              >
+                {signingOut ? "Signing out…" : "Sign out"}
+              </button>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+              Create an account first, then confirm your membership with Stripe Checkout.
+            </p>
+          )}
+          {user ? (
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+              Confirm Standard or Pro, then subscribe securely with Stripe.
+            </p>
+          ) : null}
 
           {!isAuthenticated && !loading ? (
             <div className="mt-8 flex flex-wrap gap-3">
@@ -147,8 +178,8 @@ export default function CheckoutPage() {
                   <span className="text-base font-medium text-neutral-500"> {SHORT[interval]}</span>
                 </p>
                 <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-                  You will be redirected to Stripe Checkout. Access unlocks after webhook
-                  confirmation, not from the browser alone.
+                  You will be redirected to Stripe Checkout to pay securely. After payment you
+                  return here and membership unlocks automatically.
                 </p>
               </div>
 

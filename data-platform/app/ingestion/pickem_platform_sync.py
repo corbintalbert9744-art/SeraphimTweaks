@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.analytics.engine import expected_value, home_away_split, rest_days, streak
 from app.analytics.factors.base import PredictionContext
-from app.analytics.prediction import predict_prop
+from app.analytics.prediction import model_edge_percent, predict_prop
 from app.config import get_settings
 from app.db.models import Game, Injury, Player, PlayerGameLog, Prop, PropAnalytics
 from app.ingestion.generic_board import market_values_from_logs
@@ -329,12 +329,24 @@ def _market_samples(logs: list[PlayerGameLog], market: str) -> list[float]:
         "Threes",
         "Steals",
         "Blocks",
+        "Turnovers",
         "PRA",
         "PR",
         "PA",
         "RA",
+        "Pts+Rebs",
+        "Pts+Asts",
+        "Rebs+Asts",
         "Pts+Rebs+Asts",
+        "Steals+Blocks",
+        "Blocks+Rebs",
+        "Asts+TOs",
+        "Fantasy Score",
+        "Fantasy Points",
+        "Double Double",
+        "Triple Double",
         "3-PT Made",
+        "3-Pointers Made",
     }:
         return _nba_market_values(logs, market)
     return market_values_from_logs(logs, market, raw_stat_key=None)
@@ -610,10 +622,10 @@ def sync_pickem_platform_board(
             "requiresApiKey": True,
             "envVar": "PROPLINE_API_KEY",
             "requiresAdditionalKeys": ["SHARPAPI_API_KEY", "ODDS_API_KEY"],
+            # Member-facing copy only — never expose env var / vendor limit details.
             "note": (
-                f"Live {label} props need at least one odds key "
-                "(PROPLINE_API_KEY, SHARPAPI_API_KEY, or ODDS_API_KEY). "
-                "We do not invent pick'em lines or substitute sportsbook odds."
+                f"{label} lines for {code} aren’t available right now. "
+                "Check back shortly — we only show live platform lines."
             ),
         }
 
@@ -650,28 +662,44 @@ def sync_pickem_platform_board(
         )
         until = propline_rate_limit.blocked_until()
         missing = [name for name, ok in keyed if not ok]
-        extra_hint = (
-            f" Add {', '.join(missing)} so boards can fall through when PropLine is exhausted."
-            if limited and missing
-            else ""
+        # Ops-only detail (logs / refreshError). Never put vendor limits in `note`.
+        ops_detail = (
+            f"provider refresh blocked until "
+            f"{until.strftime('%Y-%m-%d %H:%M UTC') if until else 'reset'}; "
+            f"missing fallbacks: {', '.join(missing) if missing else 'none'}"
         )
-        reset_hint = (
-            f" PropLine daily free-tier limit hit — new lines (including tomorrow's PrizePicks slate) "
-            f"resume after {until.strftime('%b %d %H:%M UTC') if until else 'the next UTC day'}."
+        member_note = (
+            f"Showing the latest saved {label} lines while tonight’s feed refreshes. "
+            "Projections are Seraphim estimates vs those lines."
             if limited
-            else ""
+            else f"Showing the latest saved {label} lines. Projections are Seraphim estimates vs those lines."
+        )
+        member_empty = (
+            f"{label} lines for {code} aren’t loaded yet. "
+            "Check back shortly — we only show players currently listed on the app."
         )
         if stale is not None:
-            stale["note"] = (
-                f"Showing last live {label} lines from warehouse.{reset_hint}{extra_hint} "
-                "Projections are Seraphim estimates vs those lines."
-            )
+            stale["note"] = member_note
             stale["cached"] = True
-            stale["refreshError"] = msg
+            stale["refreshError"] = f"{msg}; {ops_detail}"
             stale["rateLimited"] = limited
             if attempts is not None:
                 stale["pickemAttempts"] = attempts
             return stale
+        # Prefer the Cursor-exported PrizePicks snapshot over a blank board.
+        from app.ingestion.cursor_board_seed import (
+            load_cursor_board_seed,
+            materialize_cursor_seed_to_warehouse,
+        )
+
+        seed = materialize_cursor_seed_to_warehouse(db, league=code, platform=app) or load_cursor_board_seed(
+            code, app
+        )
+        if seed is not None:
+            seed["refreshError"] = f"{msg}; {ops_detail}"
+            if attempts is not None:
+                seed["pickemAttempts"] = attempts
+            return seed
         return {
             "ok": False,
             "league": code,
@@ -683,14 +711,12 @@ def sync_pickem_platform_board(
             "updatedAt": None,
             "propsUpdatedAt": None,
             "dataSource": f"pickem:{app}",
-            "error": msg,
+            "error": None,
+            "refreshError": f"{msg}; {ops_detail}",
             "rateLimited": limited,
             "requiresAdditionalKeys": missing or None,
             "pickemAttempts": attempts,
-            "note": (
-                f"No cached {label} lines for {code}.{reset_hint}{extra_hint} "
-                "We only show players currently listed on the app — never invented lines."
-            ).strip(),
+            "note": member_empty,
         }
 
     aggregator = get_pickem_aggregator()
@@ -810,13 +836,17 @@ def sync_pickem_platform_board(
                 edge = float(prediction.edge_vs_line) if prediction.edge_vs_line is not None else round(
                     projected - platform_line, 2
                 )
-                edge_pct = (
-                    round((edge / platform_line) * 100, 2) if abs(platform_line) > 1e-9 else None
+                over_p = float(prediction.over_probability)
+                under_p = float(prediction.under_probability)
+                edge_pct = model_edge_percent(
+                    projected=projected,
+                    line=platform_line,
+                    over_probability=over_p,
+                    under_probability=under_p,
+                    side=side,
                 )
                 confidence = int(prediction.confidence_score)
                 research = int(prediction.research_score)
-                over_p = float(prediction.over_probability)
-                under_p = float(prediction.under_probability)
                 explain = list(prediction.explanation)
                 influential = list(prediction.influential_factors or [])
                 model_version = prediction.model_version
@@ -1219,6 +1249,9 @@ def _finalize_platform_board(
             "All cached tips look finished — waiting on PropLine for the next PrizePicks slate."
         )
         note = f"{note} {suffix}".strip() if note else suffix
+    from app.ingestion.platform_board import filter_live_betting_site_props
+
+    filtered = filter_live_betting_site_props(filtered)
     return {
         "ok": True,
         "league": code,
@@ -1232,6 +1265,7 @@ def _finalize_platform_board(
         "propsUpdatedAt": updated,
         "dataSource": f"pickem:{platform}",
         "live": True,
+        "fallback": False,
         "note": note,
         **extra,
     }
@@ -1302,12 +1336,16 @@ def _apply_prediction_to_analytics(
         if prediction.edge_vs_line is not None
         else round(projected - platform_line, 2)
     )
-    edge_pct = (
-        round((edge / platform_line) * 100, 2) if abs(platform_line) > 1e-9 else None
-    )
     over_p = float(prediction.over_probability)
     under_p = float(prediction.under_probability)
     lean_side = "Over" if projected >= platform_line else "Under"
+    edge_pct = model_edge_percent(
+        projected=projected,
+        line=platform_line,
+        over_probability=over_p,
+        under_probability=under_p,
+        side=lean_side,
+    )
     ev = expected_value(
         over_p if lean_side == "Over" else under_p,
         over_odds if lean_side == "Over" else under_odds,
@@ -1517,11 +1555,18 @@ def _list_cached_platform_board(
         line = float(over.line)
         projected = analytics.projected_value
         edge = analytics.edge_vs_line
-        edge_pct = (
-            round((float(edge) / line) * 100, 2)
-            if edge is not None and abs(line) > 1e-9
-            else None
-        )
+        over_p = float(analytics.over_probability or 0.5)
+        under_p = float(analytics.under_probability or (1.0 - over_p))
+        if projected is not None:
+            edge_pct = model_edge_percent(
+                projected=float(projected),
+                line=line,
+                over_probability=over_p,
+                under_probability=under_p,
+                side=prop.side,
+            )
+        else:
+            edge_pct = None
         team, opponent = _team_opponent_from_matchup_note(analytics.matchup_note)
         board.append(
             {

@@ -33,6 +33,14 @@ export const CANONICAL_LINE_PROVIDERS: LineProviderSpec[] = [
     notes: "Live when PropLine / Underdog quotes arrive — otherwise unavailable.",
   },
   {
+    slug: "sleeper",
+    name: "Sleeper",
+    kind: "pickem",
+    mark: "SL",
+    accent: "#22c55e",
+    notes: "Live when PropLine / SharpAPI returns Sleeper — otherwise unavailable.",
+  },
+  {
     slug: "fanduel",
     name: "FanDuel",
     kind: "sportsbook",
