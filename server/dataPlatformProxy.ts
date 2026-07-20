@@ -60,7 +60,8 @@ export function registerDataPlatformProxy(
   });
 
   app.get("/api/command-center", async (req, res) => {
-    await proxyGet(`/api/v1/nba/command-center`, res, () => handlers.commandCenter(req, res));
+    // Command Center aggregates multi-sport pick'em — allow cold-start headroom.
+    await proxyGet(`/api/v1/nba/command-center`, res, () => handlers.commandCenter(req, res), 90_000);
   });
 
   // NFL — data platform only (no Node ESPN fallback yet)

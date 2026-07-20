@@ -628,7 +628,15 @@ def _hit_likelihood(prop: dict[str, Any]) -> tuple[float, float, float]:
 
 
 def _collect_today_board_props(db: Session) -> tuple[list[dict[str, Any]], Any]:
-    """Gather open warehouse props whose tip date is today (US/Eastern or UTC)."""
+    """Gather open live pick'em props for tonight's research desk.
+
+    Prefers betting-site rows (``:pickem:`` / platform-live). Includes tips for
+    today and tomorrow in US/Eastern so late-night tips still count as the
+    current slate.
+    """
+    from app.db.models import Player, Prop, PropAnalytics
+    from app.ingestion.platform_board import is_live_betting_site_prop
+
     try:
         from zoneinfo import ZoneInfo
 
@@ -636,43 +644,118 @@ def _collect_today_board_props(db: Session) -> tuple[list[dict[str, Any]], Any]:
     except Exception:
         today_et = datetime.now(timezone.utc).date()
     today_utc = datetime.now(timezone.utc).date()
+    from datetime import timedelta
+
+    slate_dates = {today_et, today_et + timedelta(days=1), today_utc, today_utc + timedelta(days=1)}
 
     boards: list[dict[str, Any]] = []
+
+    # Fast path: open pick'em props already in Postgres (PrizePicks / Underdog / …).
     try:
-        from app.ingestion.nba_board import list_nba_props_from_warehouse
+        rows = (
+            db.execute(
+                select(Prop, PropAnalytics, Player)
+                .join(PropAnalytics, PropAnalytics.prop_id == Prop.id)
+                .outerjoin(Player, Player.id == Prop.player_id)
+                .where(Prop.status == "open", Prop.id.like("%:pickem:%"))
+                .order_by(PropAnalytics.research_score.desc())
+                .limit(800)
+            )
+            .all()
+        )
+        for prop, analytics, player in rows:
+            tip = None
+            if prop.game_id:
+                game = db.get(Game, prop.game_id)
+                if game and game.tipoff_at:
+                    tip = game.tipoff_at.isoformat()
+            if tip is None and getattr(analytics, "computed_at", None):
+                tip = analytics.computed_at.isoformat()
+            boards.append(
+                {
+                    "id": prop.id,
+                    "playerId": (player.external_id if player else None) or "",
+                    "playerWarehouseId": player.id if player else prop.player_id,
+                    "player": player.full_name if player else "Player",
+                    "team": "",
+                    "opponent": "TBD",
+                    "position": (player.position if player else None) or "",
+                    "market": prop.market,
+                    "side": prop.side,
+                    "line": prop.line,
+                    "americanOdds": -110,
+                    "noVigProb": analytics.no_vig_prob
+                    or (
+                        analytics.over_probability
+                        if prop.side == "Over"
+                        else analytics.under_probability
+                    )
+                    or 0.5,
+                    "overProbability": analytics.over_probability,
+                    "underProbability": analytics.under_probability,
+                    "evPercent": analytics.ev_percent or 0,
+                    "confidence": analytics.confidence_score or 50,
+                    "researchScore": analytics.research_score or 50,
+                    "dqs": analytics.data_quality_score or 50,
+                    "l5": f"{analytics.l5_hits or 0}/{analytics.l5_samples or 0}",
+                    "l10": f"{analytics.l10_hits or 0}/{analytics.l10_samples or 0}",
+                    "l20": f"{analytics.l20_hits or 0}/{analytics.l20_samples or 0}",
+                    "season": f"{analytics.season_hits or 0}/{analytics.season_samples or 0}",
+                    "tipTime": tip,
+                    "league": prop.league,
+                    "projectedValue": analytics.projected_value,
+                    "edgeVsLine": analytics.edge_vs_line,
+                    "oddsAreMock": bool(analytics.odds_are_mock),
+                    "oddsRole": "platform-live",
+                    "platform": "prizepicks"
+                    if ":pickem:prizepicks:" in (prop.id or "")
+                    else "underdog"
+                    if ":pickem:underdog:" in (prop.id or "")
+                    else "sleeper"
+                    if ":pickem:sleeper:" in (prop.id or "")
+                    else "pickem",
+                    "explanation": analytics.explain_bullets or [],
+                    "matchupNote": analytics.matchup_note,
+                    "headshot": player.headshot_url if player else None,
+                }
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("command-center pickem collect failed: %s", exc)
 
-        for p in list_nba_props_from_warehouse(db) or []:
-            boards.append({**p, "league": p.get("league") or "NBA"})
-    except Exception:
-        pass
-    try:
-        from app.ingestion.wnba_board import list_wnba_props_from_warehouse
+    # Fallback: warehouse list helpers (still filter to live betting-site rows).
+    if len(boards) < 8:
+        try:
+            from app.ingestion.nba_board import list_nba_props_from_warehouse
+            from app.ingestion.wnba_board import list_wnba_props_from_warehouse
+            from app.ingestion.nfl_board import list_nfl_props_from_warehouse
+            from app.ingestion.generic_board import list_league_props
 
-        for p in list_wnba_props_from_warehouse(db) or []:
-            boards.append({**p, "league": p.get("league") or "WNBA"})
-    except Exception:
-        pass
-    try:
-        from app.ingestion.nfl_board import list_nfl_props_from_warehouse
+            for p in list_nba_props_from_warehouse(db) or []:
+                boards.append({**p, "league": p.get("league") or "NBA"})
+            for p in list_wnba_props_from_warehouse(db) or []:
+                boards.append({**p, "league": p.get("league") or "WNBA"})
+            for p in list_nfl_props_from_warehouse(db) or []:
+                boards.append({**p, "league": p.get("league") or "NFL"})
+            for league in ("MLB", "NHL", "Soccer", "ATP", "WTA"):
+                for p in list_league_props(db, league) or []:
+                    boards.append({**p, "league": p.get("league") or league})
+        except Exception as exc:  # noqa: BLE001
+            log.warning("command-center warehouse fallback failed: %s", exc)
 
-        for p in list_nfl_props_from_warehouse(db) or []:
-            boards.append({**p, "league": p.get("league") or "NFL"})
-    except Exception:
-        pass
-    try:
-        from app.ingestion.generic_board import list_league_props
+    live = [p for p in boards if is_live_betting_site_prop(p)]
 
-        for league in ("MLB", "NHL", "Soccer"):
-            for p in list_league_props(db, league) or []:
-                boards.append({**p, "league": p.get("league") or league})
-    except Exception:
-        pass
+    def on_slate(p: dict[str, Any]) -> bool:
+        tip_et = _tip_date(p)
+        tip_utc = _tip_date_utc(p)
+        if tip_et is None and tip_utc is None:
+            # Pick'em rows without tip still count when they are open live lines.
+            return True
+        return (tip_et in slate_dates) or (tip_utc in slate_dates)
 
-    def is_today(p: dict[str, Any]) -> bool:
-        return _tip_date(p) == today_et or _tip_date_utc(p) == today_utc
+    todays = [p for p in live if on_slate(p)]
+    if not todays:
+        todays = live  # show live books even if tip metadata is missing
 
-    todays = [p for p in boards if is_today(p)]
-    # Dedupe by id, prefer higher hit likelihood
     by_id: dict[str, dict[str, Any]] = {}
     for p in todays:
         pid = str(p.get("id") or "")
@@ -689,21 +772,34 @@ def _collect_today_board_props(db: Session) -> tuple[list[dict[str, Any]], Any]:
     return ranked, today_et
 
 
+_CC_CACHE: dict[str, Any] = {"at": 0.0, "payload": None}
+_CC_CACHE_TTL_SEC = 90.0
+
+
 def build_command_center(db: Session) -> dict[str, Any]:
-    featured = build_and_store_featured_prop(db)
-    schedule = get_nba_providers().schedule.fetch_schedule("NBA") if get_nba_providers().schedule else []
+    """Research desk payload — live pick'em lines first, no blocking ESPN sync."""
+    import time
+
+    now = time.time()
+    cached = _CC_CACHE.get("payload")
+    if cached is not None and (now - float(_CC_CACHE.get("at") or 0)) < _CC_CACHE_TTL_SEC:
+        return {**cached, "cached": True}
+
+    # Do NOT call build_and_store_featured_prop here — it hits ESPN every request
+    # and routinely pushes free-tier Render past the Node proxy timeout.
+    featured: dict[str, Any] = {"ok": False, "injuries": []}
+    schedule = []
+    try:
+        providers = get_nba_providers()
+        if providers.schedule:
+            schedule = providers.schedule.fetch_schedule("NBA") or []
+    except Exception as exc:  # noqa: BLE001
+        log.warning("command-center schedule fetch failed: %s", exc)
+        schedule = []
+
     today_props, board_date = _collect_today_board_props(db)
     if not isinstance(board_date, str):
         board_date = board_date.isoformat() if board_date else datetime.now(timezone.utc).date().isoformat()
-
-    # Prefer live ESPN schedule date when it matches today; else keep Eastern "today".
-    if schedule:
-        try:
-            sched_day = schedule[0].tipoff_at.date().isoformat()
-            if sched_day == board_date:
-                pass
-        except Exception:
-            pass
 
     games_soon = [
         {
@@ -718,26 +814,13 @@ def build_command_center(db: Session) -> dict[str, Any]:
 
     featured_prop = featured.get("prop") if featured.get("ok") else None
 
-    # Prop of the Day + top 6 most likely to hit — must be from today's slate.
     prop: dict[str, Any] | None = None
     top_props: list[dict[str, Any]] = []
     if today_props:
         prop = today_props[0]
-        # Prefer featured why writeup when same player/market
-        if featured_prop and str(featured_prop.get("player")) == str(prop.get("player")):
-            if featured_prop.get("why") and not prop.get("why"):
-                prop = {**prop, "why": featured_prop["why"]}
         top_props = today_props[1:7] if len(today_props) > 1 else today_props[:6]
         if prop and top_props and top_props[0].get("id") == prop.get("id"):
             top_props = today_props[1:7]
-    elif featured_prop and _tip_date(featured_prop) == datetime.fromisoformat(board_date).date():
-        prop = featured_prop
-        top_props = [featured_prop][:6]
-    elif featured_prop:
-        # Featured ESPN prop is not from today — keep schedule context but don't
-        # advertise a stale Prop of the Day.
-        prop = None
-        top_props = []
 
     best_ev = (
         max(today_props, key=lambda p: float(p.get("evPercent") or 0)) if today_props else prop
@@ -746,9 +829,7 @@ def build_command_center(db: Session) -> dict[str, Any]:
         max(today_props, key=lambda p: float(p.get("confidence") or 0)) if today_props else prop
     )
 
-    # OddsIQ-style no-vig board: strongest juice-free lean edges on today's slate.
     best_no_vig = _rank_novig_picks(today_props, limit=8)
-    # +EV board: projection vs market lines (threshold from plus_ev engine)
     best_plus_ev = _rank_plus_ev_picks(today_props, limit=8)
     generated_at = datetime.now(timezone.utc).isoformat()
     notifications: list[dict[str, Any]] = []
@@ -792,25 +873,17 @@ def build_command_center(db: Session) -> dict[str, Any]:
                 "createdAt": generated_at,
             }
         )
-    for inj in (featured.get("injuries") or [])[:4]:
-        notifications.append(
-            {
-                "id": f"injury:{inj.get('player') or inj.get('player_name') or len(notifications)}",
-                "kind": "injury",
-                "tone": "injury",
-                "title": f"Injury · {inj.get('player') or inj.get('player_name') or 'Player'}",
-                "detail": (
-                    f"{inj.get('team') or ''} {inj.get('status') or ''} "
-                    f"{inj.get('detail') or ''}"
-                ).strip()
-                or "Injury update",
-                "propId": None,
-                "league": "NBA",
-                "createdAt": generated_at,
-            }
-        )
 
-    return {
+    live_books = sorted(
+        {
+            str(p.get("platformName") or p.get("platform") or "")
+            for p in today_props
+            if p.get("platform") or p.get("platformName")
+        }
+    )
+    live_books = [b for b in live_books if b]
+
+    payload = {
         "ok": True,
         "generatedAt": generated_at,
         "disclaimer": get_settings().model_disclaimer,
@@ -826,6 +899,8 @@ def build_command_center(db: Session) -> dict[str, Any]:
                 }
                 for g in schedule
             ],
+            "livePropCount": len(today_props),
+            "books": live_books,
         },
         "propOfTheDay": prop,
         "topProps": top_props,
@@ -840,11 +915,16 @@ def build_command_center(db: Session) -> dict[str, Any]:
         "featured": featured,
         "providers": {
             "schedule": "espn-nba",
-            "odds": "mock" if (prop or {}).get("oddsAreMock", True) else "line-aggregator",
-            "slate": "warehouse-today",
+            "odds": "pickem-live",
+            "slate": "pickem-platform-live",
             "novigRefreshSeconds": 300,
+            "books": live_books,
         },
+        "cached": False,
     }
+    _CC_CACHE["at"] = now
+    _CC_CACHE["payload"] = payload
+    return payload
 
 
 def _novig_lean_prob(prop: dict[str, Any]) -> float:
