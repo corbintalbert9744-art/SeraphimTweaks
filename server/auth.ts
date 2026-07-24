@@ -44,6 +44,11 @@ export function configureSession(app: Express) {
   }
   const resolvedSecret = secret || "seraphim-iq-dev-session-secret";
   const isProd = isProduction();
+  // Only mark cookies Secure when the public app URL is HTTPS (IP/HTTP VPS needs false).
+  const appUrl = (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || "").trim();
+  const secureCookie =
+    process.env.COOKIE_SECURE === "true" ||
+    (process.env.COOKIE_SECURE !== "false" && isProd && appUrl.startsWith("https://"));
 
   app.set("trust proxy", 1);
   app.use(
@@ -56,7 +61,7 @@ export function configureSession(app: Express) {
       cookie: {
         httpOnly: true,
         sameSite: "lax",
-        secure: isProd,
+        secure: secureCookie,
         maxAge: 30 * 24 * 60 * 60 * 1000,
       },
     }),

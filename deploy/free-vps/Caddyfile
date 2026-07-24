@@ -1,0 +1,14 @@
+# Free HTTPS via Let's Encrypt once DNS A records point here.
+# Until DNS is ready you can still hit http://<VPS_IP> (IQ) and
+# http://<VPS_IP>:8080 if you temporarily map tweaks — with domains
+# both sites share 80/443 on their own hostnames.
+
+{$IQ_HOST:seraphimiq.com} {
+	encode gzip
+	reverse_proxy iq:5000
+}
+
+{$TWEAKS_HOST:seraphimtweaks.com} {
+	encode gzip
+	reverse_proxy tweaks:5001
+}

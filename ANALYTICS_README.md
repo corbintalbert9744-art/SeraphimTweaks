@@ -82,5 +82,5 @@ See `data-platform/README.md`.
 - **Tweaks (production):** `SeraphimTweaks` `main` → `seraphimtweaks.com` on its **own** Render account
 - **IQ / Analytics:** this app → `seraphimiq.com` on a **different** Render account (needs `seraphim-iq` + `seraphim-iq-data` + Postgres)
 
-See **`docs/RENDER_TWO_ACCOUNTS.md`** for the exact two-account Blueprint steps.
-Do not deploy this IQ build to the Tweaks domain or the Tweaks Render account.
+See **`docs/HOSTING_FREE.md`** for the recommended free forever host (Oracle Always Free + Docker).
+Render is optional legacy — prefer the VPS path. Do not put IQ and Tweaks on one free PaaS quota.

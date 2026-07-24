@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
+# Vite client builds to dist/public (see vite.config.ts outDir)
 COPY --from=node-build /app/dist ./dist
-COPY --from=node-build /app/client/dist ./client/dist
 COPY server ./server
 COPY shared ./shared
 COPY scripts ./scripts
