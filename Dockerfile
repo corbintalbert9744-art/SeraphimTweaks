@@ -11,7 +11,7 @@ WORKDIR /app
 ENV NODE_ENV=production PORT=5001
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
+# Vite client lands in dist/public (not client/dist)
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/client/dist ./client/dist
 EXPOSE 5001
 CMD ["node", "dist/index.cjs"]
