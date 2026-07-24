@@ -79,5 +79,8 @@ See `data-platform/README.md`.
 
 ## Product separation
 
-- **Tweaks (production):** `SeraphimTweaks` `main` — leave alone
-- **Analytics:** this branch / sports research app
+- **Tweaks (production):** `SeraphimTweaks` `main` → `seraphimtweaks.com` on its **own** Render account
+- **IQ / Analytics:** this app → `seraphimiq.com` on a **different** Render account (needs `seraphim-iq` + `seraphim-iq-data` + Postgres)
+
+See **`docs/RENDER_TWO_ACCOUNTS.md`** for the exact two-account Blueprint steps.
+Do not deploy this IQ build to the Tweaks domain or the Tweaks Render account.
