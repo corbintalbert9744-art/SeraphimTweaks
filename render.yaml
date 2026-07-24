@@ -1,18 +1,44 @@
+# =============================================================================
+# Seraphim Tweaks — Render Blueprint (Account B only)
+# =============================================================================
+# Gaming tweaks commerce site → seraphimtweaks.com
+#
+# Use a DIFFERENT Render account than Seraphim IQ so free-tier hours / the one
+# free Postgres do not compete with the IQ data platform.
+#
+# Deploy:
+#   1. Log into the Tweaks Render account (not the IQ account)
+#   2. Dashboard → New → Blueprint
+#   3. Connect repo SeraphimTweaks
+#   4. Branch: main (or cursor/tweaks-render-account-754e until merged)
+#   5. Blueprint path: render.yaml
+#   6. After deploy: Custom Domain → seraphimtweaks.com
+#
+# Do NOT deploy Seraphim IQ (data-platform / analytics) on this account.
+# =============================================================================
+
+databases:
+  - name: seraphim-tweaks-db
+    plan: free
+    postgresMajorVersion: "16"
+    ipAllowList: []
+
 services:
   - type: web
-    name: seraphim-iq
-    env: node
+    name: seraphim-tweaks
+    runtime: node
     plan: free
+    region: oregon
+    autoDeployTrigger: commit
     buildCommand: npm install --include=dev && npm run build
     startCommand: npm run db:push && npm run start
+    healthCheckPath: /
     envVars:
+      - key: NODE_VERSION
+        value: "20.18.0"
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
         fromDatabase:
-          name: seraphim-iq-db
+          name: seraphim-tweaks-db
           property: connectionString
-
-databases:
-  - name: seraphim-iq-db
-    plan: free
