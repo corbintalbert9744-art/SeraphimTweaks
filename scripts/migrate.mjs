@@ -19,7 +19,7 @@ const files = readdirSync(dir)
 
 const pool = new pg.Pool({
   connectionString: url.replace(/^postgres:\/\//, "postgresql://"),
-  ssl: url.includes("localhost") || url.includes("127.0.0.1") ? false : { rejectUnauthorized: false },
+  ssl: (url.includes("localhost") || url.includes("127.0.0.1") || url.includes("postgres") || url.includes("sslmode=disable") || process.env.PGSSLMODE === "disable") ? false : { rejectUnauthorized: false },
 });
 
 const client = await pool.connect();

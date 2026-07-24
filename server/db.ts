@@ -18,7 +18,11 @@ export function getDb() {
   if (!dbInstance) {
     const connectionString = process.env.DATABASE_URL!.replace(/^postgres:\/\//, "postgresql://");
     const local =
-      connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
+      connectionString.includes("localhost") ||
+      connectionString.includes("127.0.0.1") ||
+      connectionString.includes("@postgres:") ||
+      connectionString.includes("sslmode=disable") ||
+      process.env.PGSSLMODE === "disable";
     pool = new Pool({
       connectionString,
       // Render / managed Postgres require TLS; local Docker usually does not.
