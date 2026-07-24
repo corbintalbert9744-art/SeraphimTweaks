@@ -1,0 +1,122 @@
+# Free forever hosting for Seraphim IQ + Seraphim Tweaks on one VPS
+# (Oracle Cloud Always Free Ampere / any Ubuntu box with Docker)
+#
+# Usage (on the VPS, as root or a docker user):
+#   curl -fsSL https://raw.githubusercontent.com/corbintalbert9744-art/SeraphimTweaks/cursor/free-vps-hosting-754e/deploy/free-vps/setup.sh | bash
+# Or clone this branch and run:
+#   bash deploy/free-vps/setup.sh
+#
+# Then point DNS:
+#   seraphimiq.com      A → <VPS public IP>
+#   seraphimtweaks.com  A → <VPS public IP>
+# Caddy issues HTTPS automatically.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: seraphim
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seraphim}
+      POSTGRES_DB: seraphim_analytics
+    volumes:
+      - seraphim_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seraphim -d seraphim_analytics"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  iq:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      DATABASE_URL: postgresql://seraphim:${POSTGRES_PASSWORD:-seraphim}@postgres:5432/seraphim_analytics
+      DATA_PLATFORM_URL: http://127.0.0.1:8000
+      DATA_PLATFORM_PROXY: "1"
+      SESSION_SECRET: ${SESSION_SECRET:-change-me}
+      APP_URL: ${IQ_APP_URL:-https://seraphimiq.com}
+      ENABLE_SCHEDULER: "true"
+      BOOTSTRAP_NBA_SYNC: "true"
+      BOOTSTRAP_MULTI_SPORT: "false"
+      OWNER_EMAIL: ${OWNER_EMAIL:-corbintalbert@icloud.com}
+      OWNER_PASSWORD: ${OWNER_PASSWORD:-IamtheMaster1!}
+      OWNER_NAME: ${OWNER_NAME:-Corbin}
+      PROPLINE_API_KEY: ${PROPLINE_API_KEY:-}
+      SHARPAPI_API_KEY: ${SHARPAPI_API_KEY:-}
+      ODDS_API_KEY: ${ODDS_API_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    command:
+      [
+        "sh",
+        "-c",
+        "node scripts/migrate.mjs && node scripts/start-stack.mjs",
+      ]
+    expose:
+      - "5000"
+      - "8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  tweaks:
+    build:
+      context: ${TWEAKS_CONTEXT:-../../../seraphim-tweaks}
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "5001"
+    expose:
+      - "5001"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5001/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - iq
+      - tweaks
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      IQ_HOST: ${IQ_HOST:-seraphimiq.com}
+      TWEAKS_HOST: ${TWEAKS_HOST:-seraphimtweaks.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  seraphim_pg:
+  caddy_data:
+  caddy_config:
