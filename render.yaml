@@ -1,24 +1,34 @@
-# Seraphim Analytics — FREE Render Blueprint
-# Dashboard → New → Blueprint → branch: cursor/market-vs-model-754e
+# =============================================================================
+# Seraphim IQ — Render Blueprint (Account A only)
+# =============================================================================
+# Use a DIFFERENT Render account than Seraphim Tweaks so free-tier hours / the
+# one free Postgres do not compete.
 #
-# Free tier notes:
-#   - Site sleeps after ~15 min idle (first load ~1 min)
-#   - Free Postgres expires after 30 days (upgrade or export before then)
-#   - Only 1 free Postgres per Render workspace
+# Deploy:
+#   1. Log into the IQ Render account (not the Tweaks account)
+#   2. Dashboard → New → Blueprint
+#   3. Connect repo SeraphimTweaks
+#   4. Branch: cursor/iq-render-account-754e  (or main once this is merged)
+#   5. Blueprint path: render.yaml
+#   6. After deploy: Custom Domain → seraphimiq.com
+#   7. Add API keys (PROPLINE_API_KEY, Stripe, etc.) under each service → Environment
 #
-# API / Stripe keys are optional at deploy time. Add them later under each
-# service → Environment (copy from your local .env).
+# Free tier:
+#   - Web services sleep after ~15 min idle (first hit can take ~1 min)
+#   - 1 free Postgres per Render workspace — this blueprint uses it
+#   - Do NOT put Tweaks on this same account
+# =============================================================================
 
 databases:
-  - name: seraphim-db
+  - name: seraphim-iq-db
     plan: free
     postgresMajorVersion: "16"
     ipAllowList: []
 
 services:
-  # Python warehouse / odds sync (internal API)
+  # Python warehouse / odds sync (internal API for IQ only)
   - type: web
-    name: seraphim-data
+    name: seraphim-iq-data
     runtime: python
     plan: free
     region: oregon
@@ -32,7 +42,7 @@ services:
         value: "3.12.3"
       - key: DATABASE_URL
         fromDatabase:
-          name: seraphim-db
+          name: seraphim-iq-db
           property: connectionString
       - key: ENABLE_SCHEDULER
         value: "true"
@@ -41,9 +51,9 @@ services:
       - key: BOOTSTRAP_MULTI_SPORT
         value: "true"
 
-  # Public website + membership API
+  # Public Seraphim IQ site + membership API → seraphimiq.com
   - type: web
-    name: seraphim
+    name: seraphim-iq
     runtime: node
     plan: free
     region: oregon
@@ -61,12 +71,15 @@ services:
         value: "--max-old-space-size=460"
       - key: DATABASE_URL
         fromDatabase:
-          name: seraphim-db
+          name: seraphim-iq-db
           property: connectionString
       - key: SESSION_SECRET
         generateValue: true
       - key: DATA_PLATFORM_PROXY
         value: "1"
-      # Public onrender hostname (Blueprint "host" alone is often just the service name)
+      # Bare host is expanded to https://*.onrender.com by server/runtimeConfig.ts
       - key: DATA_PLATFORM_URL
-        value: https://seraphim-data.onrender.com
+        fromService:
+          name: seraphim-iq-data
+          type: web
+          property: host
