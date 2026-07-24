@@ -97,10 +97,25 @@
   --input: 240 3.7% 15.9%;
   --ring: 240 4.9% 83.9%;
 
-  --font-sans: 'Inter', sans-serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, sans-serif;
   --font-serif: Georgia, serif;
-  --font-mono: Menlo, monospace;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --radius: .5rem; /* 8px */
+
+  /* Seraphim research desk tokens */
+  --seraphim-bg: #0a0a0a;
+  --seraphim-surface: #0d0d0d;
+  --seraphim-surface-2: #111111;
+  --seraphim-border: #1a1a1a;
+  --seraphim-gold: #eab308;
+  --seraphim-gold-soft: rgba(234, 179, 8, 0.12);
+  --seraphim-hit: #34d399;
+  --seraphim-miss: #f87171;
+  --chart-1: 45 93% 47%;
+  --chart-2: 160 84% 39%;
+  --chart-3: 0 72% 51%;
+  --chart-4: 215 20% 65%;
+  --chart-5: 280 40% 55%;
   --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00); /*replace with H S L */
   --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00); /*replace with H S L */
   --shadow-sm: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
@@ -455,3 +470,57 @@
 .btn-3d:active {
   transform: translateY(0);
 }
+
+/* Analytics app: quieter atmosphere than marketing landing */
+.analytics-shell {
+  background-color: #0a0a0a;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px, 48px 48px;
+  background-attachment: fixed;
+}
+
+/* Marketing site — same Inter type stack as the app */
+.marketing-site {
+  --mkt-bg: #0a0a0a;
+  --mkt-fg: #f5f5f5;
+  --mkt-gold: #eab308;
+  font-family: var(--font-sans);
+}
+
+@keyframes mkt-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-18px);
+  }
+}
+
+@keyframes mkt-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mkt-reveal {
+  animation: mkt-reveal 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.mkt-delay-1 {
+  animation-delay: 0.12s;
+}
+.mkt-delay-2 {
+  animation-delay: 0.24s;
+}
+.mkt-delay-3 {
+  animation-delay: 0.36s;
+}
+

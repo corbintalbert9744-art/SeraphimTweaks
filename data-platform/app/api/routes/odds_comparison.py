@@ -1,0 +1,130 @@
+"""Live Odds Comparison API — provider-adapter backed, Postgres-timestamped lines."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.ingestion.comparison_books import build_live_odds_comparison
+from app.ingestion.nba_board import get_nba_prop_detail, list_nba_props_from_warehouse
+from app.ingestion.generic_board import list_league_props
+from app.ingestion.wnba_board import get_wnba_prop_detail
+from app.providers.comparison_lines import canonical_provider_catalog
+
+router = APIRouter(prefix="/odds", tags=["odds-comparison"])
+
+_LEAGUE_PREFIX = {
+    "nba": "NBA",
+    "wnba": "WNBA",
+    "nfl": "NFL",
+    "mlb": "MLB",
+    "nhl": "NHL",
+    "soccer": "Soccer",
+    "atp": "ATP",
+    "wta": "WTA",
+}
+
+
+def _infer_league(prop_id: str, league: str | None) -> str | None:
+    if league:
+        raw = league.strip()
+        if raw.upper() == "SOCCER":
+            return "Soccer"
+        return raw.upper() if raw.upper() in {"NBA", "WNBA", "NFL", "MLB", "NHL", "ATP", "WTA"} else raw
+    prefix = prop_id.split(":")[0].lower() if ":" in prop_id else ""
+    return _LEAGUE_PREFIX.get(prefix)
+
+
+def _prop_base(db: Session, prop_id: str, league: str | None) -> tuple[dict, str]:
+    """Resolve a prop row + league for comparison."""
+    inferred = _infer_league(prop_id, league)
+    order = (
+        [inferred]
+        if inferred
+        else ["NBA", "WNBA", "NFL", "MLB", "NHL", "Soccer", "ATP", "WTA"]
+    )
+    # Prefer rich detail builders when available
+    for code in order:
+        if code == "NBA":
+            detail = get_nba_prop_detail(db, prop_id)
+            if detail:
+                return detail, "NBA"
+            board = {p["id"]: p for p in list_nba_props_from_warehouse(db)}
+            if prop_id in board:
+                return board[prop_id], "NBA"
+        elif code == "WNBA":
+            detail = get_wnba_prop_detail(db, prop_id)
+            if detail:
+                return detail, "WNBA"
+        props = list_league_props(db, code)
+        row = next((p for p in props if p["id"] == prop_id), None)
+        if row:
+            return row, code
+
+    if inferred:
+        # Fallback full scan if inferred league missed
+        for code in ("NBA", "WNBA", "NFL", "MLB", "NHL", "Soccer", "ATP", "WTA"):
+            if code == inferred:
+                continue
+            props = list_league_props(db, code)
+            row = next((p for p in props if p["id"] == prop_id), None)
+            if row:
+                return row, code
+
+    raise HTTPException(status_code=404, detail="Prop not found")
+
+
+@router.get("/providers")
+def odds_providers():
+    """Canonical sportsbook + pick'em catalog (frontend adapters map onto these slugs)."""
+    return {"ok": True, "providers": canonical_provider_catalog()}
+
+
+@router.get("/comparison/{prop_id:path}")
+def live_odds_comparison(
+    prop_id: str,
+    league: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Live Odds Comparison table for one player prop.
+
+    Returns every canonical operator with live lines when available,
+    best-line highlight, line-diff flags, and last update timestamps from Postgres.
+    """
+    base, resolved_league = _prop_base(db, prop_id, league)
+    # Detail builders already attach a full oddsComparison payload
+    existing = base.get("oddsComparison")
+    if isinstance(existing, dict) and existing.get("books"):
+        return {
+            "ok": True,
+            "propId": prop_id,
+            "league": resolved_league,
+            "player": base.get("player"),
+            "market": base.get("market"),
+            "side": base.get("recommendation") or base.get("side"),
+            "line": base.get("line"),
+            "projectedValue": base.get("projectedValue") or base.get("line"),
+            **existing,
+        }
+
+    projected = float(base.get("projectedValue") or base.get("line") or 0)
+    model_side = str(base.get("recommendation") or base.get("side") or "Over")
+    comparison = build_live_odds_comparison(
+        db,
+        league=resolved_league,
+        base=base,
+        projected=projected,
+        model_side=model_side,
+    )
+    return {
+        "ok": True,
+        "propId": prop_id,
+        "league": resolved_league,
+        "player": base.get("player"),
+        "market": base.get("market"),
+        "side": model_side,
+        "line": base.get("line"),
+        "projectedValue": projected,
+        **comparison,
+    }

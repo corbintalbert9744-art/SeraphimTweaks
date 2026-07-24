@@ -1,0 +1,15 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+sqlalchemy>=2.0.36
+alembic>=1.14.0
+httpx>=0.28.0
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+apscheduler>=3.10.4
+python-dotenv>=1.0.1
+psycopg2-binary>=2.9.10
+greenlet>=3.1.0
+
+# Optional legitimate data supplements (no API keys):
+# nba_api>=1.4.1          # NBA Stats via nba_api — ESPN remains primary without it
+# nfl_data_py>=0.3.1      # NFLVerse rosters/weekly — ESPN remains primary without it
