@@ -22,10 +22,17 @@ A gaming tweaks product website built with Express + Vite + React (TypeScript). 
 - `npm run start` - Production server
 - `npm run db:push` - Push Drizzle schema to database
 
-## Deployment
-- Target: Autoscale
-- Build: `npm run build`
-- Run: `npm run start`
+## Deployment (Render — Tweaks account only)
+
+Seraphim Tweaks and Seraphim IQ must use **different Render accounts** so free-tier
+usage does not collide. This `render.yaml` deploys **Tweaks only** (`seraphim-tweaks`).
+
+1. Log into the **Tweaks** Render account (not IQ).
+2. [Dashboard](https://dashboard.render.com) → **New** → **Blueprint**.
+3. Connect `SeraphimTweaks` → branch `main` → `render.yaml`.
+4. Custom Domain → `seraphimtweaks.com`.
+
+Do not deploy the IQ analytics / `data-platform` stack on this account.
 
 ## Recent Changes
 - 2026-02-11: Imported project from GitHub. Moved files from SeraphimTweaks-1/ subdirectory to workspace root. Configured workflow and deployment for Replit environment.
